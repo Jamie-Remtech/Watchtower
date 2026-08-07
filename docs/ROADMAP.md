@@ -71,8 +71,9 @@ The model of the physical situation: terrain + weather + fire behavior — and h
 
 Many things need watching; coordinators must be told what matters *now*.
 
-- [ ] Attention engine: rules over the live event stream (battery low, crew static too long, wind shift near crews, missed check-in, geofence breach) → prioritized attention queue
-- [ ] Attention inbox for coordinators: ranked, acknowledgeable, with one-tap actions
+- [x] Attention engine v1: sweeps every 5 min — device offline/maintenance/unplaced, NASA EONET hazards near the fleet (wildfires 150 km, others 300 km), USGS M4.5+ quakes within 300 km, Open-Meteo fire-weather at the fleet centroid, invitations expiring <48h; deduped via attention_items (0004), device conditions auto-resolve
+- [x] Attention inbox: bell with severity badge in the shell, slide-over panel ranked by severity, one-tap acknowledge, manual re-check; raises/acks recorded in the events log
+- [ ] Attention v2: field-crew rules (missed check-in, static too long, geofence breach) once positions flow; wind-shift-near-crews via World Engine
 - [ ] Escalation: unacknowledged critical items escalate (louder, wider, eventually voice call-out via pillar 3)
 - [ ] Pattern records: recurring situations get named and become protocol candidates
 

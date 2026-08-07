@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe
+  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell
 } from 'lucide-react';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
@@ -8,6 +8,8 @@ import { useAuth } from './auth/AuthContext';
 import { ROLE_LABELS } from './auth/roles';
 import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
+import { useAttention } from './hooks/useAttention';
+import { AttentionPanel } from './components/AttentionPanel';
 import { mockStreams } from './data/streams';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -31,6 +33,8 @@ const WatchtowerPortal = () => {
   const { profile, isDemo, signOut } = useAuth();
   const org = useOrg();
   const { devices } = useDevices();
+  const attention = useAttention();
+  const [attnOpen, setAttnOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('streams');
@@ -99,6 +103,17 @@ const WatchtowerPortal = () => {
           <Menu className="w-6 h-6 text-slate-300" />
         </button>
         <Logo />
+        <div className="flex items-center gap-1">
+        {!isDemo && (
+          <button onClick={() => setAttnOpen(true)} className="relative p-2 hover:bg-slate-800 rounded-lg">
+            <Bell className={`w-5 h-5 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-300'}`} />
+            {attention.openItems.length > 0 && (
+              <span className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center text-white ${attention.hasCritical ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
+                {attention.openItems.length}
+              </span>
+            )}
+          </button>
+        )}
         {/* Alert Status Indicator — Red: unattended | Orange: tended | Green: clear */}
         {activeAlerts > 0 ? (
           <button 
@@ -122,6 +137,7 @@ const WatchtowerPortal = () => {
             <span className="text-green-400 text-xs font-medium">OK</span>
           </div>
         )}
+        </div>
       </header>
 
       {sidebarOpen && <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />}
@@ -195,6 +211,16 @@ const WatchtowerPortal = () => {
             <p className="text-xs text-slate-500">{org.name}{org.region && ` — ${org.region}`}</p>
           </div>
           <div className="flex items-center gap-3">
+            {!isDemo && (
+              <button onClick={() => setAttnOpen(true)} className="relative p-1.5 hover:bg-slate-800 rounded-lg" title="Attention queue">
+                <Bell className={`w-4 h-4 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-400'}`} />
+                {attention.openItems.length > 0 && (
+                  <span className={`absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white ${attention.hasCritical ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
+                    {attention.openItems.length}
+                  </span>
+                )}
+              </button>
+            )}
             {/* Alert Status — Red: unattended | Orange: tended | Green: clear */}
             {activeAlerts > 0 ? (
               <button 
@@ -232,6 +258,16 @@ const WatchtowerPortal = () => {
       </main>
 
       <AIAssistant isOpen={aiOpen} onClose={() => setAiOpen(false)} />
+
+      <AttentionPanel
+        open={attnOpen}
+        onClose={() => setAttnOpen(false)}
+        items={attention.items}
+        sweeping={attention.sweeping}
+        lastSweep={attention.lastSweep}
+        onSweep={attention.sweep}
+        onAcknowledge={attention.acknowledge}
+      />
       
       {!aiOpen && (
         <button onClick={() => setAiOpen(true)} className="fixed bottom-4 right-4 w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-30">
