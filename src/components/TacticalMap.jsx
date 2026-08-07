@@ -29,13 +29,8 @@ const TacticalMap = ({
     'hybrid': 'hybrid'
   }[mapMode] || 'satellite';
 
-  const defaultDevices = [
-    { id: 'drone-1', name: 'Drone M3T', type: 'drone', position: { lat: 43.2141, lng: 2.3522 }, icon: '🚁', color: 'purple' },
-    { id: 'ptz-1', name: 'PTZ Tower Alpha', type: 'camera', position: { lat: 43.2180, lng: 2.3580 }, icon: '📹', color: 'blue' },
-    { id: 'weather-1', name: 'Weather Station', type: 'sensor', position: { lat: 43.2100, lng: 2.3500 }, icon: '📡', color: 'orange' }
-  ];
-
-  const activeDevices = devices.length > 0 ? devices : defaultDevices;
+  // Render exactly what we're given — no fake fallback devices.
+  const activeDevices = devices;
 
   const getMarkerColor = (type) => {
     switch(type) {

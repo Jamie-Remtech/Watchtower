@@ -1062,17 +1062,73 @@ export const TacticalMapTab = () => {
 
   // Live mode: the tactical picture comes from real devices and positions.
   if (isLive) {
+    const placed = devices.filter(d => d.lat != null && d.lng != null);
+    if (placed.length === 0) {
+      return (
+        <LiveEmptyState
+          icon={Map}
+          title="Tactical picture is empty"
+          description="No simulated markers here — the map lights up as devices with coordinates are registered (Settings → Register Device)."
+          facts={[
+            { label: 'Registered devices', value: devices.length },
+            { label: 'With coordinates', value: 0 },
+          ]}
+          hint="Connected to Supabase · live mode"
+        />
+      );
+    }
+
+    const KIND_ICON = { drone: '🚁', ptz_camera: '📹', camera: '📷', sensor: '📡', edge_box: '🖥️' };
+    const KIND_TYPE = { drone: 'drone', ptz_camera: 'camera', camera: 'camera', sensor: 'sensor', edge_box: 'sensor' };
+    const mapDevices = placed.map(d => ({
+      id: d.id,
+      name: d.name,
+      type: KIND_TYPE[d.kind] ?? 'sensor',
+      status: d.status,
+      position: { lat: d.lat, lng: d.lng },
+      icon: KIND_ICON[d.kind] ?? '📍',
+    }));
+    const center = {
+      lat: placed.reduce((a, d) => a + d.lat, 0) / placed.length,
+      lng: placed.reduce((a, d) => a + d.lng, 0) / placed.length,
+    };
+
     return (
-      <LiveEmptyState
-        icon={Map}
-        title="Tactical picture is empty"
-        description="No simulated markers here — the map lights up as devices are registered and field collaborators share positions."
-        facts={[
-          { label: 'Registered devices', value: devices.length },
-          { label: 'With coordinates', value: devices.filter(d => d.lat != null && d.lng != null).length },
-        ]}
-        hint="Connected to Supabase · live mode"
-      />
+      <div className="h-full flex flex-col gap-2 min-h-0">
+        <div className="flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Map className="w-4 h-4 text-orange-400" />
+            <h2 className="text-sm font-bold text-white">Tactical Map</h2>
+            <span className="text-xs text-slate-500">{placed.length} device{placed.length === 1 ? '' : 's'} placed</span>
+          </div>
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+            {['satellite', 'roadmap', 'terrain', 'hybrid'].map(m => (
+              <button
+                key={m}
+                onClick={() => setMapMode(m)}
+                className={`px-2 py-1 rounded text-xs capitalize ${mapMode === m ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-h-[400px] rounded-xl overflow-hidden border border-slate-800">
+          <TacticalMap
+            mapMode={mapMode}
+            devices={mapDevices}
+            center={center}
+            zoom={11}
+            geofences={[]}
+            alerts={[]}
+            markers={[]}
+          />
+        </div>
+        <p className="text-xs text-slate-600 flex items-center gap-1.5 flex-shrink-0">
+          <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
+          Connected to Supabase · live devices only
+        </p>
+      </div>
     );
   }
 

@@ -7,14 +7,12 @@ import { C } from '../data/collaboratorData';
 import { customerChannelData, orgData } from '../data/org';
 import { aiSoftwareCapabilities, capabilities, customAIModules, edgeBoxCapabilities } from '../data/settingsData';
 import { mockStreams } from '../data/streams';
-import { LiveEmptyState } from '../components/LiveEmptyState';
+import { DeviceManager } from '../components/DeviceManager';
 import { useDevices } from '../hooks/useDevices';
-import { useOrg } from '../hooks/useOrg';
 
 
 export const SettingsTab = () => {
-  const { isLive, devices } = useDevices();
-  const org = useOrg();
+  const { isLive, devices, createDevice, updateDevice, removeDevice } = useDevices();
   const [activeSection, setActiveSection] = useState('channels');
   const [channelTab, setChannelTab] = useState('overview');
   const [configureDevice, setConfigureDevice] = useState(null);
@@ -703,21 +701,14 @@ export const SettingsTab = () => {
     );
   };
   
-  // Live mode: settings reflect the real organization; device and channel
-  // management UI arrives with device registration.
+  // Live mode: real device & channel management against the devices table.
   if (isLive) {
     return (
-      <LiveEmptyState
-        icon={Settings}
-        title="Organization settings"
-        description="This is your real organization — no simulated devices or channel allocations. Device registration and channel management are the next build step."
-        facts={[
-          { label: 'Organization', value: org.name },
-          { label: 'Region', value: org.region || '—' },
-          { label: 'Plan tier', value: org.tier || '—' },
-          { label: 'Registered devices', value: devices.length },
-        ]}
-        hint="Connected to Supabase · live mode"
+      <DeviceManager
+        devices={devices}
+        createDevice={createDevice}
+        updateDevice={updateDevice}
+        removeDevice={removeDevice}
       />
     );
   }
