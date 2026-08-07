@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
-  Video, Users, CreditCard, Settings, AlertTriangle, Eye, Camera, CheckCircle, XCircle, X, UserPlus, FileText, MapPin, Download, Edit, Mail, Phone, Shield, Database, ChevronRight, Activity, Radio, Grid, List, User, Navigation, Layers, Map, Satellite, Info
+  Video, Users, CreditCard, Settings, AlertTriangle, Eye, Camera, CheckCircle, XCircle, X, UserPlus, FileText, MapPin, Download, Edit, Mail, Phone, Shield, Database, ChevronRight, Activity, Radio, Grid, List, User, Navigation, Layers, Map, Satellite, Info, Copy, Ticket, Loader2
 } from 'lucide-react';
 import { C } from '../data/collaboratorData';
+import { useTeam } from '../hooks/useTeam';
+import { ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../auth/roles';
 
 
 // ============================================
@@ -92,8 +94,8 @@ export const TeamTab = () => {
     },
   };
   
-  // Comprehensive team members data
-  const [teamMembers] = useState([
+  // Comprehensive team members data (demo mode)
+  const mockTeamMembers = [
     {
       id: 1,
       name: 'Jean-Pierre Dubois',
@@ -307,13 +309,19 @@ export const TeamTab = () => {
       ],
       shifts: { current: 'Off Duty', schedule: '-' },
     },
-  ]);
-  
-  // Role configurations
+  ];
+
+  // Live data from Supabase (falls back to demo roster when not configured)
+  const { isLive, liveMembers, invitations, loading: teamLoading, createInvitation, revokeInvitation } = useTeam();
+  const teamMembers = isLive ? liveMembers : mockTeamMembers;
+
+  // Role configurations (covers demo roles and the live role ladder)
   const roleConfigs = {
     admin: { label: 'Admin', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: Shield },
+    coordinator: { label: 'Coordinator', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: Activity },
     operator: { label: 'Operator', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: Radio },
     pilot: { label: 'Pilot', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: Navigation },
+    field: { label: 'Field', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: MapPin },
     viewer: { label: 'Viewer', color: 'bg-slate-500/20 text-slate-400 border-slate-500/30', icon: Eye },
   };
   
@@ -430,6 +438,45 @@ export const TeamTab = () => {
         </div>
       </div>
       
+      {/* PENDING INVITATIONS (live mode) */}
+      {isLive && invitations.length > 0 && (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Ticket className="w-4 h-4 text-orange-400" />
+            <h3 className="text-sm font-bold text-white">Pending Invitations</h3>
+            <span className="text-xs text-slate-500">{invitations.length}</span>
+          </div>
+          <div className="space-y-2">
+            {invitations.map(inv => (
+              <div key={inv.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 rounded-lg">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs font-mono text-orange-300">{inv.code}</code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(inv.code)}
+                      className="text-slate-500 hover:text-orange-400" title="Copy code"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    {ROLE_LABELS[inv.role] ?? inv.role}
+                    {inv.email && ` · restricted to ${inv.email}`}
+                    {' · expires '}{new Date(inv.expires_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => revokeInvitation(inv.id)}
+                  className="text-xs text-slate-400 hover:text-red-400 flex-shrink-0 ml-3"
+                >
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* LIST VIEW */}
       {viewMode === 'list' && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl divide-y divide-slate-800">
@@ -1312,6 +1359,112 @@ export const TeamTab = () => {
           </div>
         </div>
       )}
+
+      {/* INVITE MODAL */}
+      {showInviteModal && (
+        <InviteModal
+          isLive={isLive}
+          onClose={() => setShowInviteModal(false)}
+          onCreate={createInvitation}
+        />
+      )}
+    </div>
+  );
+};
+
+// Invitation creation modal — in live mode this writes a real invitation
+// to Supabase and shows the code to hand to the new collaborator.
+const InviteModal = ({ isLive, onClose, onCreate }) => {
+  const [role, setRole] = useState('field');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [created, setCreated] = useState(null);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const inv = await onCreate({ role, email: email.trim() });
+      setCreated(inv);
+    } catch (err) {
+      setError(err.message ?? 'Could not create invitation');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-orange-400" />Invite a collaborator
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
+        </div>
+
+        {!isLive ? (
+          <p className="text-xs text-slate-400">
+            Invitations need live mode. Configure Supabase in <code className="text-orange-300">.env</code> to invite real collaborators.
+          </p>
+        ) : created ? (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-300">Invitation created. Give this code to your collaborator — they sign up with <span className="text-orange-300 font-medium">Join with invite</span>:</p>
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800 border border-orange-500/30 rounded-lg">
+              <code className="text-base font-mono text-orange-300 flex-1">{created.code}</code>
+              <button
+                onClick={() => navigator.clipboard.writeText(created.code)}
+                className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-medium hover:bg-orange-500/30 flex items-center gap-1"
+              >
+                <Copy className="w-3 h-3" />Copy
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              Role: {ROLE_LABELS[created.role]}{created.email && ` · restricted to ${created.email}`} · expires {new Date(created.expires_at).toLocaleDateString()}
+            </p>
+            <button onClick={onClose} className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs">Done</button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1.5">Role</label>
+              <div className="space-y-1">
+                {ROLES.map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setRole(r)}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-xs ${
+                      role === r ? 'bg-orange-500/15 border-orange-500/40 text-orange-300' : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="font-medium">{ROLE_LABELS[r]}</span>
+                    <span className="block text-[10px] text-slate-500">{ROLE_DESCRIPTIONS[r]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1.5">Restrict to email (optional)</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="anyone with the code can join if empty"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
+              />
+            </div>
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <button
+              onClick={submit}
+              disabled={busy}
+              className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Create invitation
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
