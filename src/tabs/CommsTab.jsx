@@ -4,6 +4,8 @@ import {
 } from 'lucide-react';
 import { CollaboratorPreviewFrame } from '../components/Collaborator';
 import { C } from '../data/collaboratorData';
+import { LiveEmptyState } from '../components/LiveEmptyState';
+import { useTeam } from '../hooks/useTeam';
 
 
 // ============================================
@@ -11,6 +13,7 @@ import { C } from '../data/collaboratorData';
 // Full international comms, tracking, and emergency coordination
 // ============================================
 export const CommsTab = () => {
+  const { isLive, liveMembers } = useTeam();
   const [activePanel, setActivePanel] = useState('channels');
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [messageInput, setMessageInput] = useState('');
@@ -151,6 +154,22 @@ export const CommsTab = () => {
     { id: 'welfare', name: 'Welfare', icon: Shield },
     { id: 'evacuation', name: 'Evacuation', icon: Navigation },
   ];
+
+  // Live mode: comms activate as real collaborators join and go to the field.
+  if (isLive) {
+    return (
+      <LiveEmptyState
+        icon={Radio}
+        title="Comms are quiet"
+        description="No simulated radio traffic here. Channels, personnel tracking, and welfare checks activate as your team grows and goes into the field."
+        facts={[
+          { label: 'Team members', value: liveMembers.length },
+          { label: 'Field collaborators', value: liveMembers.filter(m => m.role === 'field').length },
+        ]}
+        hint="Connected to Supabase · live mode"
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">

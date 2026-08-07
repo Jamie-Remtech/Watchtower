@@ -5,6 +5,8 @@ import {
 import TacticalMap from '../components/TacticalMap';
 import { C } from '../data/collaboratorData';
 import { mockStreams } from '../data/streams';
+import { LiveEmptyState } from '../components/LiveEmptyState';
+import { useDevices } from '../hooks/useDevices';
 
 
 // ============================================
@@ -12,6 +14,7 @@ import { mockStreams } from '../data/streams';
 // ============================================
 
 export const TacticalMapTab = () => {
+  const { isLive, devices } = useDevices();
   const [mapMode, setMapMode] = useState('satellite'); // satellite, roadmap, terrain, hybrid
   const [showDevices, setShowDevices] = useState(true);
   const [showGeofences, setShowGeofences] = useState(true);
@@ -1056,6 +1059,22 @@ export const TacticalMapTab = () => {
       default: return '📍';
     }
   };
+
+  // Live mode: the tactical picture comes from real devices and positions.
+  if (isLive) {
+    return (
+      <LiveEmptyState
+        icon={Map}
+        title="Tactical picture is empty"
+        description="No simulated markers here — the map lights up as devices are registered and field collaborators share positions."
+        facts={[
+          { label: 'Registered devices', value: devices.length },
+          { label: 'With coordinates', value: devices.filter(d => d.lat != null && d.lng != null).length },
+        ]}
+        hint="Connected to Supabase · live mode"
+      />
+    );
+  }
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950' : 'h-full flex flex-col'}`}>

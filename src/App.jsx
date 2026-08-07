@@ -6,7 +6,8 @@ import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
 import { ROLE_LABELS } from './auth/roles';
-import { orgData } from './data/org';
+import { useOrg } from './hooks/useOrg';
+import { useDevices } from './hooks/useDevices';
 import { mockStreams } from './data/streams';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -28,6 +29,8 @@ import { WorldTab } from './tabs/WorldTab';
 
 const WatchtowerPortal = () => {
   const { profile, isDemo, signOut } = useAuth();
+  const org = useOrg();
+  const { devices } = useDevices();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('streams');
@@ -41,11 +44,14 @@ const WatchtowerPortal = () => {
       setTendedAlerts(e.detail.tended);
     };
     window.addEventListener('watchtower-alerts', handler);
-    // Initial count from static data
-    setActiveAlerts(mockStreams.filter(s => s.hasActiveDetection && !s.alertAcknowledged).length);
-    setTendedAlerts(mockStreams.filter(s => s.hasActiveDetection && s.alertTended).length);
+    // Initial count from simulated data — demo mode only. Live mode starts
+    // clean and only real detections raise alerts.
+    if (isDemo) {
+      setActiveAlerts(mockStreams.filter(s => s.hasActiveDetection && !s.alertAcknowledged).length);
+      setTendedAlerts(mockStreams.filter(s => s.hasActiveDetection && s.alertTended).length);
+    }
     return () => window.removeEventListener('watchtower-alerts', handler);
-  }, []);
+  }, [isDemo]);
   
   // Inject alert animation styles
   useEffect(() => {
@@ -131,8 +137,8 @@ const WatchtowerPortal = () => {
           <div className="px-2 py-1.5 bg-slate-800/50 rounded-lg">
             <div className="flex items-center gap-2">
               <Building2 className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-medium text-white text-xs">{orgData.name}</span>
-              <span className="text-xs text-slate-500">· {orgData.region}</span>
+              <span className="font-medium text-white text-xs">{org.name}</span>
+              {org.region && <span className="text-xs text-slate-500">· {org.region}</span>}
             </div>
           </div>
         </div>
@@ -186,7 +192,7 @@ const WatchtowerPortal = () => {
         <header className="hidden lg:flex bg-slate-900/80 border-b border-slate-800 px-4 py-2 items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-sm font-bold text-white">{navItems.find(n => n.id === activeTab)?.name}</h1>
-            <p className="text-xs text-slate-500">{orgData.name} — {orgData.region}</p>
+            <p className="text-xs text-slate-500">{org.name}{org.region && ` — ${org.region}`}</p>
           </div>
           <div className="flex items-center gap-3">
             {/* Alert Status — Red: unattended | Orange: tended | Green: clear */}
@@ -212,10 +218,12 @@ const WatchtowerPortal = () => {
                 <span className="text-green-400 text-xs font-medium">No active alerts</span>
               </div>
             )}
-            {/* Active streams */}
+            {/* Active devices */}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-lg">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-green-400 text-xs font-medium">{mockStreams.filter(s => s.status === 'active').length} online</span>
+              <span className="text-green-400 text-xs font-medium">
+                {isDemo ? mockStreams.filter(s => s.status === 'active').length : devices.filter(d => d.status === 'active').length} online
+              </span>
             </div>
           </div>
         </header>

@@ -12,6 +12,8 @@ The backend for identity, data, and realtime sync.
 
 - [x] Supabase client wiring with graceful **demo mode** when no keys are configured
 - [x] Schema v1: organizations, profiles, roles, invitations, events (append-only operational log)
+- [x] Schema: devices table (0003) — every feed source is a device row
+- [x] **Live-mode honesty**: simulated data exists only in demo mode; live mode shows real data or clearly-labeled empty states on every tab
 - [ ] Realtime subscriptions: positions, alerts, comms messages sync live between clients
 - [ ] Replace `src/data/*` mock modules with Supabase queries, one module at a time (the data boundary was built for exactly this swap)
 - [ ] Storage buckets for incident media (snapshots, recordings, reports)

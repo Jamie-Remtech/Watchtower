@@ -8,6 +8,8 @@ import { C, STREAMS } from '../data/collaboratorData';
 import { streamDetections } from '../data/detections';
 import { capabilities } from '../data/settingsData';
 import { datacenterInfo, edgeBoxes, mockStreams } from '../data/streams';
+import { LiveEmptyState } from '../components/LiveEmptyState';
+import { useDevices } from '../hooks/useDevices';
 
 
 // ============================================
@@ -15,6 +17,7 @@ import { datacenterInfo, edgeBoxes, mockStreams } from '../data/streams';
 // ============================================
 
 export const StreamsTab = () => {
+  const { isLive, devices } = useDevices();
   const [viewMode, setViewMode] = useState('operator'); // 'operator', 'grid', 'list'
   const [fullscreenStreamId, setFullscreenStreamId] = useState(null);
   const [selectedStreamId, setSelectedStreamId] = useState(mockStreams[0]?.id || null);
@@ -221,6 +224,22 @@ export const StreamsTab = () => {
 
   // Get selected stream
   const selectedStream = selectedStreamId ? streams.find(s => s.id === selectedStreamId) : null;
+
+  // Live mode: only real feeds. Simulated streams exist solely in demo mode.
+  if (isLive) {
+    return (
+      <LiveEmptyState
+        icon={Video}
+        title="No feeds connected"
+        description="Watchtower is wired to your live database — no simulated data here. Feeds appear as soon as devices are registered and streaming."
+        facts={[
+          { label: 'Registered devices', value: devices.length },
+          { label: 'Active now', value: devices.filter(d => d.status === 'active').length },
+        ]}
+        hint="Connected to Supabase · live mode"
+      />
+    );
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">
