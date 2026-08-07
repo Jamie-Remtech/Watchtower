@@ -176,7 +176,7 @@ export const WorldTab = () => {
       center: [2.35, 43.2], // demo org region; the world is one drag away
       zoom: 2.2,
       minZoom: 1,
-      maxZoom: 12,
+      maxZoom: 18,
       attributionControl: { compact: true },
       style: {
         version: 8,
@@ -185,6 +185,13 @@ export const WorldTab = () => {
             type: 'raster', tileSize: 256, maxzoom: 9,
             tiles: [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', time)],
             attribution: 'NASA GIBS/EOSDIS · USGS · Open-Meteo',
+          },
+          streets: {
+            // Street-level detail: NASA imagery resolves to ~250 m/px, so
+            // past zoom ~9 a dark street basemap takes over for close zooms.
+            type: 'raster', tileSize: 256,
+            tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+            attribution: '© CARTO © OpenStreetMap contributors',
           },
           labels: {
             type: 'raster', tileSize: 256,
@@ -195,6 +202,10 @@ export const WorldTab = () => {
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#020617' } },
           { id: 'basemap', type: 'raster', source: 'basemap' },
+          {
+            id: 'streets', type: 'raster', source: 'streets', minzoom: 8,
+            paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 1] },
+          },
           { id: 'labels', type: 'raster', source: 'labels', paint: { 'raster-opacity': 0.9 } },
         ],
       },
