@@ -238,7 +238,10 @@ export const WorldTab = () => {
       const tiles = [`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`];
       if (map.getLayer('radar')) map.removeLayer('radar');
       if (map.getSource('radar')) map.removeSource('radar');
-      map.addSource('radar', { type: 'raster', tiles, tileSize: 256, attribution: 'RainViewer' });
+      // RainViewer's composite only exists to z7 — deeper requests return
+      // literal "Zoom Level Not Supported" tiles. Cap the source so MapLibre
+      // upscales real z7 data at street zooms instead.
+      map.addSource('radar', { type: 'raster', tiles, tileSize: 256, maxzoom: 7, attribution: 'RainViewer' });
       map.addLayer({
         id: 'radar', type: 'raster', source: 'radar',
         layout: { visibility: enabled.radar ? 'visible' : 'none' },
