@@ -60,6 +60,11 @@ The model of the physical situation: terrain + weather + fire behavior — and h
   - NASA EONET natural events (wildfires, volcanoes, severe storms) with per-event source links
   - Click anywhere → live point weather (Open-Meteo, aggregating national weather services)
 - [x] **Cascade Watch v1**: auto-flags chain-capable events (tsunami-flagged or M6+ quakes) and documents known cascade chains (quake→tsunami, dust→algae bloom, fire→air quality, rain-on-burn-scar→landslide, marine heatwave→bloom)
+- [x] Time dimension: radar loop slider with play/pause (~2 h of frames) and a 30-day NASA satellite history slider (true color + aerosol + chlorophyll + surface temp step back day by day)
+- [x] Wind field layer: direction arrows sampled on a grid across the view (Open-Meteo), colored/sized by speed, refreshed on pan/zoom
+- [x] Terrain relief layer: elevation hillshade (AWS Terrain Tiles — USGS 3DEP lidar in the US, SRTM+ globally)
+- [x] Pollen + air quality in My Weather: 6 pollen species (European CAMS model) + PM2.5/PM10/ozone worldwide
+- [ ] Live geostationary cloud loop (NASA GIBS GOES/Himawari/Meteosat IR bands, 10-min steps) — RainViewer's public IR feed was discontinued
 - [ ] Cascade Watch v2: cross-source correlation (aerosol plume trajectory over ocean → bloom watch; storm track vs fire perimeter) and recording flags into the events log
 - [ ] Meteorological ingest into the tactical layer: wind field & humidity per operation zone, refreshed continuously
 - [ ] Fire weather indices (FWI) computed per zone; feeds risk display

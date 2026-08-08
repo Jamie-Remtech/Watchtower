@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Globe, Layers, CloudRain, Flame, Wind, Droplets, Thermometer,
   Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info,
-  LocateFixed, Loader2
+  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain
 } from 'lucide-react';
 
 // ============================================
@@ -15,11 +15,38 @@ import {
 // flags how one disaster can trigger another.
 // ============================================
 
-// GIBS daily products lag ~1 day; use yesterday (UTC) for reliable tiles.
-const gibsDate = () => {
-  const d = new Date(Date.now() - 24 * 60 * 60 * 1000);
+// GIBS daily products lag ~1 day; daysBack=1 (yesterday, UTC) is the
+// latest reliable date. Larger values step into satellite history.
+const gibsDate = (daysBack = 1) => {
+  const d = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
 };
+
+// Native max zoom per raster source (beyond these the providers have no data)
+const RASTER_MAXZOOM = { radar: 7, basemap: 9, aerosol: 6, chlorophyll: 7, lst: 7 };
+
+// Wind arrow sprite drawn on canvas (up = 0°; rotated per-feature by wind dir)
+const makeArrow = (color) => {
+  const c = document.createElement('canvas');
+  c.width = 44; c.height = 44;
+  const ctx = c.getContext('2d');
+  ctx.translate(22, 22);
+  ctx.beginPath();
+  ctx.moveTo(0, -15); ctx.lineTo(9, 3); ctx.lineTo(3.5, 3); ctx.lineTo(3.5, 15);
+  ctx.lineTo(-3.5, 15); ctx.lineTo(-3.5, 3); ctx.lineTo(-9, 3); ctx.closePath();
+  ctx.fillStyle = color; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();
+  return ctx.getImageData(0, 0, 44, 44);
+};
+const WIND_COLORS = ['#7dd3fc', '#38bdf8', '#fb923c', '#ef4444'];
+const windBucket = (speed) => (speed < 10 ? 0 : speed < 25 ? 1 : speed < 45 ? 2 : 3);
+
+const POLLEN_SPECIES = [
+  ['alder_pollen', 'Alder'], ['birch_pollen', 'Birch'], ['grass_pollen', 'Grass'],
+  ['mugwort_pollen', 'Mugwort'], ['olive_pollen', 'Olive'], ['ragweed_pollen', 'Ragweed'],
+];
+const pollenColor = (v) => (v < 10 ? 'text-green-400' : v < 30 ? 'text-yellow-400' : v < 70 ? 'text-orange-400' : 'text-red-400');
+const pmColor = (v) => (v < 15 ? 'text-green-400' : v < 35 ? 'text-yellow-400' : v < 75 ? 'text-orange-400' : 'text-red-400');
 
 const GIBS = (layer, level, ext, time) =>
   `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${time}/GoogleMapsCompatible_Level${level}/{z}/{y}/{x}.${ext}`;
@@ -29,7 +56,17 @@ const OVERLAYS = [
   {
     id: 'radar', name: 'Precipitation radar', icon: CloudRain, defaultOn: true,
     source: 'RainViewer (global radar composite, ~10 min refresh)',
-    desc: 'Live rain & snow radar',
+    desc: 'Live rain & snow radar — scrub the loop below the globe',
+  },
+  {
+    id: 'wind', name: 'Wind field', icon: Navigation2, defaultOn: false,
+    source: 'Open-Meteo grid sampling (national weather services)',
+    desc: 'Direction arrows across the view, colored by speed',
+  },
+  {
+    id: 'terrain', name: 'Terrain relief', icon: Mountain, defaultOn: false,
+    source: 'AWS Terrain Tiles (USGS 3DEP lidar in the US, SRTM globally)',
+    desc: 'Elevation hillshade — ridges, valleys, drainage',
   },
   {
     id: 'events', name: 'Natural events', icon: Flame, defaultOn: true,
@@ -107,10 +144,14 @@ export const WorldTab = () => {
   const [quakeCount, setQuakeCount] = useState(0);
   const [chainsOpen, setChainsOpen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [myWx, setMyWx] = useState(null);       // { pos, place, current, daily, at }
+  const [myWx, setMyWx] = useState(null);       // { pos, place, current, daily, air, at }
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState(null);
   const myMarkerRef = useRef(null);
+  const [frames, setFrames] = useState(null);   // { host, list: [{time, path}] } — radar loop
+  const [frameIdx, setFrameIdx] = useState(-1); // -1 = live (latest frame)
+  const [playing, setPlaying] = useState(false);
+  const [daysBack, setDaysBack] = useState(1);  // NASA satellite history slider
 
   // ---------- my-location weather ----------
   const showMyMarker = useCallback((pos) => {
@@ -136,6 +177,15 @@ export const WorldTab = () => {
       `&forecast_days=7&timezone=auto`
     );
     const data = await r.json();
+    // Air quality + pollen (pollen coverage is Europe-only; rest is global)
+    let air = null;
+    try {
+      const a = await (await fetch(
+        `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${pos.lat.toFixed(4)}&longitude=${pos.lng.toFixed(4)}` +
+        `&current=pm2_5,pm10,ozone,alder_pollen,birch_pollen,grass_pollen,mugwort_pollen,olive_pollen,ragweed_pollen&timezone=auto`
+      )).json();
+      air = a.current ?? null;
+    } catch { /* air data optional */ }
     // Best-effort place name (no key, graceful fallback to coordinates)
     let place = `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}`;
     try {
@@ -146,7 +196,7 @@ export const WorldTab = () => {
       const region = g.principalSubdivision || g.countryName;
       if (town || region) place = [town, region].filter(Boolean).join(', ');
     } catch { /* keep coordinates */ }
-    setMyWx({ pos, place, current: data.current, daily: data.daily, at: new Date() });
+    setMyWx({ pos, place, current: data.current, daily: data.daily, air, at: new Date() });
     localStorage.setItem(MY_LOCATION_KEY, JSON.stringify(pos));
   }, [showMyMarker]);
 
@@ -229,26 +279,52 @@ export const WorldTab = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const radarTiles = (host, path) => [`${host}${path}/256/{z}/{x}/{y}/2/1_1.png`];
+
   const loadRadar = useCallback(async (map) => {
     try {
       const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
       const data = await res.json();
-      const frame = data?.radar?.past?.at(-1);
-      if (!frame) return;
-      const tiles = [`${data.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`];
-      if (map.getLayer('radar')) map.removeLayer('radar');
-      if (map.getSource('radar')) map.removeSource('radar');
-      // RainViewer's composite only exists to z7 — deeper requests return
-      // literal "Zoom Level Not Supported" tiles. Cap the source so MapLibre
-      // upscales real z7 data at street zooms instead.
-      map.addSource('radar', { type: 'raster', tiles, tileSize: 256, maxzoom: 7, attribution: 'RainViewer' });
-      map.addLayer({
-        id: 'radar', type: 'raster', source: 'radar',
-        layout: { visibility: enabled.radar ? 'visible' : 'none' },
-        paint: { 'raster-opacity': 0.75 },
-      }, 'quake-circles');
-    } catch { /* keep previous frame */ }
+      const list = data?.radar?.past ?? [];
+      if (!list.length) return;
+      if (!map.getSource('radar')) {
+        // RainViewer's composite only exists to z7 — deeper requests return
+        // literal "Zoom Level Not Supported" tiles. Cap the source so MapLibre
+        // upscales real z7 data at street zooms instead.
+        map.addSource('radar', {
+          type: 'raster', tiles: radarTiles(data.host, list.at(-1).path),
+          tileSize: 256, maxzoom: 7, attribution: 'RainViewer',
+        });
+        map.addLayer({
+          id: 'radar', type: 'raster', source: 'radar',
+          layout: { visibility: enabled.radar ? 'visible' : 'none' },
+          paint: { 'raster-opacity': 0.75 },
+        }, 'quake-circles');
+      }
+      setFrames({ host: data.host, list });
+    } catch { /* keep previous frames */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Swap raster tiles in place (falls back to re-adding the layer when the
+  // running MapLibre lacks RasterTileSource.setTiles)
+  const setRasterTiles = useCallback((id, tiles, beforeId) => {
+    const map = mapRef.current;
+    if (!map || !map.getSource(id)) return;
+    const src = map.getSource(id);
+    if (typeof src.setTiles === 'function') {
+      try { src.setTiles(tiles); return; } catch { /* fall through */ }
+    }
+    if (!map.getLayer(id)) return;
+    const vis = map.getLayoutProperty(id, 'visibility') ?? 'visible';
+    const op = map.getPaintProperty(id, 'raster-opacity') ?? 0.8;
+    map.removeLayer(id);
+    map.removeSource(id);
+    map.addSource(id, { type: 'raster', tileSize: 256, maxzoom: RASTER_MAXZOOM[id], tiles });
+    map.addLayer(
+      { id, type: 'raster', source: id, layout: { visibility: vis }, paint: { 'raster-opacity': op } },
+      beforeId && map.getLayer(beforeId) ? beforeId : undefined
+    );
   }, []);
 
   // ---------- map init ----------
@@ -298,6 +374,18 @@ export const WorldTab = () => {
 
     map.on('style.load', () => {
       map.setProjection({ type: 'globe' });
+
+      // Terrain relief (lidar-derived elevation in the US, SRTM+ globally)
+      map.addSource('dem', {
+        type: 'raster-dem', encoding: 'terrarium', tileSize: 256, maxzoom: 15,
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        attribution: 'Terrain: AWS/USGS/SRTM',
+      });
+      map.addLayer({
+        id: 'terrain', type: 'hillshade', source: 'dem',
+        layout: { visibility: enabled.terrain ? 'visible' : 'none' },
+        paint: { 'hillshade-exaggeration': 0.6 },
+      }, 'streets');
 
       // GIBS overlays
       for (const o of OVERLAYS) {
@@ -429,6 +517,101 @@ export const WorldTab = () => {
     if (ready && myWx) showMyMarker(myWx.pos);
   }, [ready, myWx, showMyMarker]);
 
+  // ---------- radar time loop ----------
+  useEffect(() => {
+    if (!ready || !frames) return;
+    const idx = frameIdx === -1 ? frames.list.length - 1 : Math.min(frameIdx, frames.list.length - 1);
+    const f = frames.list[idx];
+    if (f) setRasterTiles('radar', radarTiles(frames.host, f.path), 'quake-circles');
+  }, [ready, frames, frameIdx, setRasterTiles]);
+
+  useEffect(() => {
+    if (!playing || !frames) return;
+    const t = setInterval(() => {
+      setFrameIdx(i => {
+        const n = frames.list.length;
+        const cur = i === -1 ? n - 1 : i;
+        return (cur + 1) % n;
+      });
+    }, 650);
+    return () => clearInterval(t);
+  }, [playing, frames]);
+
+  // ---------- NASA satellite history (day slider) ----------
+  useEffect(() => {
+    if (!ready) return;
+    const ds = gibsDate(daysBack);
+    setRasterTiles('basemap', [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', ds)], 'streets');
+    for (const o of OVERLAYS) {
+      if (o.gibs) setRasterTiles(o.id, [GIBS(o.gibs.layer, o.gibs.level, o.gibs.ext, ds)], 'eonet-circles');
+    }
+  }, [ready, daysBack, setRasterTiles]);
+
+  // ---------- wind field ----------
+  const fetchWind = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    const south = Math.max(-80, b.getSouth()), north = Math.min(80, b.getNorth());
+    const west = b.getWest(), east = b.getEast();
+    const pts = [];
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 6; c++) {
+        const lat = south + (north - south) * (r + 0.5) / 4;
+        const lng = ((west + (east - west) * (c + 0.5) / 6 + 540) % 360) - 180;
+        pts.push({ lat, lng });
+      }
+    }
+    try {
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p => p.lat.toFixed(2)).join(',')}` +
+        `&longitude=${pts.map(p => p.lng.toFixed(2)).join(',')}&current=wind_speed_10m,wind_direction_10m`
+      );
+      const j = await res.json();
+      const arr = Array.isArray(j) ? j : [j];
+      const features = arr.map((row, i) => {
+        const w = row?.current;
+        if (!w || w.wind_speed_10m == null) return null;
+        return {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [pts[i].lng, pts[i].lat] },
+          properties: {
+            speed: w.wind_speed_10m,
+            rot: (w.wind_direction_10m + 180) % 360, // arrow points where wind goes
+            img: `wind-${windBucket(w.wind_speed_10m)}`,
+          },
+        };
+      }).filter(Boolean);
+      map.getSource('wind')?.setData({ type: 'FeatureCollection', features });
+    } catch { /* wind sampling unavailable — keep last arrows */ }
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (enabled.wind && !map.getSource('wind')) {
+      WIND_COLORS.forEach((col, i) => { if (!map.hasImage(`wind-${i}`)) map.addImage(`wind-${i}`, makeArrow(col)); });
+      map.addSource('wind', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'wind', type: 'symbol', source: 'wind',
+        layout: {
+          'icon-image': ['get', 'img'],
+          'icon-rotate': ['get', 'rot'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-size': ['interpolate', ['linear'], ['get', 'speed'], 0, 0.45, 60, 1.05],
+        },
+      }, map.getLayer('eonet-circles') ? 'eonet-circles' : undefined);
+    }
+    if (map.getLayer('wind')) map.setLayoutProperty('wind', 'visibility', enabled.wind ? 'visible' : 'none');
+    if (!enabled.wind) return;
+    fetchWind();
+    let t = null;
+    const onMove = () => { clearTimeout(t); t = setTimeout(fetchWind, 700); };
+    map.on('moveend', onMove);
+    return () => { clearTimeout(t); map.off('moveend', onMove); };
+  }, [enabled.wind, ready, fetchWind]);
+
   // ---------- layer toggling ----------
   const toggle = (id) => {
     setEnabled(prev => {
@@ -459,6 +642,48 @@ export const WorldTab = () => {
           <span className="text-xs font-semibold text-white">World Engine</span>
           <span className="text-[10px] text-slate-400">live · click anywhere for weather</span>
         </div>
+
+        {/* Time controls: radar loop + satellite history */}
+        {frames && (
+          <div className="absolute bottom-2 left-2 right-2 sm:right-14 bg-slate-900/85 border border-slate-700 rounded-lg px-2.5 py-1.5 space-y-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPlaying(p => !p)}
+                className="p-0.5 text-orange-400 hover:text-orange-300 flex-shrink-0"
+                title={playing ? 'Pause radar loop' : 'Play radar loop (last 2 h)'}
+              >
+                {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              </button>
+              <input
+                type="range" min={0} max={frames.list.length - 1}
+                value={frameIdx === -1 ? frames.list.length - 1 : frameIdx}
+                onChange={e => setFrameIdx(Number(e.target.value))}
+                className="flex-1 accent-orange-500 h-1"
+              />
+              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                {(() => {
+                  const idx = frameIdx === -1 ? frames.list.length - 1 : frameIdx;
+                  return idx === frames.list.length - 1
+                    ? 'LIVE'
+                    : new Date(frames.list[idx].time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                })()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+              <input
+                type="range" min={1} max={30} value={daysBack}
+                onChange={e => setDaysBack(Number(e.target.value))}
+                style={{ direction: 'rtl' }}
+                className="flex-1 accent-sky-500 h-1"
+              />
+              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                {daysBack === 1 ? 'Latest' : gibsDate(daysBack).slice(5)}
+              </span>
+            </div>
+            <p className="text-[8px] text-slate-500 leading-none">Top: rain radar loop (2 h) · Bottom: NASA satellite history (30 days)</p>
+          </div>
+        )}
       </div>
 
       {/* Side panel */}
@@ -505,6 +730,33 @@ export const WorldTab = () => {
                 <span>💨 {Math.round(myWx.current.wind_speed_10m)} km/h</span>
                 <span>☔ {myWx.current.precipitation} mm</span>
               </div>
+
+              {/* Air quality & pollen */}
+              {myWx.air && (
+                <div className="mt-2 pt-2 border-t border-slate-800">
+                  <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <Leaf className="w-2.5 h-2.5" />Air & pollen
+                  </p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
+                    {myWx.air.pm2_5 != null && <span>PM2.5 <b className={pmColor(myWx.air.pm2_5)}>{Math.round(myWx.air.pm2_5)}</b></span>}
+                    {myWx.air.pm10 != null && <span>PM10 <b className={pmColor(myWx.air.pm10 / 2)}>{Math.round(myWx.air.pm10)}</b></span>}
+                    {myWx.air.ozone != null && <span>O₃ <b className={myWx.air.ozone < 100 ? 'text-green-400' : myWx.air.ozone < 160 ? 'text-yellow-400' : 'text-red-400'}>{Math.round(myWx.air.ozone)}</b></span>}
+                  </div>
+                  {(() => {
+                    const species = POLLEN_SPECIES.filter(([k]) => myWx.air[k] != null);
+                    return species.length ? (
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400 mt-1">
+                        {species.map(([k, label]) => (
+                          <span key={k}>{label} <b className={pollenColor(myWx.air[k])}>{Math.round(myWx.air[k])}</b></span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[9px] text-slate-600 mt-1">Pollen forecast: no coverage at this location (European model)</p>
+                    );
+                  })()}
+                  <p className="text-[8px] text-slate-600 mt-1">pollen: grains/m³ · air: µg/m³ · Source: Open-Meteo Air Quality (CAMS)</p>
+                </div>
+              )}
 
               {/* 7-day forecast */}
               <div className="mt-2.5 space-y-0.5">
