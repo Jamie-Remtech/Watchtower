@@ -37,7 +37,7 @@ const WatchtowerPortal = () => {
   const [attnOpen, setAttnOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('streams');
+  const [activeTab, setActiveTab] = useState('world');
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [tendedAlerts, setTendedAlerts] = useState(0);
 
@@ -91,7 +91,7 @@ const WatchtowerPortal = () => {
       case 'team': return <TeamTab />;
       case 'billing': return <BillingTab />;
       case 'settings': return <SettingsTab />;
-      default: return <StreamsTab />;
+      default: return <WorldTab />;
     }
   };
 
