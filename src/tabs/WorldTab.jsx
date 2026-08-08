@@ -3,7 +3,8 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Globe, Layers, CloudRain, Flame, Wind, Droplets, Thermometer,
-  Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info
+  Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info,
+  LocateFixed, Loader2
 } from 'lucide-react';
 
 // ============================================
@@ -70,6 +71,21 @@ const CASCADE_CHAINS = [
   { trigger: 'Marine heatwave', effect: 'Mass bloom / fishery collapse', watch: 'Surface temperature + Chlorophyll anomalies' },
 ];
 
+const WEATHER_EMOJI = (code) => {
+  if (code === 0) return '☀️';
+  if (code <= 2) return '🌤️';
+  if (code === 3) return '☁️';
+  if (code <= 48) return '🌫️';
+  if (code <= 57) return '🌦️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '🌨️';
+  if (code <= 82) return '🌧️';
+  if (code <= 86) return '🌨️';
+  return '⛈️';
+};
+
+const MY_LOCATION_KEY = 'watchtower-my-location';
+
 const WEATHER_CODES = {
   0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
   45: 'Fog', 48: 'Rime fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
@@ -91,6 +107,70 @@ export const WorldTab = () => {
   const [quakeCount, setQuakeCount] = useState(0);
   const [chainsOpen, setChainsOpen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [myWx, setMyWx] = useState(null);       // { pos, place, current, daily, at }
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState(null);
+  const myMarkerRef = useRef(null);
+
+  // ---------- my-location weather ----------
+  const showMyMarker = useCallback((pos) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!myMarkerRef.current) {
+      const el = document.createElement('div');
+      el.style.cssText =
+        'width:16px;height:16px;border-radius:50%;background:#38bdf8;border:3px solid #fff;box-shadow:0 0 12px rgba(56,189,248,.9)';
+      myMarkerRef.current = new maplibregl.Marker({ element: el });
+    }
+    myMarkerRef.current.setLngLat([pos.lng, pos.lat]).addTo(map);
+  }, []);
+
+  const loadMyWeather = useCallback(async (pos, { fly = false } = {}) => {
+    showMyMarker(pos);
+    if (fly) mapRef.current?.flyTo({ center: [pos.lng, pos.lat], zoom: 9 });
+    // Weather: current + 7-day daily forecast, in the location's own timezone
+    const r = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${pos.lat.toFixed(4)}&longitude=${pos.lng.toFixed(4)}` +
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,precipitation,weather_code` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max` +
+      `&forecast_days=7&timezone=auto`
+    );
+    const data = await r.json();
+    // Best-effort place name (no key, graceful fallback to coordinates)
+    let place = `${pos.lat.toFixed(3)}, ${pos.lng.toFixed(3)}`;
+    try {
+      const g = await (await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lng}&localityLanguage=en`
+      )).json();
+      const town = g.city || g.locality;
+      const region = g.principalSubdivision || g.countryName;
+      if (town || region) place = [town, region].filter(Boolean).join(', ');
+    } catch { /* keep coordinates */ }
+    setMyWx({ pos, place, current: data.current, daily: data.daily, at: new Date() });
+    localStorage.setItem(MY_LOCATION_KEY, JSON.stringify(pos));
+  }, [showMyMarker]);
+
+  const locateMe = useCallback(() => {
+    if (!navigator.geolocation) { setLocError('Geolocation is not supported here'); return; }
+    setLocating(true);
+    setLocError(null);
+    navigator.geolocation.getCurrentPosition(
+      async (p) => {
+        try {
+          await loadMyWeather({ lat: p.coords.latitude, lng: p.coords.longitude }, { fly: true });
+        } catch { setLocError('Weather source unreachable — try again'); }
+        setLocating(false);
+      },
+      (err) => {
+        setLocError(
+          err.code === 1 ? 'Location permission denied — allow it in your browser' :
+          err.code === 2 ? 'Position unavailable' : 'Location request timed out'
+        );
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, [loadMyWeather]);
 
   // ---------- live data fetchers ----------
   const loadQuakes = useCallback(async (map) => {
@@ -332,6 +412,20 @@ export const WorldTab = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Restore last known position immediately on mount — weather must not
+  // wait for the globe (map tiles can stall on slow connections).
+  useEffect(() => {
+    const stored = localStorage.getItem(MY_LOCATION_KEY);
+    if (stored) {
+      try { loadMyWeather(JSON.parse(stored)).catch(() => {}); } catch { /* corrupt entry — ignore */ }
+    }
+  }, [loadMyWeather]);
+
+  // Keep the "you are here" marker in sync once the globe is ready
+  useEffect(() => {
+    if (ready && myWx) showMyMarker(myWx.pos);
+  }, [ready, myWx, showMyMarker]);
+
   // ---------- layer toggling ----------
   const toggle = (id) => {
     setEnabled(prev => {
@@ -366,6 +460,72 @@ export const WorldTab = () => {
 
       {/* Side panel */}
       <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-2 min-h-0 overflow-y-auto">
+        {/* My Weather */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <LocateFixed className="w-3.5 h-3.5 text-sky-400" />
+              <h3 className="text-xs font-bold text-white">My Weather</h3>
+            </div>
+            <button
+              onClick={locateMe}
+              disabled={locating}
+              className="flex items-center gap-1.5 px-2 py-1 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-[10px] font-medium hover:bg-sky-500/25 disabled:opacity-50"
+            >
+              {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
+              {myWx ? 'Update' : 'Use my GPS'}
+            </button>
+          </div>
+
+          {locError && <p className="text-[10px] text-red-400 mb-1">{locError}</p>}
+
+          {!myWx ? (
+            <p className="text-[10px] text-slate-500">
+              Tap “Use my GPS” to see live conditions and the 7-day forecast wherever you are.
+            </p>
+          ) : (
+            <>
+              <p className="text-[10px] text-slate-400 truncate">{myWx.place}</p>
+              <div className="flex items-center gap-3 mt-1.5">
+                <span className="text-3xl">{WEATHER_EMOJI(myWx.current.weather_code)}</span>
+                <div>
+                  <p className="text-xl font-bold text-white leading-none">
+                    {Math.round(myWx.current.temperature_2m)}°C
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {WEATHER_CODES[myWx.current.weather_code] ?? 'Conditions'} · feels {Math.round(myWx.current.apparent_temperature)}°
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400">
+                <span>💧 {myWx.current.relative_humidity_2m}%</span>
+                <span>💨 {Math.round(myWx.current.wind_speed_10m)} km/h</span>
+                <span>☔ {myWx.current.precipitation} mm</span>
+              </div>
+
+              {/* 7-day forecast */}
+              <div className="mt-2.5 space-y-0.5">
+                {myWx.daily.time.map((day, i) => (
+                  <div key={day} className="flex items-center gap-2 text-[11px] py-0.5">
+                    <span className="w-8 text-slate-400">
+                      {i === 0 ? 'Today' : new Date(day + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' })}
+                    </span>
+                    <span className="w-5 text-center">{WEATHER_EMOJI(myWx.daily.weather_code[i])}</span>
+                    <span className="w-8 text-sky-400 text-[10px]">
+                      {myWx.daily.precipitation_probability_max?.[i] != null ? `${myWx.daily.precipitation_probability_max[i]}%` : ''}
+                    </span>
+                    <span className="flex-1 text-right text-slate-500">{Math.round(myWx.daily.temperature_2m_min[i])}°</span>
+                    <span className="w-7 text-right font-semibold text-white">{Math.round(myWx.daily.temperature_2m_max[i])}°</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] text-slate-600 mt-1.5">
+                Updated {myWx.at.toLocaleTimeString()} · Source: Open-Meteo (national weather services)
+              </p>
+            </>
+          )}
+        </div>
+
         {/* Layers */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2">
