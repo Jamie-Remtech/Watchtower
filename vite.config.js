@@ -24,6 +24,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
+        id: '/',
         name: 'Watchtower',
         short_name: 'Watchtower',
         description: 'Tactical coordination hub',
