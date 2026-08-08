@@ -7,11 +7,32 @@ import {
 // COMPONENTS
 // ============================================
 
+// Brand mark: a watchtower broadcasting a signal (same artwork as /icon.svg)
+export const LogoMark = ({ className = 'h-8 w-8' }) => (
+  <svg viewBox="0 0 512 512" className={`${className} flex-shrink-0`} aria-label="Watchtower">
+    <defs>
+      <linearGradient id="tw-mark" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#f97316" />
+        <stop offset="100%" stopColor="#ea580c" />
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="96" fill="#0f172a" />
+    <path d="M 200 118 A 56 56 0 0 1 312 118" fill="none" stroke="#7dd3fc" strokeWidth="18" strokeLinecap="round" />
+    <path d="M 162 118 A 94 94 0 0 1 350 118" fill="none" stroke="#7dd3fc" strokeWidth="18" strokeLinecap="round" opacity="0.55" />
+    <circle cx="256" cy="142" r="20" fill="#bae6fd" />
+    <rect x="192" y="172" width="128" height="62" rx="14" fill="url(#tw-mark)" />
+    <rect x="172" y="234" width="168" height="16" rx="8" fill="#ea580c" />
+    <path d="M 218 250 L 178 408" stroke="#f97316" strokeWidth="24" strokeLinecap="round" />
+    <path d="M 294 250 L 334 408" stroke="#f97316" strokeWidth="24" strokeLinecap="round" />
+    <path d="M 196 332 L 316 332" stroke="#f97316" strokeWidth="15" strokeLinecap="round" />
+    <path d="M 186 374 L 326 374" stroke="#f97316" strokeWidth="13" strokeLinecap="round" opacity="0.8" />
+    <rect x="148" y="406" width="216" height="18" rx="9" fill="#334155" />
+  </svg>
+);
+
 export const Logo = () => (
   <div className="flex items-center gap-2">
-    <div className="h-8 w-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
-      <Flame className="w-5 h-5 text-white" />
-    </div>
+    <LogoMark className="h-8 w-8" />
     <span className="font-bold text-xl"><span className="text-orange-500">Watch</span><span className="text-slate-100">tower</span></span>
   </div>
 );

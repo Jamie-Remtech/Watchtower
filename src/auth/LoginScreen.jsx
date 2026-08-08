@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Flame, Mail, KeyRound, Ticket, Loader2 } from 'lucide-react';
+import { Mail, KeyRound, Ticket, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { LogoMark } from '../components/common';
 
 // Three onboarding paths: password sign-in, magic link, invitation-code signup.
 const MODES = [
@@ -51,9 +52,7 @@ export const LoginScreen = () => {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="h-10 w-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-            <Flame className="w-6 h-6 text-white" />
-          </div>
+          <LogoMark className="h-10 w-10" />
           <span className="font-bold text-2xl">
             <span className="text-orange-500">Watch</span>
             <span className="text-slate-100">tower</span>
