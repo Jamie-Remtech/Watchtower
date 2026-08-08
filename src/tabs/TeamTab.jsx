@@ -1420,6 +1420,31 @@ const InviteModal = ({ isLive, onClose, onCreate }) => {
                 <Copy className="w-3 h-3" />Copy
               </button>
             </div>
+            {(() => {
+              const message =
+                `You're invited to Watchtower!\n\n` +
+                `1. Open ${window.location.origin}\n` +
+                `2. Tap "Join with invite"\n` +
+                `3. Enter invitation code: ${created.code}\n` +
+                `4. Create your account${created.email ? ` using this email (${created.email})` : ''}\n\n` +
+                `You'll see the world live: weather, storms, wildfires and earthquakes on one globe.`;
+              return (
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={`mailto:${created.email ?? ''}?subject=${encodeURIComponent('Your Watchtower invitation')}&body=${encodeURIComponent(message)}`}
+                    className="py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold text-center flex items-center justify-center gap-1.5"
+                  >
+                    <Mail className="w-3.5 h-3.5" />Send by email
+                  </a>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(message)}
+                    className="py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-lg text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5" />Copy message
+                  </button>
+                </div>
+              );
+            })()}
             <p className="text-[10px] text-slate-500">
               Role: {ROLE_LABELS[created.role]}{created.email && ` · restricted to ${created.email}`} · expires {new Date(created.expires_at).toLocaleDateString()}
             </p>

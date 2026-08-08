@@ -5,7 +5,7 @@ import {
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
-import { ROLE_LABELS } from './auth/roles';
+import { ROLE_LABELS, allowedTabs } from './auth/roles';
 import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
@@ -72,6 +72,9 @@ const WatchtowerPortal = () => {
     };
   }, []);
   
+  // Tabs are filtered by role — e.g. viewers see the World tab only.
+  // Demo mode runs as coordinator, so the full demo stays intact.
+  const allowed = isDemo ? allowedTabs('coordinator') : allowedTabs(profile?.role);
   const navItems = [
     { id: 'streams', name: 'Live Streams', icon: Video },
     { id: 'tactical', name: 'Tactical Map', icon: Map },
@@ -80,9 +83,15 @@ const WatchtowerPortal = () => {
     { id: 'team', name: 'Team', icon: Users },
     { id: 'billing', name: 'Billing', icon: CreditCard },
     { id: 'settings', name: 'Settings', icon: Settings },
-  ];
+  ].filter(item => allowed.includes(item.id));
+
+  // Never leave someone on a tab their role can't open
+  useEffect(() => {
+    if (!allowed.includes(activeTab)) setActiveTab(allowed[0] ?? 'world');
+  }, [allowed, activeTab]);
 
   const renderTab = () => {
+    if (!allowed.includes(activeTab)) return <WorldTab />;
     switch(activeTab) {
       case 'streams': return <StreamsTab />;
       case 'tactical': return <TacticalMapTab />;
