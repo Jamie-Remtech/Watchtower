@@ -64,6 +64,7 @@ The model of the physical situation: terrain + weather + fire behavior — and h
 - [x] Wind field layer: direction arrows sampled on a grid across the view (Open-Meteo), colored/sized by speed, refreshed on pan/zoom
 - [x] Terrain relief layer: elevation hillshade (AWS Terrain Tiles — USGS 3DEP lidar in the US, SRTM+ globally)
 - [x] Pollen + air quality in My Weather: 6 pollen species (European CAMS model) + PM2.5/PM10/ozone worldwide
+- [x] Forecast layer: predicted precipitation and cloud cover to +48 h (Open-Meteo model blend) with a future slider — grid-sampled, cached per view, scrubbed without refetching
 - [ ] Live geostationary cloud loop (NASA GIBS GOES/Himawari/Meteosat IR bands, 10-min steps) — RainViewer's public IR feed was discontinued
 - [ ] Cascade Watch v2: cross-source correlation (aerosol plume trajectory over ocean → bloom watch; storm track vs fire perimeter) and recording flags into the events log
 - [ ] Meteorological ingest into the tactical layer: wind field & humidity per operation zone, refreshed continuously

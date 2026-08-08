@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Globe, Layers, CloudRain, Flame, Wind, Droplets, Thermometer,
   Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info,
-  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain
+  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud
 } from 'lucide-react';
 
 // ============================================
@@ -67,6 +67,11 @@ const OVERLAYS = [
     id: 'terrain', name: 'Terrain relief', icon: Mountain, defaultOn: false,
     source: 'AWS Terrain Tiles (USGS 3DEP lidar in the US, SRTM globally)',
     desc: 'Elevation hillshade — ridges, valleys, drainage',
+  },
+  {
+    id: 'fcst', name: 'Forecast precip & clouds', icon: Cloud, defaultOn: false,
+    source: 'Open-Meteo model blend (ICON/GFS/AROME…), hourly to +48 h',
+    desc: 'Predicted rain and cloud cover — scrub the green slider',
   },
   {
     id: 'events', name: 'Natural events', icon: Flame, defaultOn: true,
@@ -152,6 +157,8 @@ export const WorldTab = () => {
   const [frameIdx, setFrameIdx] = useState(-1); // -1 = live (latest frame)
   const [playing, setPlaying] = useState(false);
   const [daysBack, setDaysBack] = useState(1);  // NASA satellite history slider
+  const [fcstHour, setFcstHour] = useState(0);  // model forecast slider (+0..+48 h)
+  const fcstRef = useRef(null);                 // cached grid forecast {pts, precip[][], cloud[][]}
 
   // ---------- my-location weather ----------
   const showMyMarker = useCallback((pos) => {
@@ -586,6 +593,94 @@ export const WorldTab = () => {
     } catch { /* wind sampling unavailable — keep last arrows */ }
   }, []);
 
+  // ---------- precipitation & cloud forecast (model, +48 h) ----------
+  const applyFcstHour = useCallback((hour) => {
+    const map = mapRef.current;
+    const data = fcstRef.current;
+    if (!map || !data || !map.getSource('fcst')) return;
+    const features = data.pts.map((p, i) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      properties: {
+        p: data.precip[i]?.[hour] ?? 0,
+        c: data.cloud[i]?.[hour] ?? 0,
+      },
+    }));
+    map.getSource('fcst').setData({ type: 'FeatureCollection', features });
+  }, []);
+
+  const fetchFcst = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = map.getBounds();
+    const south = Math.max(-80, b.getSouth()), north = Math.min(80, b.getNorth());
+    const west = b.getWest(), east = b.getEast();
+    const pts = [];
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 8; c++) {
+        const lat = south + (north - south) * (r + 0.5) / 5;
+        const lng = ((west + (east - west) * (c + 0.5) / 8 + 540) % 360) - 180;
+        pts.push({ lat, lng });
+      }
+    }
+    try {
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p => p.lat.toFixed(2)).join(',')}` +
+        `&longitude=${pts.map(p => p.lng.toFixed(2)).join(',')}&hourly=precipitation,cloud_cover&forecast_days=3&timezone=UTC`
+      );
+      const j = await res.json();
+      const arr = Array.isArray(j) ? j : [j];
+      // Index 0 of the hourly arrays = current UTC hour onward
+      const nowIso = new Date().toISOString().slice(0, 13);
+      const startIdx = Math.max(0, (arr[0]?.hourly?.time ?? []).findIndex(t => t.startsWith(nowIso)));
+      fcstRef.current = {
+        pts,
+        precip: arr.map(row => (row?.hourly?.precipitation ?? []).slice(startIdx)),
+        cloud: arr.map(row => (row?.hourly?.cloud_cover ?? []).slice(startIdx)),
+      };
+    } catch { /* forecast unavailable — keep last grid */ }
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (enabled.fcst && !map.getSource('fcst')) {
+      map.addSource('fcst', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      const before = map.getLayer('eonet-circles') ? 'eonet-circles' : undefined;
+      map.addLayer({
+        id: 'fcst-clouds', type: 'circle', source: 'fcst',
+        paint: {
+          'circle-radius': 26,
+          'circle-color': '#94a3b8',
+          'circle-blur': 1,
+          'circle-opacity': ['*', ['/', ['get', 'c'], 100], 0.4],
+        },
+      }, before);
+      map.addLayer({
+        id: 'fcst-precip', type: 'circle', source: 'fcst',
+        filter: ['>', ['get', 'p'], 0.05],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'p'], 0.05, 5, 1, 9, 5, 16, 15, 26],
+          'circle-color': ['interpolate', ['linear'], ['get', 'p'], 0.05, '#7dd3fc', 1, '#3b82f6', 5, '#8b5cf6', 15, '#e11d48'],
+          'circle-blur': 0.5,
+          'circle-opacity': 0.55,
+        },
+      }, before);
+    }
+    for (const l of ['fcst-clouds', 'fcst-precip']) {
+      if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', enabled.fcst ? 'visible' : 'none');
+    }
+    if (!enabled.fcst) return;
+    fetchFcst().then(() => applyFcstHour(fcstHour));
+    let t = null;
+    const onMove = () => { clearTimeout(t); t = setTimeout(() => fetchFcst().then(() => applyFcstHour(fcstHour)), 800); };
+    map.on('moveend', onMove);
+    return () => { clearTimeout(t); map.off('moveend', onMove); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled.fcst, ready, fetchFcst, applyFcstHour]);
+
+  useEffect(() => { applyFcstHour(fcstHour); }, [fcstHour, applyFcstHour]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
@@ -617,9 +712,11 @@ export const WorldTab = () => {
     setEnabled(prev => {
       const next = { ...prev, [id]: !prev[id] };
       const map = mapRef.current;
-      const layerId = { quakes: 'quake-circles', events: 'eonet-circles' }[id] ?? id;
-      if (map?.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
+      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'] }[id] ?? [id];
+      for (const layerId of layerIds) {
+        if (map?.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
+        }
       }
       return next;
     });
@@ -670,6 +767,20 @@ export const WorldTab = () => {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <Cloud className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+              <input
+                type="range" min={0} max={48} value={fcstHour}
+                onChange={e => {
+                  setFcstHour(Number(e.target.value));
+                  if (!enabled.fcst) toggle('fcst');
+                }}
+                className="flex-1 accent-green-500 h-1"
+              />
+              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                {fcstHour === 0 ? 'Now' : `+${fcstHour}h`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
               <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
               <input
                 type="range" min={1} max={30} value={daysBack}
@@ -681,7 +792,7 @@ export const WorldTab = () => {
                 {daysBack === 1 ? 'Latest' : gibsDate(daysBack).slice(5)}
               </span>
             </div>
-            <p className="text-[8px] text-slate-500 leading-none">Top: rain radar loop (2 h) · Bottom: NASA satellite history (30 days)</p>
+            <p className="text-[8px] text-slate-500 leading-none">Orange: radar loop (past 2 h) · Green: model forecast (+48 h) · Blue: NASA satellite history (30 days)</p>
           </div>
         )}
       </div>
