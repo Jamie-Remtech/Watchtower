@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Globe, Layers, CloudRain, Flame, Wind, Droplets, Thermometer,
   Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info,
-  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud
+  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud, Clock
 } from 'lucide-react';
 
 // ============================================
@@ -378,6 +378,7 @@ export const WorldTab = () => {
     });
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
 
     map.on('style.load', () => {
       map.setProjection({ type: 'globe' });
@@ -734,67 +735,6 @@ export const WorldTab = () => {
             <Globe className="w-8 h-8 text-orange-500 animate-pulse" />
           </div>
         )}
-        <div className="absolute top-2 left-2 bg-slate-900/85 border border-slate-700 rounded-lg px-2.5 py-1.5 flex items-center gap-2">
-          <Globe className="w-3.5 h-3.5 text-orange-400" />
-          <span className="text-xs font-semibold text-white">World Engine</span>
-          <span className="text-[10px] text-slate-400">live · click anywhere for weather</span>
-        </div>
-
-        {/* Time controls: radar loop + satellite history */}
-        {frames && (
-          <div className="absolute bottom-2 left-2 right-2 sm:right-14 bg-slate-900/85 border border-slate-700 rounded-lg px-2.5 py-1.5 space-y-1">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPlaying(p => !p)}
-                className="p-0.5 text-orange-400 hover:text-orange-300 flex-shrink-0"
-                title={playing ? 'Pause radar loop' : 'Play radar loop (last 2 h)'}
-              >
-                {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              </button>
-              <input
-                type="range" min={0} max={frames.list.length - 1}
-                value={frameIdx === -1 ? frames.list.length - 1 : frameIdx}
-                onChange={e => setFrameIdx(Number(e.target.value))}
-                className="flex-1 accent-orange-500 h-1"
-              />
-              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
-                {(() => {
-                  const idx = frameIdx === -1 ? frames.list.length - 1 : frameIdx;
-                  return idx === frames.list.length - 1
-                    ? 'LIVE'
-                    : new Date(frames.list[idx].time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                })()}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Cloud className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
-              <input
-                type="range" min={0} max={48} value={fcstHour}
-                onChange={e => {
-                  setFcstHour(Number(e.target.value));
-                  if (!enabled.fcst) toggle('fcst');
-                }}
-                className="flex-1 accent-green-500 h-1"
-              />
-              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
-                {fcstHour === 0 ? 'Now' : `+${fcstHour}h`}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-              <input
-                type="range" min={1} max={30} value={daysBack}
-                onChange={e => setDaysBack(Number(e.target.value))}
-                style={{ direction: 'rtl' }}
-                className="flex-1 accent-sky-500 h-1"
-              />
-              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
-                {daysBack === 1 ? 'Latest' : gibsDate(daysBack).slice(5)}
-              </span>
-            </div>
-            <p className="text-[8px] text-slate-500 leading-none">Orange: radar loop (past 2 h) · Green: model forecast (+48 h) · Blue: NASA satellite history (30 days)</p>
-          </div>
-        )}
       </div>
 
       {/* Side panel */}
@@ -890,6 +830,71 @@ export const WorldTab = () => {
               </p>
             </>
           )}
+        </div>
+
+        {/* Time machine */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-3.5 h-3.5 text-orange-400" />
+            <h3 className="text-xs font-bold text-white">Time</h3>
+            <span className="text-[9px] text-slate-500">past · now · forecast</span>
+          </div>
+          <div className="space-y-1.5">
+            {frames && (
+              <div className="flex items-center gap-2" title="Rain radar loop — last 2 hours">
+                <button
+                  onClick={() => setPlaying(p => !p)}
+                  className="p-0.5 text-orange-400 hover:text-orange-300 flex-shrink-0"
+                  title={playing ? 'Pause radar loop' : 'Play radar loop (last 2 h)'}
+                >
+                  {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                </button>
+                <input
+                  type="range" min={0} max={frames.list.length - 1}
+                  value={frameIdx === -1 ? frames.list.length - 1 : frameIdx}
+                  onChange={e => setFrameIdx(Number(e.target.value))}
+                  className="flex-1 accent-orange-500 h-1"
+                />
+                <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                  {(() => {
+                    const idx = frameIdx === -1 ? frames.list.length - 1 : frameIdx;
+                    return idx === frames.list.length - 1
+                      ? 'LIVE'
+                      : new Date(frames.list[idx].time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  })()}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2" title="Model forecast — next 48 hours">
+              <Cloud className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+              <input
+                type="range" min={0} max={48} value={fcstHour}
+                onChange={e => {
+                  setFcstHour(Number(e.target.value));
+                  if (!enabled.fcst) toggle('fcst');
+                }}
+                className="flex-1 accent-green-500 h-1"
+              />
+              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                {fcstHour === 0 ? 'Now' : `+${fcstHour}h`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2" title="NASA satellite history — 30 days">
+              <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+              <input
+                type="range" min={1} max={30} value={daysBack}
+                onChange={e => setDaysBack(Number(e.target.value))}
+                style={{ direction: 'rtl' }}
+                className="flex-1 accent-sky-500 h-1"
+              />
+              <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
+                {daysBack === 1 ? 'Latest' : gibsDate(daysBack).slice(5)}
+              </span>
+            </div>
+            <p className="text-[8px] text-slate-500 leading-none">
+              Orange: radar loop (2 h) · Green: forecast (+48 h) · Blue: satellite history (30 d) · click the globe anywhere for live weather
+            </p>
+          </div>
         </div>
 
         {/* Layers */}
