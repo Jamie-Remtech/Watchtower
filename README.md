@@ -61,3 +61,5 @@ src/
 - **Patterns** — analyze and record what happens (detections, movements, decisions) so incidents build a queryable history.
 - **Protocols** — codified response playbooks that either AI or a human can execute, with clear handover.
 - **Link all parties** — command, field crews, aircraft, external agencies in one operational picture.
+
+<!-- deploy: banner verification -->
