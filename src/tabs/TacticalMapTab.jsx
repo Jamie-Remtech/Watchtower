@@ -7,6 +7,8 @@ import { C } from '../data/collaboratorData';
 import { mockStreams } from '../data/streams';
 import { LiveEmptyState } from '../components/LiveEmptyState';
 import { useDevices } from '../hooks/useDevices';
+import { usePositions } from '../hooks/usePositions';
+import { useTeam } from '../hooks/useTeam';
 
 
 // ============================================
@@ -15,6 +17,11 @@ import { useDevices } from '../hooks/useDevices';
 
 export const TacticalMapTab = () => {
   const { isLive, devices } = useDevices();
+  const { latest: teamPositions } = usePositions();
+  const { liveMembers } = useTeam();
+  const [myPos, setMyPos] = useState(null);
+  const [zeroKey, setZeroKey] = useState(0);
+  const [locating, setLocating] = useState(false);
   const [mapMode, setMapMode] = useState('satellite'); // satellite, roadmap, terrain, hybrid
   const [showDevices, setShowDevices] = useState(true);
   const [showGeofences, setShowGeofences] = useState(true);
@@ -1063,15 +1070,28 @@ export const TacticalMapTab = () => {
   // Live mode: the tactical picture comes from real devices and positions.
   if (isLive) {
     const placed = devices.filter(d => d.lat != null && d.lng != null);
-    if (placed.length === 0) {
+    const nameOf = Object.fromEntries(liveMembers.map(m => [m.id, m.name]));
+    const FRESH_MS = 10 * 60 * 1000; // team fixes older than 10 min are stale
+    const teamMarkers = teamPositions
+      .filter(p => Date.now() - new Date(p.at) < FRESH_MS)
+      .map(p => ({
+        id: `pos-${p.profile_id}`,
+        name: `${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+        type: 'person',
+        status: 'live',
+        position: { lat: p.lat, lng: p.lng },
+        icon: '🧍',
+      }));
+
+    if (placed.length === 0 && teamMarkers.length === 0 && !myPos) {
       return (
         <LiveEmptyState
           icon={Map}
           title="Tactical picture is empty"
-          description="No simulated markers here — the map lights up as devices with coordinates are registered (Settings → Register Device)."
+          description="No simulated markers here — the map lights up as devices are registered (Settings) and collaborators share their position (Field Log)."
           facts={[
             { label: 'Registered devices', value: devices.length },
-            { label: 'With coordinates', value: 0 },
+            { label: 'Team members sharing position', value: 0 },
           ]}
           hint="Connected to Supabase · live mode"
         />
@@ -1080,45 +1100,80 @@ export const TacticalMapTab = () => {
 
     const KIND_ICON = { drone: '🚁', ptz_camera: '📹', camera: '📷', sensor: '📡', edge_box: '🖥️' };
     const KIND_TYPE = { drone: 'drone', ptz_camera: 'camera', camera: 'camera', sensor: 'sensor', edge_box: 'sensor' };
-    const mapDevices = placed.map(d => ({
-      id: d.id,
-      name: d.name,
-      type: KIND_TYPE[d.kind] ?? 'sensor',
-      status: d.status,
-      position: { lat: d.lat, lng: d.lng },
-      icon: KIND_ICON[d.kind] ?? '📍',
-    }));
-    const center = {
-      lat: placed.reduce((a, d) => a + d.lat, 0) / placed.length,
-      lng: placed.reduce((a, d) => a + d.lng, 0) / placed.length,
+    const mapDevices = [
+      ...placed.map(d => ({
+        id: d.id,
+        name: d.name,
+        type: KIND_TYPE[d.kind] ?? 'sensor',
+        status: d.status,
+        position: { lat: d.lat, lng: d.lng },
+        icon: KIND_ICON[d.kind] ?? '📍',
+      })),
+      ...teamMarkers,
+      ...(myPos ? [{ id: 'me', name: 'My position', type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
+    ];
+
+    const anchors = [...placed.map(d => ({ lat: d.lat, lng: d.lng })), ...teamMarkers.map(t => t.position)];
+    const center = myPos ?? (anchors.length
+      ? {
+          lat: anchors.reduce((a, p) => a + p.lat, 0) / anchors.length,
+          lng: anchors.reduce((a, p) => a + p.lng, 0) / anchors.length,
+        }
+      : { lat: 43.2141, lng: 2.3522 });
+
+    const zeroIn = () => {
+      if (!navigator.geolocation) return;
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude });
+          setZeroKey(k => k + 1); // remount the map centered on me
+          setLocating(false);
+        },
+        () => setLocating(false),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
     };
 
     return (
       <div className="h-full flex flex-col gap-2 min-h-0">
-        <div className="flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Map className="w-4 h-4 text-orange-400" />
             <h2 className="text-sm font-bold text-white">Tactical Map</h2>
-            <span className="text-xs text-slate-500">{placed.length} device{placed.length === 1 ? '' : 's'} placed</span>
+            <span className="text-xs text-slate-500">
+              {placed.length} device{placed.length === 1 ? '' : 's'} · {teamMarkers.length} live crew
+            </span>
           </div>
-          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-            {['satellite', 'roadmap', 'terrain', 'hybrid'].map(m => (
-              <button
-                key={m}
-                onClick={() => setMapMode(m)}
-                className={`px-2 py-1 rounded text-xs capitalize ${mapMode === m ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                {m}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={zeroIn}
+              disabled={locating}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-xs font-medium hover:bg-sky-500/25 disabled:opacity-50"
+            >
+              <Crosshair className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
+              My area
+            </button>
+            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+              {['satellite', 'roadmap', 'terrain', 'hybrid'].map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMapMode(m)}
+                  className={`px-2 py-1 rounded text-xs capitalize ${mapMode === m ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="flex-1 min-h-[400px] rounded-xl overflow-hidden border border-slate-800">
           <TacticalMap
+            key={zeroKey}
             mapMode={mapMode}
             devices={mapDevices}
             center={center}
-            zoom={11}
+            zoom={myPos ? 15 : 11}
             geofences={[]}
             alerts={[]}
             markers={[]}
@@ -1126,7 +1181,7 @@ export const TacticalMapTab = () => {
         </div>
         <p className="text-xs text-slate-600 flex items-center gap-1.5 flex-shrink-0">
           <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
-          Connected to Supabase · live devices only
+          Connected to Supabase · devices and live crew positions (Field Log → share position)
         </p>
       </div>
     );

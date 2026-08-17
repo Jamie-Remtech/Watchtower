@@ -41,12 +41,14 @@ Onboarding methods:
 
 ## 3. AI Coordinator (voice-first)
 
-A central assistant that learns situations and helps coordinate — by voice, because collaborators have their hands full.
+A central assistant that learns situations and helps coordinate — by voice, because collaborators have their hands full. Field-validated demand (2026-08: emergency rescuers asked for exactly this).
 
-- [ ] Speech recognition (browser Web Speech API first; upgradeable to Whisper-class models)
+- [x] Speech recognition v1 (browser Web Speech API): hands-free dictation in the Field Log
 - [ ] Spoken responses (speech synthesis) with barge-in (interruptible)
-- [ ] Conversational brain: Claude API with tool access to Watchtower state (feeds, positions, weather, protocols) — it answers "what's the situation in sector 7?" from live data
-- [ ] Learning loop: every incident's event log (pillar 1) becomes training context — the AI reviews what was done, what worked, and drafts protocol improvements
+- [ ] Conversational brain: Claude API behind a Supabase Edge Function (keeps the API key server-side) with tool access to Watchtower state (feeds, positions, weather, field log, protocols) — answers "what's the situation in sector 7?" from live data
+- [ ] **Skills & knowledge library** (rescuer-requested): each user declares their specialties (CPR, water rescue, pump operation, HAZMAT…); knowledge entries (procedures, checklists, machine how-tos) accumulate per emergency-service type; the AI serves this shared knowledge to whoever needs it — "how do I start this pump?", "walk me through CPR" — voice question, voice answer, maximum speed. Schema sketch: `skills` (profile_id, skill, level), `knowledge` (org/global, service_type, title, body, source, author), AI retrieval over both plus the events log
+- [ ] Guidance interventions: AI notices from live positions/context ("you're heading away from the incident") and offers course-correction — always assist, never command
+- [ ] Learning loop: every incident's event log becomes training context — the AI reviews what was done, what worked, and drafts protocol improvements
 - [ ] Protocol execution: AI can *propose* protocol steps; human confirms; over time, trusted steps can be delegated to AI (the AI/human handover from the vision)
 
 ## 4. World Engine
@@ -79,7 +81,10 @@ Many things need watching; coordinators must be told what matters *now*.
 
 - [x] Attention engine v1: sweeps every 5 min — device offline/maintenance/unplaced, NASA EONET hazards near the fleet (wildfires 150 km, others 300 km), USGS M4.5+ quakes within 300 km, Open-Meteo fire-weather at the fleet centroid, invitations expiring <48h; deduped via attention_items (0004), device conditions auto-resolve
 - [x] Attention inbox: bell with severity badge in the shell, slide-over panel ranked by severity, one-tap acknowledge, manual re-check; raises/acks recorded in the events log
-- [ ] Attention v2: field-crew rules (missed check-in, static too long, geofence breach) once positions flow; wind-shift-near-crews via World Engine
+- [x] Field Log (rescuer-requested): speech-to-text action recording — dictated entries saved to the events log with time + GPS; admin work shrinks to speaking
+- [x] Live crew positions (0005): opt-in sharing from the Field Log; tactical map shows fresh fixes per member; history accumulates for action reconstruction
+- [x] Tactical map "My area" zero-in button (rescuer-requested)
+- [ ] Attention v2: field-crew rules (missed check-in, static too long, geofence breach) now that positions flow; wind-shift-near-crews via World Engine
 - [ ] Escalation: unacknowledged critical items escalate (louder, wider, eventually voice call-out via pillar 3)
 - [ ] Pattern records: recurring situations get named and become protocol candidates
 
