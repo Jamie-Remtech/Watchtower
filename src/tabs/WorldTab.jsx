@@ -193,6 +193,7 @@ export const WorldTab = () => {
   const [daysBack, setDaysBack] = useState(1);  // NASA satellite history slider
   const [fcstHour, setFcstHour] = useState(0);  // model forecast slider (+0..+48 h)
   const fcstRef = useRef(null);                 // cached grid forecast {pts, precip[][], cloud[][]}
+  const [windCount, setWindCount] = useState(null); // live diagnostic: samples on the map
 
   // ---------- my-location weather ----------
   const showMyMarker = useCallback((pos) => {
@@ -411,6 +412,7 @@ export const WorldTab = () => {
       },
     });
     mapRef.current = map;
+    if (import.meta.env.DEV) window.__wtMap = map; // debugging hook, dev only
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new maplibregl.FullscreenControl(), 'top-right');
 
@@ -595,19 +597,34 @@ export const WorldTab = () => {
   const fetchWind = useCallback(async () => {
     const map = mapRef.current;
     if (!map) return;
-    const b = map.getBounds();
-    const south = Math.max(-80, b.getSouth()), north = Math.min(80, b.getNorth());
-    const west = b.getWest(), east = b.getEast();
+    // Bounds can be degenerate on the globe at low zoom — fall back to a
+    // center+zoom derived window so the grid is always finite.
+    let south, north, west, east;
+    try {
+      const b = map.getBounds();
+      south = b.getSouth(); north = b.getNorth(); west = b.getWest(); east = b.getEast();
+    } catch { /* fall through to fallback */ }
+    if (![south, north, west, east].every(Number.isFinite) || Math.abs(north - south) < 0.01) {
+      const c = map.getCenter();
+      const z = map.getZoom();
+      const lngSpan = Math.min(300, 360 / Math.pow(2, Math.max(0, z - 1)));
+      const latSpan = lngSpan / 2;
+      west = c.lng - lngSpan / 2; east = c.lng + lngSpan / 2;
+      south = c.lat - latSpan / 2; north = c.lat + latSpan / 2;
+    }
+    south = Math.max(-80, south); north = Math.min(80, north);
     const pts = [];
     for (let r = 0; r < 4; r++) {
       for (let c = 0; c < 6; c++) {
         const lat = south + (north - south) * (r + 0.5) / 4;
         const lng = ((west + (east - west) * (c + 0.5) / 6 + 540) % 360) - 180;
-        pts.push({ lat, lng });
+        if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({ lat, lng });
       }
     }
+    if (!pts.length) { setWindCount(0); return; }
     // Arrow length scales with the visible area
-    const len = Math.min(Math.abs(east - west), Math.abs(north - south) * 2) / 26;
+    let len = Math.min(Math.abs(east - west), Math.abs(north - south) * 2) / 26;
+    if (!Number.isFinite(len) || len <= 0) len = 2;
     try {
       const res = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p => p.lat.toFixed(2)).join(',')}` +
@@ -626,7 +643,8 @@ export const WorldTab = () => {
         };
       }).filter(Boolean);
       map.getSource('wind')?.setData({ type: 'FeatureCollection', features });
-    } catch { /* wind sampling unavailable — keep last arrows */ }
+      setWindCount(features.length);
+    } catch { setWindCount(0); /* wind sampling unavailable */ }
   }, []);
 
   // ---------- precipitation & cloud forecast (model, +48 h) ----------
@@ -722,17 +740,31 @@ export const WorldTab = () => {
     if (!ready || !map) return;
     if (enabled.wind && !map.getSource('wind')) {
       map.addSource('wind', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // Topmost layers (no beforeId): arrows must never sit under radar or
+      // cloud rasters. Dark casing underneath keeps them visible on any
+      // background, satellite or storm.
+      map.addLayer({
+        id: 'wind-casing', type: 'line', source: 'wind',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#0f172a',
+          'line-width': ['interpolate', ['linear'], ['get', 'speed'], 0, 4, 30, 5, 60, 6.5],
+          'line-opacity': 0.85,
+        },
+      });
       map.addLayer({
         id: 'wind', type: 'line', source: 'wind',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': ['match', ['get', 'bucket'], 0, WIND_COLORS[0], 1, WIND_COLORS[1], 2, WIND_COLORS[2], WIND_COLORS[3]],
-          'line-width': ['interpolate', ['linear'], ['get', 'speed'], 0, 1.8, 30, 2.6, 60, 3.6],
-          'line-opacity': 0.95,
+          'line-width': ['interpolate', ['linear'], ['get', 'speed'], 0, 2, 30, 2.8, 60, 4],
+          'line-opacity': 1,
         },
-      }, map.getLayer('eonet-circles') ? 'eonet-circles' : undefined);
+      });
     }
-    if (map.getLayer('wind')) map.setLayoutProperty('wind', 'visibility', enabled.wind ? 'visible' : 'none');
+    for (const l of ['wind-casing', 'wind']) {
+      if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', enabled.wind ? 'visible' : 'none');
+    }
     if (!enabled.wind) return;
     fetchWind();
     let t = null;
@@ -746,7 +778,7 @@ export const WorldTab = () => {
     setEnabled(prev => {
       const next = { ...prev, [id]: !prev[id] };
       const map = mapRef.current;
-      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'] }[id] ?? [id];
+      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'] }[id] ?? [id];
       for (const layerId of layerIds) {
         if (map?.getLayer(layerId)) {
           map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
@@ -947,7 +979,9 @@ export const WorldTab = () => {
                 <o.icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${enabled[o.id] ? 'text-orange-400' : 'text-slate-500'}`} />
                 <span className="min-w-0">
                   <span className={`block text-xs font-medium ${enabled[o.id] ? 'text-orange-300' : 'text-slate-300'}`}>
-                    {o.name}{o.id === 'quakes' && quakeCount > 0 && ` (${quakeCount})`}
+                    {o.name}
+                    {o.id === 'quakes' && quakeCount > 0 && ` (${quakeCount})`}
+                    {o.id === 'wind' && enabled.wind && windCount != null && ` (${windCount} samples)`}
                   </span>
                   <span className="block text-[10px] text-slate-500 leading-tight">{o.desc}</span>
                   <span className="block text-[9px] text-slate-600 leading-tight">{o.source}</span>
