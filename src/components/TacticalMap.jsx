@@ -160,9 +160,9 @@ const TacticalMap = ({
               style={{
                 width: device.type === 'drone' ? '40px' : '32px',
                 height: device.type === 'drone' ? '40px' : '32px',
-                backgroundColor: `${getMarkerColor(device.type)}30`,
+                backgroundColor: `${device.color ?? getMarkerColor(device.type)}30`,
                 borderRadius: '50%',
-                border: `2px solid ${getMarkerColor(device.type)}`,
+                border: `2px solid ${device.color ?? getMarkerColor(device.type)}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

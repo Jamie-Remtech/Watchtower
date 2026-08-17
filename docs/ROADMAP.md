@@ -82,6 +82,10 @@ Many things need watching; coordinators must be told what matters *now*.
 - [x] Attention engine v1: sweeps every 5 min — device offline/maintenance/unplaced, NASA EONET hazards near the fleet (wildfires 150 km, others 300 km), USGS M4.5+ quakes within 300 km, Open-Meteo fire-weather at the fleet centroid, invitations expiring <48h; deduped via attention_items (0004), device conditions auto-resolve
 - [x] Attention inbox: bell with severity badge in the shell, slide-over panel ranked by severity, one-tap acknowledge, manual re-check; raises/acks recorded in the events log
 - [x] Field Log (rescuer-requested): speech-to-text action recording — dictated entries saved to the events log with time + GPS; admin work shrinks to speaking
+- [x] Field Log v2 — multi-casualty voice command grammar (SALT/TCCC practice): "new patient" / "patient two" / "triage red" / "transported" / "mark time"; per-patient timelines; beep + spoken read-back acknowledgements; patients table (0009) realtime-synced
+- [x] Offline queue: field entries persist locally with client timestamps and sync when signal returns
+- [x] Triage board: live SALT category counts on the tactical map header; casualties with positions render as triage-colored markers
+- [x] IMIST-AMBO handoff generator: one tap composes the handover from the patient's timeline — AI-written via the field-assist edge function (Claude API) when configured, honest template fallback otherwise; read-aloud + copy
 - [x] Live crew positions (0005): opt-in sharing from the Field Log; tactical map shows fresh fixes per member; history accumulates for action reconstruction
 - [x] Tactical map "My area" zero-in button (rescuer-requested)
 - [ ] Attention v2: field-crew rules (missed check-in, static too long, geofence breach) now that positions flow; wind-shift-near-crews via World Engine

@@ -6,6 +6,8 @@ import { usePositions } from '../hooks/usePositions';
 import { useTeam } from '../hooks/useTeam';
 import { useMarkers, MARKER_KINDS, markerMeta } from '../hooks/useMarkers';
 import { useMapViews } from '../hooks/useMapViews';
+import { usePatients } from '../hooks/usePatients';
+import { TRIAGE_META } from '../lib/fieldCommands';
 
 // ============================================
 // TACTICAL MAP — the shared operational picture.
@@ -21,6 +23,7 @@ export const TacticalMapTab = () => {
   const { latest: teamPositions } = usePositions();
   const { liveMembers } = useTeam();
   const { markers: liveMarkers, createMarker, updateMarker, removeMarker } = useMarkers();
+  const { patients, counts: triageCounts } = usePatients();
   const [myPos, setMyPos] = useState(null);
   const [zeroKey, setZeroKey] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -89,6 +92,19 @@ export const TacticalMapTab = () => {
     };
   });
 
+  // Casualties on the board, colored by SALT triage category
+  const patientMarkers = patients
+    .filter(p => p.status === 'active' && p.lat != null && p.lng != null)
+    .map(p => ({
+      id: `pat-${p.id}`,
+      name: `${p.tag ? `Tag ${p.tag}` : `P${p.num}`} · ${TRIAGE_META[p.triage]?.label ?? p.triage}`,
+      type: 'person',
+      status: p.triage,
+      position: { lat: p.lat, lng: p.lng },
+      icon: '🧑',
+      color: TRIAGE_META[p.triage]?.dot,
+    }));
+
   const mapDevices = [
     ...placed.map(d => ({
       id: d.id,
@@ -99,6 +115,7 @@ export const TacticalMapTab = () => {
       icon: KIND_ICON[d.kind] ?? '📍',
     })),
     ...teamMarkers,
+    ...patientMarkers,
     ...(myPos ? [{ id: 'me', name: 'My position', type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
   ];
 
@@ -247,6 +264,19 @@ export const TacticalMapTab = () => {
           <span className="text-xs text-slate-500">
             {placed.length} device{placed.length === 1 ? '' : 's'} · {teamMarkers.length} live crew
           </span>
+          {/* Triage board: live casualty counts by SALT category */}
+          {Object.keys(triageCounts).length > 0 && (
+            <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/70 border border-slate-700 rounded-lg">
+              {['red', 'yellow', 'green', 'gray', 'black', 'unknown'].map(c =>
+                triageCounts[c] ? (
+                  <span key={c} className="flex items-center gap-1 text-[10px] font-bold text-white" title={TRIAGE_META[c].label}>
+                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: TRIAGE_META[c].dot }} />
+                    {triageCounts[c]}
+                  </span>
+                ) : null
+              )}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
