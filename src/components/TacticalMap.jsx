@@ -16,7 +16,9 @@ const TacticalMap = ({
   devices = [],
   geofences = [],
   alerts = [],
-  markers = []
+  markers = [],
+  onMapClick,        // (pos {lat,lng}) => void — placement mode
+  onMarkerDelete,    // (id) => void — shows Remove in the marker popup
 }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [activeFeed, setActiveFeed] = useState(null);
@@ -74,8 +76,14 @@ const TacticalMap = ({
         mapTypeId={mapTypeId}
         gestureHandling="greedy"
         disableDefaultUI={false}
-        style={{ width: '100%', height: '100%' }}
-        onClick={() => setSelectedMarker(null)}
+        style={{ width: '100%', height: '100%', cursor: onMapClick ? 'crosshair' : undefined }}
+        onClick={(e) => {
+          if (onMapClick && e.detail?.latLng) {
+            onMapClick({ lat: e.detail.latLng.lat, lng: e.detail.latLng.lng });
+          } else {
+            setSelectedMarker(null);
+          }
+        }}
       >
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
@@ -116,6 +124,29 @@ const TacticalMap = ({
           </React.Fragment>
         ))}
 
+        {/* Tactical markers / points of interest */}
+        {showMarkers && markers.map((m) => (
+          <AdvancedMarker
+            key={m.id}
+            position={m.position}
+            onClick={() => setSelectedMarker({ ...m, isTacticalMarker: true })}
+          >
+            <div
+              className="cursor-pointer"
+              style={{
+                width: '34px', height: '34px',
+                backgroundColor: '#0f172acc',
+                borderRadius: '50%',
+                border: '2px solid #f97316',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              title={m.name}
+            >
+              <span style={{ fontSize: '17px' }}>{m.icon}</span>
+            </div>
+          </AdvancedMarker>
+        ))}
+
         {showAlerts && alerts.map((alert) => (
           <AdvancedMarker
             key={alert.id}
@@ -148,8 +179,24 @@ const TacticalMap = ({
           >
             <div className="p-2">
               <h3 className="font-semibold text-sm text-slate-900">{selectedMarker.name}</h3>
-              <p className="text-xs text-slate-600 mt-1">Type: {selectedMarker.type}</p>
-              {selectedMarker.status && (
+              {!selectedMarker.isTacticalMarker && (
+                <p className="text-xs text-slate-600 mt-1">Type: {selectedMarker.type}</p>
+              )}
+              {selectedMarker.isTacticalMarker && selectedMarker.notes && (
+                <p className="text-xs text-slate-600 mt-1">{selectedMarker.notes}</p>
+              )}
+              {selectedMarker.isTacticalMarker && selectedMarker.meta && (
+                <p className="text-[10px] text-slate-500 mt-1">{selectedMarker.meta}</p>
+              )}
+              {selectedMarker.isTacticalMarker && onMarkerDelete && (
+                <button
+                  onClick={() => { onMarkerDelete(selectedMarker.id); setSelectedMarker(null); }}
+                  className="mt-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors"
+                >
+                  Remove marker
+                </button>
+              )}
+              {!selectedMarker.isTacticalMarker && selectedMarker.status && (
                 <p className="text-xs text-slate-600">Status: {selectedMarker.status}</p>
               )}
               {(selectedMarker.type === 'drone' || selectedMarker.type === 'camera') && (
