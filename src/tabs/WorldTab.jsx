@@ -25,21 +25,25 @@ const gibsDate = (daysBack = 1) => {
 // Native max zoom per raster source (beyond these the providers have no data)
 const RASTER_MAXZOOM = { radar: 7, basemap: 9, aerosol: 6, chlorophyll: 7, lst: 7 };
 
-// Wind arrow sprite drawn on canvas (up = 0°; rotated per-feature by wind dir)
-const makeArrow = (color) => {
+// Wind arrow sprites with rotation BAKED INTO the image (16 compass
+// sectors x 4 speed colors). Data-driven icon-rotate is unreliable on
+// the globe projection, so each direction gets its own sprite.
+const makeArrow = (color, angleDeg) => {
   const c = document.createElement('canvas');
   c.width = 44; c.height = 44;
   const ctx = c.getContext('2d');
   ctx.translate(22, 22);
+  ctx.rotate((angleDeg * Math.PI) / 180);
   ctx.beginPath();
-  ctx.moveTo(0, -15); ctx.lineTo(9, 3); ctx.lineTo(3.5, 3); ctx.lineTo(3.5, 15);
-  ctx.lineTo(-3.5, 15); ctx.lineTo(-3.5, 3); ctx.lineTo(-9, 3); ctx.closePath();
+  ctx.moveTo(0, -16); ctx.lineTo(10, 4); ctx.lineTo(4, 4); ctx.lineTo(4, 16);
+  ctx.lineTo(-4, 16); ctx.lineTo(-4, 4); ctx.lineTo(-10, 4); ctx.closePath();
   ctx.fillStyle = color; ctx.fill();
   ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();
   return ctx.getImageData(0, 0, 44, 44);
 };
 const WIND_COLORS = ['#7dd3fc', '#38bdf8', '#fb923c', '#ef4444'];
 const windBucket = (speed) => (speed < 10 ? 0 : speed < 25 ? 1 : speed < 45 ? 2 : 3);
+const windSector = (dirTo) => Math.round(((dirTo % 360) + 360) % 360 / 22.5) % 16;
 
 const POLLEN_SPECIES = [
   ['alder_pollen', 'Alder'], ['birch_pollen', 'Birch'], ['grass_pollen', 'Grass'],
@@ -80,21 +84,21 @@ const OVERLAYS = [
   },
   {
     id: 'aerosol', name: 'Aerosol / dust', icon: Wind, defaultOn: false,
-    source: 'NASA MODIS Terra Aerosol Optical Depth, daily',
+    source: 'NASA MODIS Terra Aerosol Optical Depth, daily (2-day lag)',
     desc: 'Sandstorms, smoke plumes, haze',
-    gibs: { layer: 'MODIS_Terra_Aerosol', level: 6, ext: 'png' },
+    gibs: { layer: 'MODIS_Terra_Aerosol', level: 6, ext: 'png', lag: 2 },
   },
   {
     id: 'chlorophyll', name: 'Ocean chlorophyll', icon: Droplets, defaultOn: false,
-    source: 'NASA MODIS Aqua Chlorophyll-a, daily',
+    source: 'NASA MODIS Aqua Chlorophyll-a, daily (2-day lag)',
     desc: 'Algae blooms & ocean productivity',
-    gibs: { layer: 'MODIS_Aqua_L2_Chlorophyll_A', level: 7, ext: 'png' },
+    gibs: { layer: 'MODIS_Aqua_L2_Chlorophyll_A', level: 7, ext: 'png', lag: 2 },
   },
   {
     id: 'lst', name: 'Surface temperature', icon: Thermometer, defaultOn: false,
-    source: 'NASA MODIS Terra Land Surface Temp (day), daily',
+    source: 'NASA MODIS Terra Land Surface Temp (day), daily (2-day lag)',
     desc: 'Heat map of the land surface',
-    gibs: { layer: 'MODIS_Terra_Land_Surface_Temp_Day', level: 7, ext: 'png' },
+    gibs: { layer: 'MODIS_Terra_Land_Surface_Temp_Day', level: 7, ext: 'png', lag: 2 },
   },
   {
     id: 'quakes', name: 'Earthquakes (24h)', icon: Activity, defaultOn: true,
@@ -136,6 +140,29 @@ const WEATHER_CODES = {
   80: 'Rain showers', 81: 'Heavy showers', 82: 'Violent showers',
   85: 'Snow showers', 86: 'Heavy snow showers',
   95: 'Thunderstorm', 96: 'Thunderstorm + hail', 99: 'Severe thunderstorm + hail',
+};
+
+// Collapsible side-panel card; open/closed state persists per device.
+const Section = ({ id, icon, title, subtitle, action, defaultOpen = true, className = '', children }) => {
+  const [open, setOpen] = useState(() => {
+    const s = localStorage.getItem(`wt-sec-${id}`);
+    return s == null ? defaultOpen : s === '1';
+  });
+  const toggle = () => setOpen(o => { localStorage.setItem(`wt-sec-${id}`, o ? '0' : '1'); return !o; });
+  return (
+    <div className={`bg-slate-900 border border-slate-800 rounded-xl p-3 ${className}`}>
+      <div className="flex items-center gap-2 cursor-pointer select-none" onClick={toggle}>
+        {icon}
+        <h3 className="text-xs font-bold text-white">{title}</h3>
+        {subtitle && <span className="text-[9px] text-slate-500">{subtitle}</span>}
+        <div className="ml-auto flex items-center gap-1.5">
+          {action && <span onClick={e => e.stopPropagation()}>{action}</span>}
+          <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${open ? '' : '-rotate-90'}`} />
+        </div>
+      </div>
+      {open && <div className="mt-2">{children}</div>}
+    </div>
+  );
 };
 
 export const WorldTab = () => {
@@ -395,12 +422,12 @@ export const WorldTab = () => {
         paint: { 'hillshade-exaggeration': 0.6 },
       }, 'streets');
 
-      // GIBS overlays
+      // GIBS overlays (each product knows how far behind today it publishes)
       for (const o of OVERLAYS) {
         if (!o.gibs) continue;
         map.addSource(o.id, {
           type: 'raster', tileSize: 256, maxzoom: o.gibs.level,
-          tiles: [GIBS(o.gibs.layer, o.gibs.level, o.gibs.ext, time)],
+          tiles: [GIBS(o.gibs.layer, o.gibs.level, o.gibs.ext, gibsDate(o.gibs.lag ?? 1))],
         });
         map.addLayer({
           id: o.id, type: 'raster', source: o.id,
@@ -548,10 +575,12 @@ export const WorldTab = () => {
   // ---------- NASA satellite history (day slider) ----------
   useEffect(() => {
     if (!ready) return;
-    const ds = gibsDate(daysBack);
-    setRasterTiles('basemap', [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', ds)], 'streets');
+    setRasterTiles('basemap', [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', gibsDate(daysBack))], 'streets');
     for (const o of OVERLAYS) {
-      if (o.gibs) setRasterTiles(o.id, [GIBS(o.gibs.layer, o.gibs.level, o.gibs.ext, ds)], 'eonet-circles');
+      if (o.gibs) {
+        const ds = gibsDate(Math.max(daysBack, o.gibs.lag ?? 1));
+        setRasterTiles(o.id, [GIBS(o.gibs.layer, o.gibs.level, o.gibs.ext, ds)], 'eonet-circles');
+      }
     }
   }, [ready, daysBack, setRasterTiles]);
 
@@ -585,8 +614,8 @@ export const WorldTab = () => {
           geometry: { type: 'Point', coordinates: [pts[i].lng, pts[i].lat] },
           properties: {
             speed: w.wind_speed_10m,
-            rot: (w.wind_direction_10m + 180) % 360, // arrow points where wind goes
-            img: `wind-${windBucket(w.wind_speed_10m)}`,
+            // arrow points where the wind is GOING (dir is where it comes from)
+            img: `wind-${windBucket(w.wind_speed_10m)}-${windSector(w.wind_direction_10m + 180)}`,
           },
         };
       }).filter(Boolean);
@@ -686,16 +715,20 @@ export const WorldTab = () => {
     const map = mapRef.current;
     if (!ready || !map) return;
     if (enabled.wind && !map.getSource('wind')) {
-      WIND_COLORS.forEach((col, i) => { if (!map.hasImage(`wind-${i}`)) map.addImage(`wind-${i}`, makeArrow(col)); });
+      // 4 speed colors x 16 compass sectors, rotation baked into each sprite
+      WIND_COLORS.forEach((col, ci) => {
+        for (let d = 0; d < 16; d++) {
+          const name = `wind-${ci}-${d}`;
+          if (!map.hasImage(name)) map.addImage(name, makeArrow(col, d * 22.5));
+        }
+      });
       map.addSource('wind', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
         id: 'wind', type: 'symbol', source: 'wind',
         layout: {
           'icon-image': ['get', 'img'],
-          'icon-rotate': ['get', 'rot'],
-          'icon-rotation-alignment': 'map',
           'icon-allow-overlap': true,
-          'icon-size': ['interpolate', ['linear'], ['get', 'speed'], 0, 0.45, 60, 1.05],
+          'icon-size': ['interpolate', ['linear'], ['get', 'speed'], 0, 0.5, 60, 1.1],
         },
       }, map.getLayer('eonet-circles') ? 'eonet-circles' : undefined);
     }
@@ -740,12 +773,11 @@ export const WorldTab = () => {
       {/* Side panel */}
       <div className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-2 min-h-0 overflow-y-auto">
         {/* My Weather */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <LocateFixed className="w-3.5 h-3.5 text-sky-400" />
-              <h3 className="text-xs font-bold text-white">My Weather</h3>
-            </div>
+        <Section
+          id="myweather"
+          icon={<LocateFixed className="w-3.5 h-3.5 text-sky-400" />}
+          title="My Weather"
+          action={
             <button
               onClick={locateMe}
               disabled={locating}
@@ -754,8 +786,8 @@ export const WorldTab = () => {
               {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
               {myWx ? 'Update' : 'Use my GPS'}
             </button>
-          </div>
-
+          }
+        >
           {locError && <p className="text-[10px] text-red-400 mb-1">{locError}</p>}
 
           {!myWx ? (
@@ -830,15 +862,15 @@ export const WorldTab = () => {
               </p>
             </>
           )}
-        </div>
+        </Section>
 
         {/* Time machine */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-3.5 h-3.5 text-orange-400" />
-            <h3 className="text-xs font-bold text-white">Time</h3>
-            <span className="text-[9px] text-slate-500">past · now · forecast</span>
-          </div>
+        <Section
+          id="time"
+          icon={<Clock className="w-3.5 h-3.5 text-orange-400" />}
+          title="Time"
+          subtitle="past · now · forecast"
+        >
           <div className="space-y-1.5">
             {frames && (
               <div className="flex items-center gap-2" title="Rain radar loop — last 2 hours">
@@ -895,14 +927,14 @@ export const WorldTab = () => {
               Orange: radar loop (2 h) · Green: forecast (+48 h) · Blue: satellite history (30 d) · click the globe anywhere for live weather
             </p>
           </div>
-        </div>
+        </Section>
 
         {/* Layers */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Layers className="w-3.5 h-3.5 text-orange-400" />
-            <h3 className="text-xs font-bold text-white">Layers</h3>
-          </div>
+        <Section
+          id="layers"
+          icon={<Layers className="w-3.5 h-3.5 text-orange-400" />}
+          title="Layers"
+        >
           <div className="space-y-1">
             {OVERLAYS.map(o => (
               <button
@@ -923,22 +955,20 @@ export const WorldTab = () => {
               </button>
             ))}
           </div>
-        </div>
+        </Section>
 
         {/* Cascade Watch */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-1 min-h-0">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-              <h3 className="text-xs font-bold text-white">Cascade Watch</h3>
-            </div>
-            {lastRefresh && (
-              <span className="text-[9px] text-slate-500 flex items-center gap-1">
-                <RefreshCw className="w-2.5 h-2.5" />{lastRefresh.toLocaleTimeString()}
-              </span>
-            )}
-          </div>
-
+        <Section
+          id="cascade"
+          icon={<AlertTriangle className="w-3.5 h-3.5 text-orange-400" />}
+          title="Cascade Watch"
+          className="flex-shrink-0"
+          action={lastRefresh && (
+            <span className="text-[9px] text-slate-500 flex items-center gap-1">
+              <RefreshCw className="w-2.5 h-2.5" />{lastRefresh.toLocaleTimeString()}
+            </span>
+          )}
+        >
           {quakeFlags.length === 0 ? (
             <p className="text-[10px] text-slate-500">No cascade-capable seismic events in the last 24h.</p>
           ) : (
@@ -988,7 +1018,7 @@ export const WorldTab = () => {
               ))}
             </div>
           )}
-        </div>
+        </Section>
       </div>
     </div>
   );
