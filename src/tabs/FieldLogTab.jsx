@@ -37,7 +37,6 @@ export const FieldLogTab = () => {
   const [saving, setSaving] = useState(false);
   const [reports, setReports] = useState([]);
   const [names, setNames] = useState({});
-  const [demoReports, setDemoReports] = useState([]);
   const { sharing, startSharing, stopSharing, lastSent, shareError } = usePositions();
 
   const { supported, listening, interim, start, stop } = useSpeech({
@@ -62,18 +61,13 @@ export const FieldLogTab = () => {
     setSaving(true);
     if (listening) stop();
     const pos = await quickPosition();
-    if (isLive) {
-      await logEvent('field.report', { text: body, ...(pos ?? {}) });
-      setText('');
-      await refresh();
-    } else {
-      setDemoReports(prev => [{ id: Date.now(), at: new Date().toISOString(), payload: { text: body, ...(pos ?? {}) } }, ...prev]);
-      setText('');
-    }
+    await logEvent('field.report', { text: body, ...(pos ?? {}) });
+    setText('');
+    await refresh();
     setSaving(false);
   };
 
-  const list = isLive ? reports : demoReports;
+  const list = reports;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">

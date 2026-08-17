@@ -1,21 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-// In demo mode (no Supabase keys) everyone is a coordinator on the simulated org.
-const DEMO_PROFILE = {
-  id: 'demo-user',
-  display_name: 'Demo Coordinator',
-  callsign: 'WATCH-1',
-  role: 'coordinator',
-  org_id: 'demo-org',
-  demo: true,
-};
-
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(isSupabaseConfigured ? null : DEMO_PROFILE);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
   const loadProfile = useCallback(async (userId) => {
@@ -68,7 +58,6 @@ export const AuthProvider = ({ children }) => {
         profile,
         loading,
         isConfigured: isSupabaseConfigured,
-        isDemo: !isSupabaseConfigured,
         signInWithPassword,
         signInWithMagicLink,
         signUpWithInvite,

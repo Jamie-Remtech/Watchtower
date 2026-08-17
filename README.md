@@ -17,10 +17,9 @@ npm run dev
 
 The tactical map needs a Google Maps API key — see [GOOGLE_MAPS_SETUP.md](GOOGLE_MAPS_SETUP.md). Put it in `.env` as `VITE_GOOGLE_MAPS_API_KEY` (see `.env.example`).
 
-### Demo mode vs live mode
+### Configuration (required)
 
-- **Demo mode** (default): no Supabase keys in `.env` → the app opens without login and runs on simulated data from `src/data/`.
-- **Live mode**: create a Supabase project, apply [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql), and set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in `.env` → login is required, with email/password, magic-link, and invitation-code onboarding, and a five-level role ladder (viewer → field → operator → coordinator → admin).
+Watchtower runs on **real data only** — there is no demo or simulation mode. Create a Supabase project, apply the migrations in [supabase/migrations](supabase/migrations) in order, and set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in `.env`. Login offers email/password, magic-link, and invitation-code onboarding, with a five-level role ladder (viewer → field → operator → coordinator → admin).
 
 The full plan is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -30,30 +29,26 @@ The app is a Vite + React 18 + Tailwind single-page app. Each major surface is i
 
 ```
 src/
-├── App.jsx                    Thin shell: sidebar nav, alert status, tab routing
+├── App.jsx                    Thin shell: sidebar nav, attention bell, tab routing
 ├── tabs/                      One module per surface
-│   ├── StreamsTab.jsx         Live feeds with AI detection overlays
-│   ├── TacticalMapTab.jsx     Shared map: devices, geofences, markers, flight paths
-│   ├── WorldTab.jsx           World Engine globe: live weather/hazard layers + Cascade Watch
-│   ├── CommsTab.jsx           Radio channels, messaging, personnel tracking
+│   ├── WorldTab.jsx           World Engine globe: live weather/hazard layers, time sliders, Cascade Watch
+│   ├── TacticalMapTab.jsx     Shared map: devices, live crew positions, shared markers
+│   ├── FieldLogTab.jsx        Speech-to-text action logging + live position sharing
+│   ├── StreamsTab.jsx         Device feed cards (video ingest is a roadmap step)
+│   ├── CommsTab.jsx           Channels & tracking (activates as the team grows)
 │   ├── TeamTab.jsx            Members, roles, invitations
-│   ├── BillingTab.jsx         Plan, usage, invoices
-│   └── SettingsTab.jsx        Devices, channels, edge hardware, AI modules
-├── components/
-│   ├── common.jsx             Shared badges, icons, indicators
-│   ├── StreamWindow.jsx       Single feed window
-│   ├── LiveDetectionView.jsx  Fullscreen feed with detection HUD
-│   ├── TacticalMap.jsx        Google Maps wrapper
-│   ├── DeviceFeedViewer.jsx   Feed popup used from the map
-│   ├── Collaborator.jsx       Field companion app (mobile surface for crews)
-│   └── AIAssistant.jsx        Assistant side panel
-├── data/                      All simulated data, isolated behind one boundary
-│   ├── org.js  streams.js  registries.js  detections.js
-│   ├── team.js  billing.js  settingsData.js  collaboratorData.js
+│   ├── BillingTab.jsx         Real usage figures
+│   └── SettingsTab.jsx        Device registration & channel management
+├── components/                TacticalMap (Google Maps wrapper), DeviceManager,
+│   AttentionPanel, InstallPrompt, UpdateBanner, common (Logo, badges), AIAssistant
+├── hooks/                     useTeam, useDevices, usePositions, useMarkers,
+│   useAttention, useOrg, useSpeech
+├── auth/                      AuthContext, AuthGate, LoginScreen, roles
+├── lib/                       supabase client, eventLog, attentionEngine
 └── styles/alertAnimations.js  Alert pulse animations
 ```
 
-**The `src/data/` boundary is the seam for going live:** every tab reads from these modules today; replacing them with API/websocket clients later swaps simulated data for real feeds without touching the UI.
+All operational data lives in Supabase (see `supabase/migrations`): organizations, profiles, invitations, the append-only events log, devices, attention items, positions, and markers — with realtime sync for markers and positions.
 
 ## Roadmap themes
 

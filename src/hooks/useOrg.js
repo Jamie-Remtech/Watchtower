@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { orgData } from '../data/org';
 
-// The organization shown in the shell. Live mode reads the real row;
-// demo mode uses the simulated org.
+// The organization shown in the shell, read from the real row.
 export const useOrg = () => {
-  const [org, setOrg] = useState(
-    isSupabaseConfigured
-      ? { name: '…', region: '', tier: '' }
-      : { name: orgData.name, region: orgData.region, tier: orgData.tier }
-  );
+  const [org, setOrg] = useState({ name: '…', region: '', tier: '' });
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;

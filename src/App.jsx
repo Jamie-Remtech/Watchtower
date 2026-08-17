@@ -10,7 +10,6 @@ import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
 import { AttentionPanel } from './components/AttentionPanel';
-import { mockStreams } from './data/streams';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
 import { CommsTab } from './tabs/CommsTab';
@@ -27,11 +26,11 @@ import { FieldLogTab } from './tabs/FieldLogTab';
 // WATCHTOWER — MAIN SHELL
 // Tactical coordination hub: nav + tab routing.
 // Each tab lives in src/tabs/, shared pieces in
-// src/components/, mock data in src/data/.
+// src/components/. Real data only — no mock layer.
 // ============================================
 
 const WatchtowerPortal = () => {
-  const { profile, isDemo, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const org = useOrg();
   const { devices } = useDevices();
   const attention = useAttention();
@@ -49,14 +48,8 @@ const WatchtowerPortal = () => {
       setTendedAlerts(e.detail.tended);
     };
     window.addEventListener('watchtower-alerts', handler);
-    // Initial count from simulated data — demo mode only. Live mode starts
-    // clean and only real detections raise alerts.
-    if (isDemo) {
-      setActiveAlerts(mockStreams.filter(s => s.hasActiveDetection && !s.alertAcknowledged).length);
-      setTendedAlerts(mockStreams.filter(s => s.hasActiveDetection && s.alertTended).length);
-    }
     return () => window.removeEventListener('watchtower-alerts', handler);
-  }, [isDemo]);
+  }, []);
   
   // Inject alert animation styles
   useEffect(() => {
@@ -74,8 +67,7 @@ const WatchtowerPortal = () => {
   }, []);
   
   // Tabs are filtered by role — e.g. viewers see the World tab only.
-  // Demo mode runs as coordinator, so the full demo stays intact.
-  const allowed = isDemo ? allowedTabs('coordinator') : allowedTabs(profile?.role);
+  const allowed = allowedTabs(profile?.role);
   const navItems = [
     { id: 'streams', name: 'Live Streams', icon: Video },
     { id: 'tactical', name: 'Tactical Map', icon: Map },
@@ -116,7 +108,7 @@ const WatchtowerPortal = () => {
         </button>
         <Logo />
         <div className="flex items-center gap-1">
-        {!isDemo && (
+        {(
           <button onClick={() => setAttnOpen(true)} className="relative p-2 hover:bg-slate-800 rounded-lg">
             <Bell className={`w-5 h-5 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-300'}`} />
             {attention.openItems.length > 0 && (
@@ -203,10 +195,10 @@ const WatchtowerPortal = () => {
             <div className="min-w-0">
               <p className="text-xs font-medium text-white truncate">{profile?.display_name ?? 'Signed in'}</p>
               <p className="text-[10px] text-slate-500">
-                {ROLE_LABELS[profile?.role] ?? profile?.role}{isDemo && ' · Demo mode'}
+                {ROLE_LABELS[profile?.role] ?? profile?.role}
               </p>
             </div>
-            {!isDemo && (
+            {(
               <button onClick={signOut} className="text-[10px] text-slate-400 hover:text-orange-400 font-medium ml-2 flex-shrink-0">
                 Sign out
               </button>
@@ -223,7 +215,7 @@ const WatchtowerPortal = () => {
             <p className="text-xs text-slate-500">{org.name}{org.region && ` — ${org.region}`}</p>
           </div>
           <div className="flex items-center gap-3">
-            {!isDemo && (
+            {(
               <button onClick={() => setAttnOpen(true)} className="relative p-1.5 hover:bg-slate-800 rounded-lg" title="Attention queue">
                 <Bell className={`w-4 h-4 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-400'}`} />
                 {attention.openItems.length > 0 && (
@@ -260,7 +252,7 @@ const WatchtowerPortal = () => {
             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-lg">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
               <span className="text-green-400 text-xs font-medium">
-                {isDemo ? mockStreams.filter(s => s.status === 'active').length : devices.filter(d => d.status === 'active').length} online
+                {devices.filter(d => d.status === "active").length} online
               </span>
             </div>
           </div>
