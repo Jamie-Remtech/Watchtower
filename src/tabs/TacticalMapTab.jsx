@@ -26,6 +26,7 @@ export const TacticalMapTab = () => {
   const [mapMode, setMapMode] = useState('satellite');
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerBusy, setMarkerBusy] = useState(false);
+  const [markerError, setMarkerError] = useState(null);
   const cameraCenterRef = useRef(null);
 
   // Open the map on the user's own area right away — rescuers need
@@ -97,10 +98,18 @@ export const TacticalMapTab = () => {
   const quickDrop = async (kindId) => {
     const c = cameraCenterRef.current ?? myPos ?? center;
     setMarkerBusy(true);
+    setMarkerError(null);
     try {
       await createMarker({ kind: kindId, label: '', lat: c.lat, lng: c.lng });
       setMarkerPanelOpen(false);
-    } catch { /* refused — keep panel open */ }
+    } catch (err) {
+      // Never fail silently — a missing table or refused permission must be visible
+      setMarkerError(
+        /does not exist/i.test(err.message ?? '')
+          ? 'The markers table is missing — run migration 0006/0007 in the Supabase SQL Editor.'
+          : (err.message ?? 'Could not create the marker')
+      );
+    }
     setMarkerBusy(false);
   };
 
@@ -179,6 +188,7 @@ export const TacticalMapTab = () => {
           <p className="text-[10px] text-slate-500">
             Tap a type — it drops at the center of your view. <b className="text-slate-400">Drag</b> it into position, <b className="text-slate-400">tap</b> it to add label &amp; notes. Everyone sees changes live.
           </p>
+          {markerError && <p className="text-[10px] text-red-400">{markerError}</p>}
         </div>
       )}
 
