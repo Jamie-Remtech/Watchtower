@@ -19,15 +19,13 @@ export const TacticalMapTab = () => {
   const { isLive, devices } = useDevices();
   const { latest: teamPositions } = usePositions();
   const { liveMembers } = useTeam();
-  const { markers: liveMarkers, createMarker, removeMarker } = useMarkers();
+  const { markers: liveMarkers, createMarker, updateMarker, removeMarker } = useMarkers();
   const [myPos, setMyPos] = useState(null);
   const [zeroKey, setZeroKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
-  const [markerKind, setMarkerKind] = useState('poi');
-  const [markerLabel, setMarkerLabel] = useState('');
-  const [placing, setPlacing] = useState(false);
   const [markerBusy, setMarkerBusy] = useState(false);
+  const cameraCenterRef = useRef(null);
 
   // Live mode: open the map on the user's own area right away —
   // rescuers need their surroundings even before anything is registered.
@@ -1124,6 +1122,8 @@ export const TacticalMapTab = () => {
       return {
         id: m.id,
         name: m.label || meta.label,
+        rawLabel: m.label,
+        kindLabel: meta.label,
         icon: meta.icon,
         position: { lat: m.lat, lng: m.lng },
         notes: m.notes,
@@ -1131,26 +1131,16 @@ export const TacticalMapTab = () => {
       };
     });
 
-    const placeMarker = async (pos) => {
-      if (!pos) return;
+    // Tap a type -> drop instantly at the middle of the current view,
+    // then drag into place and tap to fill in details.
+    const quickDrop = async (kindId) => {
+      const c = cameraCenterRef.current ?? myPos ?? center;
       setMarkerBusy(true);
       try {
-        await createMarker({ kind: markerKind, label: markerLabel.trim(), ...pos });
-        setPlacing(false);
+        await createMarker({ kind: kindId, label: '', lat: c.lat, lng: c.lng });
         setMarkerPanelOpen(false);
-        setMarkerLabel('');
-      } catch { /* RLS or network refusal — leave panel open */ }
+      } catch { /* refused — keep panel open */ }
       setMarkerBusy(false);
-    };
-
-    const placeAtMyLocation = () => {
-      if (!navigator.geolocation) return;
-      setMarkerBusy(true);
-      navigator.geolocation.getCurrentPosition(
-        (p) => placeMarker({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => setMarkerBusy(false),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
     };
 
     const anchors = [...placed.map(d => ({ lat: d.lat, lng: d.lng })), ...teamMarkers.map(t => t.position)];
@@ -1188,7 +1178,7 @@ export const TacticalMapTab = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setMarkerPanelOpen(o => !o); setPlacing(false); }}
+              onClick={() => setMarkerPanelOpen(o => !o)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
                 markerPanelOpen ? 'bg-orange-500/20 border-orange-500/40 text-orange-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
               }`}
@@ -1217,49 +1207,25 @@ export const TacticalMapTab = () => {
             </div>
           </div>
         </div>
-        {/* Marker creation panel */}
+        {/* Marker creation: tap a type -> it drops at the center of your view */}
         {markerPanelOpen && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-shrink-0 space-y-2">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-shrink-0 space-y-1.5">
             <div className="grid grid-cols-3 sm:grid-cols-9 gap-1">
               {MARKER_KINDS.map(k => (
                 <button
                   key={k.id}
-                  onClick={() => setMarkerKind(k.id)}
-                  className={`flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] ${
-                    markerKind === k.id ? 'bg-orange-500/15 border-orange-500/40 text-orange-300' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
-                  }`}
+                  onClick={() => quickDrop(k.id)}
+                  disabled={markerBusy}
+                  className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-orange-500/15 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50"
                 >
                   <span className="text-base leading-none">{k.icon}</span>
                   {k.label}
                 </button>
               ))}
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                value={markerLabel}
-                onChange={e => setMarkerLabel(e.target.value)}
-                placeholder="Label (optional) — e.g. 'Hydrant behind school'"
-                className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPlacing(p => !p)}
-                  disabled={markerBusy}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium border disabled:opacity-50 ${
-                    placing ? 'bg-orange-500 border-orange-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'
-                  }`}
-                >
-                  {placing ? 'Tap the map…' : 'Tap map to place'}
-                </button>
-                <button
-                  onClick={placeAtMyLocation}
-                  disabled={markerBusy}
-                  className="px-3 py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
-                >
-                  At my location
-                </button>
-              </div>
-            </div>
+            <p className="text-[10px] text-slate-500">
+              Tap a type — it drops at the center of your view. <b className="text-slate-400">Drag</b> it into position, <b className="text-slate-400">tap</b> it to add label &amp; notes. Everyone sees changes live.
+            </p>
           </div>
         )}
 
@@ -1273,17 +1239,12 @@ export const TacticalMapTab = () => {
             geofences={[]}
             alerts={[]}
             markers={tacticalMarkers}
-            onMapClick={placing ? placeMarker : undefined}
+            onMarkerMove={(id, pos) => updateMarker(id, pos).catch(() => {})}
+            onMarkerEdit={(id, patch) => updateMarker(id, patch).catch(() => {})}
             onMarkerDelete={(id) => removeMarker(id).catch(() => {})}
+            onCameraChanged={(c) => { if (c) cameraCenterRef.current = c; }}
           />
-          {placing && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-orange-500/90 rounded-lg px-3 py-1.5 pointer-events-none">
-              <p className="text-[11px] text-white font-medium">
-                Tap the map to drop: {markerMeta(markerKind).icon} {markerMeta(markerKind).label}
-              </p>
-            </div>
-          )}
-          {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && !placing && (
+          {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
               <p className="text-[10px] text-slate-300">
                 Nothing on the map yet — drop a marker, register devices, or share your position from the Field Log

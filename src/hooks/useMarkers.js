@@ -17,9 +17,10 @@ export const MARKER_KINDS = [
 
 export const markerMeta = (kind) => MARKER_KINDS.find(k => k.id === kind) ?? MARKER_KINDS.at(-1);
 
-const POLL_MS = 30 * 1000;
+const POLL_MS = 60 * 1000; // fallback only — realtime does the heavy lifting
 
-// Shared tactical markers, kept fresh for the whole team.
+// Shared tactical markers, synced live to the whole team via Supabase
+// Realtime (with slow polling as a safety net).
 export const useMarkers = () => {
   const isLive = isSupabaseConfigured;
   const [markers, setMarkers] = useState([]);
@@ -38,7 +39,11 @@ export const useMarkers = () => {
     if (!isLive) return;
     refresh();
     const t = setInterval(refresh, POLL_MS);
-    return () => clearInterval(t);
+    const channel = supabase
+      .channel('markers-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'markers' }, refresh)
+      .subscribe();
+    return () => { clearInterval(t); supabase.removeChannel(channel); };
   }, [isLive, refresh]);
 
   const createMarker = useCallback(async ({ kind, label, lat, lng, notes = null }) => {
@@ -55,6 +60,13 @@ export const useMarkers = () => {
     return data;
   }, [refresh]);
 
+  const updateMarker = useCallback(async (id, patch) => {
+    const { error } = await supabase.from('markers').update(patch).eq('id', id);
+    if (error) throw error;
+    await logEvent('marker.updated', patch, id);
+    await refresh();
+  }, [refresh]);
+
   const removeMarker = useCallback(async (id) => {
     const m = markers.find(x => x.id === id);
     const { error } = await supabase.from('markers').delete().eq('id', id);
@@ -63,5 +75,5 @@ export const useMarkers = () => {
     await refresh();
   }, [markers, refresh]);
 
-  return { isLive, markers, refresh, createMarker, removeMarker };
+  return { isLive, markers, refresh, createMarker, updateMarker, removeMarker };
 };

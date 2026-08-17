@@ -31,7 +31,11 @@ export const usePositions = () => {
     if (!isLive) return;
     refresh();
     const t = setInterval(refresh, POLL_MS);
-    return () => clearInterval(t);
+    const channel = supabase
+      .channel('positions-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'positions' }, refresh)
+      .subscribe();
+    return () => { clearInterval(t); supabase.removeChannel(channel); };
   }, [isLive, refresh]);
 
   const stopSharing = useCallback(() => {

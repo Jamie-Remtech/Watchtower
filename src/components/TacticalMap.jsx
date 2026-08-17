@@ -3,6 +3,60 @@ import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-goog
 import { Flame, Camera, Radio, Wind, Video } from 'lucide-react';
 import DeviceFeedViewer from './DeviceFeedViewer';
 
+// Inline editor shown in a tactical marker's popup: label + notes,
+// saved for the whole team. Position changes by dragging the marker.
+const MarkerEditor = ({ marker, onSave, onDelete }) => {
+  const [label, setLabel] = useState(marker.rawLabel ?? '');
+  const [notes, setNotes] = useState(marker.notes ?? '');
+  return (
+    <div style={{ minWidth: 200 }}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span style={{ fontSize: 16 }}>{marker.icon}</span>
+        <span className="text-xs font-semibold text-slate-900">{marker.kindLabel ?? marker.name}</span>
+      </div>
+      {onSave ? (
+        <>
+          <input
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            placeholder="Label — e.g. Hydrant behind school"
+            className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-slate-900 mb-1"
+          />
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            rows={2}
+            className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-slate-900"
+          />
+        </>
+      ) : (
+        <>
+          {marker.rawLabel && <p className="text-xs text-slate-700">{marker.rawLabel}</p>}
+          {marker.notes && <p className="text-xs text-slate-600">{marker.notes}</p>}
+        </>
+      )}
+      {marker.meta && <p className="text-[10px] text-slate-500 mt-1">{marker.meta}</p>}
+      <p className="text-[10px] text-slate-400 mt-0.5">Drag the marker on the map to move it</p>
+      <div className="flex gap-1.5 mt-2">
+        {onSave && (
+          <button
+            onClick={() => onSave({ label: label.trim(), notes: notes.trim() || null })}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
+          >
+            Save
+          </button>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const TacticalMap = ({
   mapMode = 'satellite',
   showDevices = true,
@@ -19,6 +73,9 @@ const TacticalMap = ({
   markers = [],
   onMapClick,        // (pos {lat,lng}) => void — placement mode
   onMarkerDelete,    // (id) => void — shows Remove in the marker popup
+  onMarkerMove,      // (id, pos) => void — makes markers draggable
+  onMarkerEdit,      // (id, {label, notes}) => void — editable popup
+  onCameraChanged,   // (center {lat,lng}) => void — track current view
 }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [activeFeed, setActiveFeed] = useState(null);
@@ -84,6 +141,7 @@ const TacticalMap = ({
             setSelectedMarker(null);
           }
         }}
+        onCameraChanged={(e) => onCameraChanged?.(e.detail?.center)}
       >
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
@@ -124,11 +182,16 @@ const TacticalMap = ({
           </React.Fragment>
         ))}
 
-        {/* Tactical markers / points of interest */}
+        {/* Tactical markers / points of interest — draggable to reposition */}
         {showMarkers && markers.map((m) => (
           <AdvancedMarker
             key={m.id}
             position={m.position}
+            draggable={Boolean(onMarkerMove)}
+            onDragEnd={(e) => {
+              const ll = e.latLng;
+              if (ll && onMarkerMove) onMarkerMove(m.id, { lat: ll.lat(), lng: ll.lng() });
+            }}
             onClick={() => setSelectedMarker({ ...m, isTacticalMarker: true })}
           >
             <div
@@ -140,7 +203,7 @@ const TacticalMap = ({
                 border: '2px solid #f97316',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              title={m.name}
+              title={`${m.name} — drag to move`}
             >
               <span style={{ fontSize: '17px' }}>{m.icon}</span>
             </div>
@@ -178,26 +241,20 @@ const TacticalMap = ({
             onCloseClick={() => setSelectedMarker(null)}
           >
             <div className="p-2">
-              <h3 className="font-semibold text-sm text-slate-900">{selectedMarker.name}</h3>
-              {!selectedMarker.isTacticalMarker && (
-                <p className="text-xs text-slate-600 mt-1">Type: {selectedMarker.type}</p>
-              )}
-              {selectedMarker.isTacticalMarker && selectedMarker.notes && (
-                <p className="text-xs text-slate-600 mt-1">{selectedMarker.notes}</p>
-              )}
-              {selectedMarker.isTacticalMarker && selectedMarker.meta && (
-                <p className="text-[10px] text-slate-500 mt-1">{selectedMarker.meta}</p>
-              )}
-              {selectedMarker.isTacticalMarker && onMarkerDelete && (
-                <button
-                  onClick={() => { onMarkerDelete(selectedMarker.id); setSelectedMarker(null); }}
-                  className="mt-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors"
-                >
-                  Remove marker
-                </button>
-              )}
-              {!selectedMarker.isTacticalMarker && selectedMarker.status && (
-                <p className="text-xs text-slate-600">Status: {selectedMarker.status}</p>
+              {selectedMarker.isTacticalMarker ? (
+                <MarkerEditor
+                  marker={selectedMarker}
+                  onSave={onMarkerEdit ? (patch) => { onMarkerEdit(selectedMarker.id, patch); setSelectedMarker(null); } : null}
+                  onDelete={onMarkerDelete ? () => { onMarkerDelete(selectedMarker.id); setSelectedMarker(null); } : null}
+                />
+              ) : (
+                <>
+                  <h3 className="font-semibold text-sm text-slate-900">{selectedMarker.name}</h3>
+                  <p className="text-xs text-slate-600 mt-1">Type: {selectedMarker.type}</p>
+                  {selectedMarker.status && (
+                    <p className="text-xs text-slate-600">Status: {selectedMarker.status}</p>
+                  )}
+                </>
               )}
               {(selectedMarker.type === 'drone' || selectedMarker.type === 'camera') && (
                 <button
