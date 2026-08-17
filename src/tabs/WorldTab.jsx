@@ -25,25 +25,32 @@ const gibsDate = (daysBack = 1) => {
 // Native max zoom per raster source (beyond these the providers have no data)
 const RASTER_MAXZOOM = { radar: 7, basemap: 9, aerosol: 6, chlorophyll: 7, lst: 7 };
 
-// Wind arrow sprites with rotation BAKED INTO the image (16 compass
-// sectors x 4 speed colors). Data-driven icon-rotate is unreliable on
-// the globe projection, so each direction gets its own sprite.
-const makeArrow = (color, angleDeg) => {
-  const c = document.createElement('canvas');
-  c.width = 44; c.height = 44;
-  const ctx = c.getContext('2d');
-  ctx.translate(22, 22);
-  ctx.rotate((angleDeg * Math.PI) / 180);
-  ctx.beginPath();
-  ctx.moveTo(0, -16); ctx.lineTo(10, 4); ctx.lineTo(4, 4); ctx.lineTo(4, 16);
-  ctx.lineTo(-4, 16); ctx.lineTo(-4, 4); ctx.lineTo(-10, 4); ctx.closePath();
-  ctx.fillStyle = color; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = '#0f172a'; ctx.stroke();
-  return ctx.getImageData(0, 0, 44, 44);
-};
+// Wind arrows as VECTOR LINE GEOMETRY (shaft + arrowhead per sample).
+// Sprite icons on symbol layers proved unreliable on the globe
+// projection across devices; line layers render everywhere.
 const WIND_COLORS = ['#7dd3fc', '#38bdf8', '#fb923c', '#ef4444'];
 const windBucket = (speed) => (speed < 10 ? 0 : speed < 25 ? 1 : speed < 45 ? 2 : 3);
-const windSector = (dirTo) => Math.round(((dirTo % 360) + 360) % 360 / 22.5) % 16;
+
+// Build a MultiLineString arrow at (lat,lng) pointing dirTo (deg, 0=N),
+// sized in degrees so it scales with the current view span.
+const windArrowGeom = (lat, lng, dirTo, len) => {
+  const rad = (dirTo * Math.PI) / 180;
+  const cosLat = Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  const vec = (angle, l) => [ (Math.sin(angle) * l) / cosLat, Math.cos(angle) * l ];
+  const [dx, dy] = vec(rad, len);
+  const tip = [lng + dx, lat + dy];
+  const tail = [lng - dx * 0.6, lat - dy * 0.6];
+  const [h1x, h1y] = vec(rad + Math.PI * 0.82, len * 0.45);
+  const [h2x, h2y] = vec(rad - Math.PI * 0.82, len * 0.45);
+  return {
+    type: 'MultiLineString',
+    coordinates: [
+      [tail, tip],
+      [tip, [tip[0] + h1x, tip[1] + h1y]],
+      [tip, [tip[0] + h2x, tip[1] + h2y]],
+    ],
+  };
+};
 
 const POLLEN_SPECIES = [
   ['alder_pollen', 'Alder'], ['birch_pollen', 'Birch'], ['grass_pollen', 'Grass'],
@@ -599,6 +606,8 @@ export const WorldTab = () => {
         pts.push({ lat, lng });
       }
     }
+    // Arrow length scales with the visible area
+    const len = Math.min(Math.abs(east - west), Math.abs(north - south) * 2) / 26;
     try {
       const res = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p => p.lat.toFixed(2)).join(',')}` +
@@ -611,12 +620,9 @@ export const WorldTab = () => {
         if (!w || w.wind_speed_10m == null) return null;
         return {
           type: 'Feature',
-          geometry: { type: 'Point', coordinates: [pts[i].lng, pts[i].lat] },
-          properties: {
-            speed: w.wind_speed_10m,
-            // arrow points where the wind is GOING (dir is where it comes from)
-            img: `wind-${windBucket(w.wind_speed_10m)}-${windSector(w.wind_direction_10m + 180)}`,
-          },
+          // arrow points where the wind is GOING (dir is where it comes from)
+          geometry: windArrowGeom(pts[i].lat, pts[i].lng, (w.wind_direction_10m + 180) % 360, len),
+          properties: { speed: w.wind_speed_10m, bucket: windBucket(w.wind_speed_10m) },
         };
       }).filter(Boolean);
       map.getSource('wind')?.setData({ type: 'FeatureCollection', features });
@@ -715,20 +721,14 @@ export const WorldTab = () => {
     const map = mapRef.current;
     if (!ready || !map) return;
     if (enabled.wind && !map.getSource('wind')) {
-      // 4 speed colors x 16 compass sectors, rotation baked into each sprite
-      WIND_COLORS.forEach((col, ci) => {
-        for (let d = 0; d < 16; d++) {
-          const name = `wind-${ci}-${d}`;
-          if (!map.hasImage(name)) map.addImage(name, makeArrow(col, d * 22.5));
-        }
-      });
       map.addSource('wind', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
-        id: 'wind', type: 'symbol', source: 'wind',
-        layout: {
-          'icon-image': ['get', 'img'],
-          'icon-allow-overlap': true,
-          'icon-size': ['interpolate', ['linear'], ['get', 'speed'], 0, 0.5, 60, 1.1],
+        id: 'wind', type: 'line', source: 'wind',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': ['match', ['get', 'bucket'], 0, WIND_COLORS[0], 1, WIND_COLORS[1], 2, WIND_COLORS[2], WIND_COLORS[3]],
+          'line-width': ['interpolate', ['linear'], ['get', 'speed'], 0, 1.8, 30, 2.6, 60, 3.6],
+          'line-opacity': 0.95,
         },
       }, map.getLayer('eonet-circles') ? 'eonet-circles' : undefined);
     }
