@@ -27,7 +27,9 @@ export const TacticalMapTab = () => {
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerBusy, setMarkerBusy] = useState(false);
   const [markerError, setMarkerError] = useState(null);
-  const cameraCenterRef = useRef(null);
+  const [drag, setDrag] = useState({ kind: null, x: 0, y: 0 }); // palette drag ghost
+  const cameraRef = useRef(null);      // { center, zoom } of the current view
+  const mapWrapRef = useRef(null);     // map container, for drop hit-testing
 
   // Open the map on the user's own area right away — rescuers need
   // their surroundings even before anything is registered.
@@ -93,14 +95,11 @@ export const TacticalMapTab = () => {
     : { lat: 20, lng: 0 });
   const zoom = myPos ? 14 : anchors.length ? 11 : 2;
 
-  // Tap a type -> drop instantly at the middle of the current view,
-  // then drag into place and tap to fill in details.
-  const quickDrop = async (kindId) => {
-    const c = cameraCenterRef.current ?? myPos ?? center;
+  const dropAt = async (kindId, pos) => {
     setMarkerBusy(true);
     setMarkerError(null);
     try {
-      await createMarker({ kind: kindId, label: '', lat: c.lat, lng: c.lng });
+      await createMarker({ kind: kindId, label: '', lat: pos.lat, lng: pos.lng });
       setMarkerPanelOpen(false);
     } catch (err) {
       // Never fail silently — a missing table or refused permission must be visible
@@ -111,6 +110,55 @@ export const TacticalMapTab = () => {
       );
     }
     setMarkerBusy(false);
+  };
+
+  // Convert a screen point inside the map container to lat/lng using the
+  // current camera (web-mercator math; the Google map is flat).
+  const pixelToLatLng = (x, y, rect) => {
+    const cam = cameraRef.current ?? { center: myPos ?? center, zoom };
+    if (!cam.center || !Number.isFinite(cam.zoom)) return null;
+    const world = 256 * Math.pow(2, cam.zoom);
+    const dx = x - (rect.left + rect.width / 2);
+    const dy = y - (rect.top + rect.height / 2);
+    const lng = ((cam.center.lng + (dx * 360) / world + 540) % 360) - 180;
+    const y0 = Math.log(Math.tan(Math.PI / 4 + (cam.center.lat * Math.PI) / 360));
+    const y1 = y0 - dy * ((2 * Math.PI) / world);
+    const lat = ((2 * Math.atan(Math.exp(y1)) - Math.PI / 2) * 180) / Math.PI;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat: Math.max(-85, Math.min(85, lat)), lng };
+  };
+
+  // Press a palette type and DRAG it onto the map (works with mouse and
+  // touch); a plain tap still drops at the center of the view.
+  const startDrag = (e, kindId) => {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+    setDrag({ kind: kindId, x: startX, y: startY });
+    const onMove = (ev) => {
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 6) moved = true;
+      setDrag(d => (d.kind ? { ...d, x: ev.clientX, y: ev.clientY } : d));
+    };
+    const onUp = (ev) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setDrag({ kind: null, x: 0, y: 0 });
+      if (ev.type === 'pointercancel') return;
+      const rect = mapWrapRef.current?.getBoundingClientRect();
+      if (!moved) {
+        const c = cameraRef.current?.center ?? myPos ?? center;
+        dropAt(kindId, c);
+        return;
+      }
+      if (rect && ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+        const pos = pixelToLatLng(ev.clientX, ev.clientY, rect);
+        if (pos) dropAt(kindId, pos);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
 
   const zeroIn = () => {
@@ -176,23 +224,27 @@ export const TacticalMapTab = () => {
             {MARKER_KINDS.map(k => (
               <button
                 key={k.id}
-                onClick={() => quickDrop(k.id)}
+                onPointerDown={(e) => !markerBusy && startDrag(e, k.id)}
                 disabled={markerBusy}
-                className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-orange-500/15 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50"
+                style={{ touchAction: 'none' }}
+                className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-orange-500/15 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50 cursor-grab active:cursor-grabbing select-none"
               >
-                <span className="text-base leading-none">{k.icon}</span>
-                {k.label}
+                <span className="text-base leading-none pointer-events-none">{k.icon}</span>
+                <span className="pointer-events-none">{k.label}</span>
               </button>
             ))}
           </div>
           <p className="text-[10px] text-slate-500">
-            Tap a type — it drops at the center of your view. <b className="text-slate-400">Drag</b> it into position, <b className="text-slate-400">tap</b> it to add label &amp; notes. Everyone sees changes live.
+            <b className="text-slate-400">Drag</b> a type onto the map to place it exactly — or tap it to drop at the center. Then drag the marker to adjust, tap it for label &amp; notes. Everyone sees changes live.
           </p>
           {markerError && <p className="text-[10px] text-red-400">{markerError}</p>}
         </div>
       )}
 
-      <div className="flex-1 min-h-[400px] rounded-xl overflow-hidden border border-slate-800 relative">
+      <div
+        ref={mapWrapRef}
+        className={`flex-1 min-h-[400px] rounded-xl overflow-hidden border relative ${drag.kind ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-slate-800'}`}
+      >
         <TacticalMap
           key={zeroKey}
           mapMode={mapMode}
@@ -205,7 +257,7 @@ export const TacticalMapTab = () => {
           onMarkerMove={(id, pos) => updateMarker(id, pos).catch(() => {})}
           onMarkerEdit={(id, patch) => updateMarker(id, patch).catch(() => {})}
           onMarkerDelete={(id) => removeMarker(id).catch(() => {})}
-          onCameraChanged={(c) => { if (c) cameraCenterRef.current = c; }}
+          onCameraChanged={(cam) => { if (cam?.center) cameraRef.current = cam; }}
         />
         {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
@@ -219,6 +271,16 @@ export const TacticalMapTab = () => {
         <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
         Connected to Supabase · devices, live crew positions, and shared markers
       </p>
+
+      {/* Ghost icon that follows the pointer while dragging from the palette */}
+      {drag.kind && (
+        <div
+          style={{ position: 'fixed', left: drag.x - 17, top: drag.y - 17, zIndex: 9999, pointerEvents: 'none' }}
+          className="w-[34px] h-[34px] rounded-full bg-slate-900/90 border-2 border-orange-500 flex items-center justify-center shadow-xl"
+        >
+          <span style={{ fontSize: 17 }}>{markerMeta(drag.kind).icon}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -141,7 +141,7 @@ const TacticalMap = ({
             setSelectedMarker(null);
           }
         }}
-        onCameraChanged={(e) => onCameraChanged?.(e.detail?.center)}
+        onCameraChanged={(e) => onCameraChanged?.({ center: e.detail?.center, zoom: e.detail?.zoom })}
       >
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
