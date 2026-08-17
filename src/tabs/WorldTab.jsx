@@ -23,7 +23,11 @@ const gibsDate = (daysBack = 1) => {
 };
 
 // Native max zoom per raster source (beyond these the providers have no data)
-const RASTER_MAXZOOM = { radar: 7, basemap: 9, aerosol: 6, chlorophyll: 7, lst: 7 };
+const RASTER_MAXZOOM = { radar: 7, basemap: 9, bluemarble: 8, aerosol: 6, chlorophyll: 7, lst: 7 };
+
+// Daily true color: VIIRS (wide 3000 km swath — no equatorial gaps),
+// layered over static Blue Marble so missing tiles show Earth, not void.
+const TRUECOLOR_LAYER = 'VIIRS_SNPP_CorrectedReflectance_TrueColor';
 
 // Wind arrows as VECTOR LINE GEOMETRY (shaft + arrowhead per sample).
 // Sprite icons on symbol layers proved unreliable on the globe
@@ -382,9 +386,14 @@ export const WorldTab = () => {
       style: {
         version: 8,
         sources: {
+          bluemarble: {
+            type: 'raster', tileSize: 256, maxzoom: 8,
+            tiles: ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_NextGeneration/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg'],
+            attribution: 'NASA GIBS/EOSDIS',
+          },
           basemap: {
             type: 'raster', tileSize: 256, maxzoom: 9,
-            tiles: [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', time)],
+            tiles: [GIBS(TRUECOLOR_LAYER, 9, 'jpg', time)],
             attribution: 'NASA GIBS/EOSDIS · USGS · Open-Meteo',
           },
           streets: {
@@ -402,6 +411,7 @@ export const WorldTab = () => {
         },
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#020617' } },
+          { id: 'bluemarble', type: 'raster', source: 'bluemarble' },
           { id: 'basemap', type: 'raster', source: 'basemap' },
           {
             id: 'streets', type: 'raster', source: 'streets', minzoom: 8,
@@ -584,7 +594,7 @@ export const WorldTab = () => {
   // ---------- NASA satellite history (day slider) ----------
   useEffect(() => {
     if (!ready) return;
-    setRasterTiles('basemap', [GIBS('MODIS_Terra_CorrectedReflectance_TrueColor', 9, 'jpg', gibsDate(daysBack))], 'streets');
+    setRasterTiles('basemap', [GIBS(TRUECOLOR_LAYER, 9, 'jpg', gibsDate(daysBack))], 'streets');
     for (const o of OVERLAYS) {
       if (o.gibs) {
         const ds = gibsDate(Math.max(daysBack, o.gibs.lag ?? 1));
