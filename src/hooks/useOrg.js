@@ -8,11 +8,13 @@ export const useOrg = () => {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       const { data } = await supabase.from('organizations').select('*').limit(1).single();
       if (!cancelled && data) setOrg(data);
-    })();
-    return () => { cancelled = true; };
+    };
+    load();
+    window.addEventListener('watchtower-org-updated', load);
+    return () => { cancelled = true; window.removeEventListener('watchtower-org-updated', load); };
   }, []);
 
   return org;
