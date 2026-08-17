@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Map, Crosshair, Plus } from 'lucide-react';
+import { Map, Crosshair, Plus, Star, RefreshCw, X, Check, ExternalLink } from 'lucide-react';
 import TacticalMap from '../components/TacticalMap';
 import { useDevices } from '../hooks/useDevices';
 import { usePositions } from '../hooks/usePositions';
 import { useTeam } from '../hooks/useTeam';
 import { useMarkers, MARKER_KINDS, markerMeta } from '../hooks/useMarkers';
+import { useMapViews } from '../hooks/useMapViews';
 
 // ============================================
 // TACTICAL MAP — the shared operational picture.
@@ -31,6 +32,20 @@ export const TacticalMapTab = () => {
   const cameraRef = useRef(null);      // { center, zoom } of the current view
   const mapWrapRef = useRef(null);     // map container, for drop hit-testing
 
+  // Saved views ("fronts"): freeze the camera, jump between areas
+  const { views, createView, updateView, removeView } = useMapViews();
+  const [viewCam, setViewCam] = useState(null);       // { lat, lng, zoom } override
+  const viewCamRef = useRef(null);
+  const [activeViewId, setActiveViewId] = useState(null);
+  const [savingView, setSavingView] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameText, setRenameText] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [viewsError, setViewsError] = useState(null);
+  const isPopped = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('pop') === 'tactical';
+
   // Open the map on the user's own area right away — rescuers need
   // their surroundings even before anything is registered.
   useEffect(() => {
@@ -38,7 +53,8 @@ export const TacticalMapTab = () => {
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude });
-        setZeroKey(k => k + 1);
+        // don't yank the camera if the operator already jumped to a saved view
+        if (!viewCamRef.current) setZeroKey(k => k + 1);
       },
       () => { /* denied — map falls back to fleet/world view */ },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
@@ -87,13 +103,57 @@ export const TacticalMapTab = () => {
   ];
 
   const anchors = [...placed.map(d => ({ lat: d.lat, lng: d.lng })), ...teamMarkers.map(t => t.position)];
-  const center = myPos ?? (anchors.length
+  const baseCenter = myPos ?? (anchors.length
     ? {
         lat: anchors.reduce((a, p) => a + p.lat, 0) / anchors.length,
         lng: anchors.reduce((a, p) => a + p.lng, 0) / anchors.length,
       }
     : { lat: 20, lng: 0 });
-  const zoom = myPos ? 14 : anchors.length ? 11 : 2;
+  const center = viewCam ? { lat: viewCam.lat, lng: viewCam.lng } : baseCenter;
+  const zoom = viewCam ? viewCam.zoom : myPos ? 14 : anchors.length ? 11 : 2;
+
+  // ---------- saved views ----------
+  const currentCam = () => {
+    const cam = cameraRef.current;
+    return cam?.center && Number.isFinite(cam.zoom)
+      ? { lat: cam.center.lat, lng: cam.center.lng, zoom: cam.zoom }
+      : { ...center, zoom };
+  };
+
+  const applyView = (v) => {
+    setMapMode(v.map_mode || 'satellite');
+    const camNext = { lat: v.lat, lng: v.lng, zoom: v.zoom };
+    setViewCam(camNext);
+    viewCamRef.current = camNext;
+    setActiveViewId(v.id);
+    setZeroKey(k => k + 1);
+  };
+
+  const saveCurrentView = async () => {
+    const name = saveName.trim() || `Front ${views.length + 1}`;
+    setViewsError(null);
+    try {
+      const v = await createView({ name, ...currentCam(), map_mode: mapMode });
+      setActiveViewId(v.id);
+      setSavingView(false);
+      setSaveName('');
+    } catch (err) {
+      setViewsError(/does not exist/i.test(err.message ?? '')
+        ? 'The map_views table is missing — run migration 0008 in the Supabase SQL Editor.'
+        : (err.message ?? 'Could not save the view'));
+    }
+  };
+
+  const refreezeView = (id) => {
+    setViewsError(null);
+    updateView(id, { ...currentCam(), map_mode: mapMode }).catch(e => setViewsError(e.message));
+  };
+
+  const commitRename = (id) => {
+    const name = renameText.trim();
+    setRenamingId(null);
+    if (name) updateView(id, { name }).catch(e => setViewsError(e.message));
+  };
 
   const dropAt = async (kindId, pos) => {
     setMarkerBusy(true);
@@ -164,6 +224,9 @@ export const TacticalMapTab = () => {
   const zeroIn = () => {
     if (!navigator.geolocation) return;
     setLocating(true);
+    setViewCam(null);
+    viewCamRef.current = null;
+    setActiveViewId(null);
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude });
@@ -203,6 +266,16 @@ export const TacticalMapTab = () => {
             <Crosshair className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
             My area
           </button>
+          {!isPopped && (
+            <button
+              onClick={() => window.open(`${window.location.origin}/?pop=tactical`, '_blank', 'width=1280,height=850,popup=yes')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-700"
+              title="Open the tactical map in its own window (stays live-synced)"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Pop out
+            </button>
+          )}
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             {['satellite', 'roadmap', 'terrain', 'hybrid'].map(m => (
               <button
@@ -215,6 +288,93 @@ export const TacticalMapTab = () => {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Saved views: freeze camera positions as named quick references */}
+      <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
+        {views.map(v => (
+          <div
+            key={v.id}
+            className={`flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg border text-xs ${
+              activeViewId === v.id
+                ? 'bg-orange-500/20 border-orange-500/40 text-orange-300'
+                : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            {renamingId === v.id ? (
+              <input
+                autoFocus
+                value={renameText}
+                onChange={e => setRenameText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitRename(v.id); if (e.key === 'Escape') setRenamingId(null); }}
+                onBlur={() => commitRename(v.id)}
+                className="w-24 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs text-white focus:outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => applyView(v)}
+                onDoubleClick={() => { setRenamingId(v.id); setRenameText(v.name); }}
+                title="Click to jump · double-click to rename"
+                className="font-medium"
+              >
+                {v.name}
+              </button>
+            )}
+            {activeViewId === v.id && (
+              <button
+                onClick={() => refreezeView(v.id)}
+                className="p-0.5 text-slate-400 hover:text-orange-300"
+                title="Re-freeze this view to what's on screen now"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            )}
+            {confirmDeleteId === v.id ? (
+              <button
+                onClick={() => { removeView(v.id).catch(e => setViewsError(e.message)); setConfirmDeleteId(null); if (activeViewId === v.id) setActiveViewId(null); }}
+                className="px-1 py-0.5 text-[10px] font-bold text-red-400"
+                title="Confirm delete"
+              >
+                sure?
+              </button>
+            ) : (
+              <button
+                onClick={() => { setConfirmDeleteId(v.id); setTimeout(() => setConfirmDeleteId(c => (c === v.id ? null : c)), 2500); }}
+                className="p-0.5 text-slate-500 hover:text-red-400"
+                title="Delete view"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        ))}
+
+        {savingView ? (
+          <div className="flex items-center gap-1 pl-2 pr-1 py-1 rounded-lg border border-orange-500/40 bg-orange-500/10">
+            <Star className="w-3 h-3 text-orange-400" />
+            <input
+              autoFocus
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveCurrentView(); if (e.key === 'Escape') { setSavingView(false); setSaveName(''); } }}
+              placeholder={`Front ${views.length + 1}`}
+              className="w-28 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+            <button onClick={saveCurrentView} className="p-0.5 text-green-400 hover:text-green-300" title="Save">
+              <Check className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setSavingView(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-slate-600 text-xs text-slate-400 hover:border-orange-500/40 hover:text-orange-300"
+            title="Freeze the current view as a named quick reference"
+          >
+            <Star className="w-3 h-3" />
+            Save view
+          </button>
+        )}
+        {viewsError && <span className="text-[10px] text-red-400">{viewsError}</span>}
       </div>
 
       {/* Marker creation: tap a type -> it drops at the center of your view */}
