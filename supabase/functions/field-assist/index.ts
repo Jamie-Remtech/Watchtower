@@ -24,9 +24,43 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { mode, patient, entries } = await req.json();
+    const { mode, patient, entries, question, context, history } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY secret is not set' }, 500);
+
+    // ---- mode: ask — voice Q&A over the live operational snapshot ----
+    if (mode === 'ask') {
+      const system = `You are Watchtower, the tactical coordination AI for an emergency response team.
+You answer questions from coordinators and field responders about THEIR live operation.
+
+Rules:
+- Answer ONLY from the live state snapshot below. If something isn't tracked there, say so plainly.
+- Radio style: short sentences, concrete facts, no markdown, no bullet symbols. Fit an answer in a few sentences — it may be read aloud.
+- When coordinates are involved, give rough distance and compass direction from the asker's position when known (approximate is fine).
+- Safety first: if the state shows critical attention items or red-triage patients relevant to the question, mention them.
+- Times in the snapshot are ISO/UTC; phrase them as minutes/hours ago relative to "now".
+
+LIVE STATE SNAPSHOT:
+${JSON.stringify(context ?? {}, null, 1)}`;
+
+      const msgs = [
+        ...(Array.isArray(history) ? history.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })) : []),
+        { role: 'user', content: String(question ?? '') },
+      ];
+
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 400, system, messages: msgs }),
+      });
+      const data = await r.json();
+      if (!r.ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      const answer = Array.isArray(data.content)
+        ? data.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n')
+        : '';
+      return json({ answer });
+    }
+
     if (mode !== 'handoff') return json({ error: 'unknown mode' }, 400);
 
     const timeline = (entries ?? [])
