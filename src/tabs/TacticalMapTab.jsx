@@ -5,7 +5,6 @@ import {
 import TacticalMap from '../components/TacticalMap';
 import { C } from '../data/collaboratorData';
 import { mockStreams } from '../data/streams';
-import { LiveEmptyState } from '../components/LiveEmptyState';
 import { useDevices } from '../hooks/useDevices';
 import { usePositions } from '../hooks/usePositions';
 import { useTeam } from '../hooks/useTeam';
@@ -22,6 +21,21 @@ export const TacticalMapTab = () => {
   const [myPos, setMyPos] = useState(null);
   const [zeroKey, setZeroKey] = useState(0);
   const [locating, setLocating] = useState(false);
+
+  // Live mode: open the map on the user's own area right away —
+  // rescuers need their surroundings even before anything is registered.
+  useEffect(() => {
+    if (!isLive || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude });
+        setZeroKey(k => k + 1);
+      },
+      () => { /* denied — map falls back to fleet/world view */ },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive]);
   const [mapMode, setMapMode] = useState('satellite'); // satellite, roadmap, terrain, hybrid
   const [showDevices, setShowDevices] = useState(true);
   const [showGeofences, setShowGeofences] = useState(true);
@@ -1083,21 +1097,6 @@ export const TacticalMapTab = () => {
         icon: '🧍',
       }));
 
-    if (placed.length === 0 && teamMarkers.length === 0 && !myPos) {
-      return (
-        <LiveEmptyState
-          icon={Map}
-          title="Tactical picture is empty"
-          description="No simulated markers here — the map lights up as devices are registered (Settings) and collaborators share their position (Field Log)."
-          facts={[
-            { label: 'Registered devices', value: devices.length },
-            { label: 'Team members sharing position', value: 0 },
-          ]}
-          hint="Connected to Supabase · live mode"
-        />
-      );
-    }
-
     const KIND_ICON = { drone: '🚁', ptz_camera: '📹', camera: '📷', sensor: '📡', edge_box: '🖥️' };
     const KIND_TYPE = { drone: 'drone', ptz_camera: 'camera', camera: 'camera', sensor: 'sensor', edge_box: 'sensor' };
     const mapDevices = [
@@ -1119,7 +1118,8 @@ export const TacticalMapTab = () => {
           lat: anchors.reduce((a, p) => a + p.lat, 0) / anchors.length,
           lng: anchors.reduce((a, p) => a + p.lng, 0) / anchors.length,
         }
-      : { lat: 43.2141, lng: 2.3522 });
+      : { lat: 20, lng: 0 });
+    const zoom = myPos ? 14 : anchors.length ? 11 : 2;
 
     const zeroIn = () => {
       if (!navigator.geolocation) return;
@@ -1167,17 +1167,24 @@ export const TacticalMapTab = () => {
             </div>
           </div>
         </div>
-        <div className="flex-1 min-h-[400px] rounded-xl overflow-hidden border border-slate-800">
+        <div className="flex-1 min-h-[400px] rounded-xl overflow-hidden border border-slate-800 relative">
           <TacticalMap
             key={zeroKey}
             mapMode={mapMode}
             devices={mapDevices}
             center={center}
-            zoom={myPos ? 15 : 11}
+            zoom={zoom}
             geofences={[]}
             alerts={[]}
             markers={[]}
           />
+          {placed.length === 0 && teamMarkers.length === 0 && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
+              <p className="text-[10px] text-slate-300">
+                Nothing on the map yet — register devices in Settings, or share your position from the Field Log
+              </p>
+            </div>
+          )}
         </div>
         <p className="text-xs text-slate-600 flex items-center gap-1.5 flex-shrink-0">
           <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
