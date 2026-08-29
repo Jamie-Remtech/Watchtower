@@ -399,14 +399,15 @@ export const WorldTab = () => {
           streets: {
             // Street-level detail: NASA imagery resolves to ~250 m/px, so
             // past zoom ~9 a dark street basemap takes over for close zooms.
-            type: 'raster', tileSize: 256,
-            tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
-            attribution: '© CARTO © OpenStreetMap contributors',
+            // Esri dark canvas — keyless (CARTO now requires API keys).
+            type: 'raster', tileSize: 256, maxzoom: 16,
+            tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],
+            attribution: '© Esri, HERE, Garmin, OpenStreetMap contributors',
           },
           labels: {
-            type: 'raster', tileSize: 256,
-            tiles: ['https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png'],
-            attribution: '© CARTO © OpenStreetMap contributors',
+            type: 'raster', tileSize: 256, maxzoom: 16,
+            tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'],
+            attribution: '© Esri',
           },
         },
         layers: [
