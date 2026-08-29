@@ -57,4 +57,4 @@ All operational data lives in Supabase (see `supabase/migrations`): organization
 - **Protocols** — codified response playbooks that either AI or a human can execute, with clear handover.
 - **Link all parties** — command, field crews, aircraft, external agencies in one operational picture.
 
-<!-- deploy: banner verification -->
+<!-- deploy: maps key rotation -->
