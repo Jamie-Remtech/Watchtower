@@ -58,13 +58,16 @@ ${JSON.stringify(picture ?? {}, null, 1)}`;
       let text = Array.isArray(data.content)
         ? data.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n')
         : '';
-      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-      try {
-        const parsed = JSON.parse(text);
-        return json({ warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [] });
-      } catch {
-        return json({ warnings: [], note: 'unparseable analysis' });
+      text = text.replace(/```(?:json)?/gi, '').trim();
+      // Parse strictly, then fall back to the outermost JSON object anywhere
+      // in the reply — models sometimes add a sentence around the JSON.
+      let parsed: { warnings?: unknown } | null = null;
+      try { parsed = JSON.parse(text); } catch {
+        const m = text.match(/\{[\s\S]*\}/);
+        if (m) { try { parsed = JSON.parse(m[0]); } catch { /* still bad */ } }
       }
+      if (parsed && Array.isArray(parsed.warnings)) return json({ warnings: parsed.warnings });
+      return json({ warnings: [], note: 'unparseable analysis', raw: text.slice(0, 300) });
     }
 
     // ---- mode: ask — voice Q&A over the live operational snapshot ----
