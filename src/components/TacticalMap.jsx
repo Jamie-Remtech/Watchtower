@@ -1,7 +1,66 @@
-import React, { useState, useCallback } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
+import React, { useState, useCallback, useEffect } from 'react';
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { Flame, Camera, Radio, Wind, Video } from 'lucide-react';
 import DeviceFeedViewer from './DeviceFeedViewer';
+
+// Live precipitation radar (RainViewer) over the tactical map.
+// RainViewer's native tiles stop at zoom 7, so beyond that each Google
+// tile shows the right crop of the z7 tile scaled up — blocky at street
+// level but the radar data itself is ~1 km resolution anyway.
+const RADAR_MAX_NATIVE_Z = 7;
+const makeRadarMapType = (host, path) => ({
+  tileSize: new window.google.maps.Size(256, 256),
+  name: 'watchtower-radar',
+  getTile(coord, zoom, doc) {
+    const div = doc.createElement('div');
+    div.style.cssText = 'width:256px;height:256px;position:relative;overflow:hidden';
+    const worldTiles = 1 << zoom;
+    let x = coord.x % worldTiles;
+    if (x < 0) x += worldTiles;
+    const y = coord.y;
+    if (y < 0 || y >= worldTiles) return div;
+    const z = Math.min(zoom, RADAR_MAX_NATIVE_Z);
+    const scale = 1 << (zoom - z);
+    const img = doc.createElement('img');
+    img.src = `${host}${path}/256/${z}/${Math.floor(x / scale)}/${Math.floor(y / scale)}/4/1_1.png`;
+    img.style.cssText =
+      `position:absolute;width:${256 * scale}px;height:${256 * scale}px;` +
+      `left:${-(x % scale) * 256}px;top:${-(y % scale) * 256}px;opacity:0.65;pointer-events:none`;
+    div.appendChild(img);
+    return div;
+  },
+  releaseTile() {},
+});
+
+const RadarOverlay = ({ visible }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !visible || !window.google?.maps) return;
+    let cancelled = false;
+    let current = null;
+    const removeOverlay = (o) => {
+      const arr = map.overlayMapTypes;
+      for (let i = arr.getLength() - 1; i >= 0; i--) {
+        if (arr.getAt(i) === o) arr.removeAt(i);
+      }
+    };
+    const apply = async () => {
+      try {
+        const j = await fetch('https://api.rainviewer.com/public/weather-maps.json').then(r => r.json());
+        const frame = j?.radar?.past?.at(-1);
+        if (!frame || cancelled) return;
+        const next = makeRadarMapType(j.host, frame.path);
+        map.overlayMapTypes.push(next);
+        if (current) removeOverlay(current);
+        current = next;
+      } catch { /* radar feed unreachable — map stays clean */ }
+    };
+    apply();
+    const t = setInterval(apply, 5 * 60 * 1000); // newest frame every 5 min
+    return () => { cancelled = true; clearInterval(t); if (current) removeOverlay(current); };
+  }, [map, visible]);
+  return null;
+};
 
 // Inline editor shown in a tactical marker's popup: label + notes,
 // saved for the whole team. Position changes by dragging the marker.
@@ -64,6 +123,7 @@ const TacticalMap = ({
   showAlerts = true,
   showFlightPaths = true,
   showMarkers = true,
+  showWeather = false,   // live precipitation radar overlay (RainViewer)
   center = { lat: 43.2141, lng: 2.3522 },
   zoom = 14,
   onMapInteraction,
@@ -143,6 +203,7 @@ const TacticalMap = ({
         }}
         onCameraChanged={(e) => onCameraChanged?.({ center: e.detail?.center, zoom: e.detail?.zoom })}
       >
+        <RadarOverlay visible={showWeather} />
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
             key={device.id}

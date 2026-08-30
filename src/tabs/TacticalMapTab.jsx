@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Map, Crosshair, Plus, Star, RefreshCw, X, Check, ExternalLink } from 'lucide-react';
+import { Map, Crosshair, Plus, Star, RefreshCw, X, Check, ExternalLink, CloudRain } from 'lucide-react';
 import TacticalMap from '../components/TacticalMap';
 import { useDevices } from '../hooks/useDevices';
 import { usePositions } from '../hooks/usePositions';
@@ -28,6 +28,11 @@ export const TacticalMapTab = () => {
   const [zeroKey, setZeroKey] = useState(0);
   const [locating, setLocating] = useState(false);
   const [mapMode, setMapMode] = useState('satellite');
+  const [showWeather, setShowWeather] = useState(() => localStorage.getItem('wt-tac-radar') === '1');
+  const toggleWeather = () => setShowWeather(v => {
+    localStorage.setItem('wt-tac-radar', v ? '0' : '1');
+    return !v;
+  });
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerBusy, setMarkerBusy] = useState(false);
   const [markerError, setMarkerError] = useState(null);
@@ -316,6 +321,14 @@ export const TacticalMapTab = () => {
                 {m}
               </button>
             ))}
+            <button
+              onClick={toggleWeather}
+              title="Live precipitation radar (RainViewer, updates every 5 min)"
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${showWeather ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <CloudRain className="w-3.5 h-3.5" />
+              Radar
+            </button>
           </div>
         </div>
       </div>
@@ -438,6 +451,7 @@ export const TacticalMapTab = () => {
         <TacticalMap
           key={zeroKey}
           mapMode={mapMode}
+          showWeather={showWeather}
           devices={mapDevices}
           center={center}
           zoom={zoom}
