@@ -10,6 +10,7 @@ import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
 import { usePresence } from './hooks/usePresence';
+import { startTracking, isTrackingPaused } from './lib/tracker';
 import { AttentionPanel } from './components/AttentionPanel';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -36,6 +37,15 @@ const WatchtowerPortal = () => {
   const { devices } = useDevices();
   const attention = useAttention();
   usePresence(); // register this session as online for the whole team
+
+  // Automatic position tracking for operational roles — no toggle needed.
+  // Viewers are never tracked; an explicit pause (Field Log) is honored.
+  useEffect(() => {
+    const role = profile?.role;
+    if (['field', 'operator', 'coordinator', 'admin'].includes(role) && !isTrackingPaused()) {
+      startTracking();
+    }
+  }, [profile?.role]);
   const [attnOpen, setAttnOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);

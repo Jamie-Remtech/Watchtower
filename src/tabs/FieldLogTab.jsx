@@ -7,7 +7,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
 import { queuedCount } from '../lib/offlineQueue';
 import { useSpeech } from '../hooks/useSpeech';
-import { usePositions } from '../hooks/usePositions';
+import { useTracker } from '../hooks/useTracker';
+import { startTracking, pauseTracking, isTrackingPaused } from '../lib/tracker';
 import { usePatients } from '../hooks/usePatients';
 import { parseCommand, TRIAGE_META } from '../lib/fieldCommands';
 import { beep, say } from '../lib/speechFeedback';
@@ -70,7 +71,7 @@ export const FieldLogTab = () => {
   const [handoff, setHandoff] = useState(null); // { patient, text, ai }
   const [handoffBusy, setHandoffBusy] = useState(false);
   const [queued, setQueued] = useState(queuedCount());
-  const { sharing, startSharing, stopSharing, lastSent, shareError } = usePositions();
+  const tracker = useTracker();
   const { patients, createPatient, updatePatient } = usePatients();
 
   const activePatient = patients.find(p => p.id === activePatientId) ?? null;
@@ -326,27 +327,31 @@ export const FieldLogTab = () => {
         )}
       </div>
 
-      {/* Live location sharing */}
+      {/* Automatic position tracking status */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-white flex items-center gap-2">
-            <Radio className={`w-4 h-4 ${sharing ? 'text-green-400' : 'text-slate-500'}`} />
-            Share my live position
+            <Radio className={`w-4 h-4 ${tracker.active ? 'text-green-400' : 'text-slate-500'}`} />
+            Live position tracking
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            {sharing
-              ? `Broadcasting to the tactical map${lastSent ? ` · last fix ${timeAgo(lastSent.toISOString())}` : ''} · keep the app open`
-              : 'Your team sees you on the tactical map while this is on'}
+            {tracker.active
+              ? `Automatic — your team sees you on the tactical map${tracker.lastFix ? ` · last fix ${timeAgo(tracker.lastFix.toISOString())}` : ' · acquiring GPS…'}`
+              : isTrackingPaused()
+                ? 'Paused by you — your team cannot see your position'
+                : tracker.error ?? 'Starting…'}
           </p>
-          {shareError && <p className="text-[10px] text-red-400 mt-0.5">{shareError}</p>}
+          {tracker.error && !isTrackingPaused() && <p className="text-[10px] text-red-400 mt-0.5">{tracker.error}</p>}
         </div>
         <button
-          onClick={sharing ? stopSharing : startSharing}
+          onClick={tracker.active ? () => pauseTracking() : () => startTracking()}
           className={`px-4 py-2 rounded-lg text-xs font-semibold flex-shrink-0 ${
-            sharing ? 'bg-green-500/20 border border-green-500/40 text-green-400' : 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+            tracker.active
+              ? 'bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700'
+              : 'bg-green-500/20 border border-green-500/40 text-green-400'
           }`}
         >
-          {sharing ? 'ON' : 'OFF'}
+          {tracker.active ? 'Pause' : 'Resume'}
         </button>
       </div>
 
