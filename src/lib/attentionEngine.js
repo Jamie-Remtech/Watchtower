@@ -24,6 +24,20 @@ const haversine = (a, b) => {
   return 2 * KM * Math.asin(Math.sqrt(s));
 };
 
+// Initial bearing a -> b in degrees (0 = north)
+const bearing = (a, b) => {
+  const φ1 = (a.lat * Math.PI) / 180, φ2 = (b.lat * Math.PI) / 180;
+  const Δλ = ((b.lng - a.lng) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+};
+
+const angleDiff = (a, b) => {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+};
+
 // Default watch ranges — admins can override per-org in Settings
 const DEFAULT_HAZARD_RADIUS_KM = 300;   // seismic / general events
 const DEFAULT_WILDFIRE_RADIUS_KM = 150; // wildfires: tighter, more serious
@@ -90,17 +104,23 @@ export async function runAttentionSweep() {
       lng: placed.reduce((a, d) => a + d.lng, 0) / placed.length,
     });
   }
+  if (anchors[0]) anchors[0].label = 'device fleet';
   try {
-    const { data: fixes } = await supabase
-      .from('positions').select('profile_id, lat, lng, at')
-      .order('at', { ascending: false }).limit(100);
+    const [{ data: fixes }, { data: profs }] = await Promise.all([
+      supabase.from('positions').select('profile_id, lat, lng, at').order('at', { ascending: false }).limit(100),
+      supabase.from('profiles').select('id, display_name'),
+    ]);
+    const nameOf = Object.fromEntries((profs ?? []).map(p => [p.id, p.display_name]));
     const seen = new Set();
     for (const p of fixes ?? []) {
       if (seen.has(p.profile_id) || Date.now() - new Date(p.at) > 15 * 60 * 1000) continue;
       seen.add(p.profile_id);
-      anchors.push({ lat: p.lat, lng: p.lng });
+      anchors.push({ lat: p.lat, lng: p.lng, label: nameOf[p.profile_id] ?? 'crew member' });
     }
   } catch { /* positions unavailable — fleet anchor still works */ }
+
+  const nearbyFires = [];
+  const nearbyQuakes = [];
 
   const nearestDist = (pos) => Math.min(...anchors.map(a => haversine(a, pos)));
   const centroid = anchors[0] ?? null;
@@ -120,6 +140,7 @@ export async function runAttentionSweep() {
         const isFire = cat === 'wildfires';
         const radius = isFire ? WILDFIRE_RADIUS_KM : HAZARD_RADIUS_KM;
         if (dist <= radius) {
+          if (isFire) nearbyFires.push({ id: e.id, title: e.title, lat: pos.lat, lng: pos.lng, dist });
           candidates.push({
             dedupe_key: `eonet:${e.id}`,
             severity: isFire ? 'critical' : 'warning',
@@ -142,6 +163,7 @@ export async function runAttentionSweep() {
         const dist = nearestDist({ lat, lng });
         if (dist <= HAZARD_RADIUS_KM) {
           const mag = f.properties.mag;
+          nearbyQuakes.push({ id: f.id, place: f.properties.place, mag, lat, lng, dist });
           candidates.push({
             dedupe_key: `quake:${f.id}`,
             severity: mag >= 6 || f.properties.tsunami === 1 ? 'critical' : 'warning',
@@ -174,6 +196,79 @@ export async function runAttentionSweep() {
         });
       }
     } catch { /* feed unreachable */ }
+  }
+
+  // ---- CASCADE LAYER 1 (geometric, always on): downwind of a fire ----
+  // Wind at each nearby fire; if it blows toward an anchor within the
+  // wind's plausible reach, that person gets a critical warning.
+  let fireWeather = [];
+  if (nearbyFires.length && anchors.length) {
+    try {
+      const fires = nearbyFires.slice(0, 8);
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${fires.map(f => f.lat.toFixed(2)).join(',')}` +
+        `&longitude=${fires.map(f => f.lng.toFixed(2)).join(',')}&current=wind_speed_10m,wind_direction_10m,relative_humidity_2m,temperature_2m`
+      );
+      const j = await res.json();
+      const rows = Array.isArray(j) ? j : [j];
+      fireWeather = fires.map((f, i) => ({ ...f, wx: rows[i]?.current ?? null }));
+      for (const f of fireWeather) {
+        if (!f.wx || f.wx.wind_speed_10m == null) continue;
+        const windTo = (f.wx.wind_direction_10m + 180) % 360;
+        const reach = Math.min(80, 15 + f.wx.wind_speed_10m * 2.5); // km, scales with wind
+        for (const a of anchors) {
+          const d = haversine(f, a);
+          const brg = bearing(f, a);
+          if (d <= reach && angleDiff(windTo, brg) <= 50) {
+            candidates.push({
+              dedupe_key: `downwind:${f.id}:${a.label}`,
+              severity: 'critical',
+              kind: 'cascade',
+              title: `${a.label} is DOWNWIND of ${f.title} (${Math.round(d)} km)`,
+              detail: `Wind ${Math.round(f.wx.wind_speed_10m)} km/h blowing from the fire toward this position (fire humidity ${f.wx.relative_humidity_2m}%, ${f.wx.temperature_2m}°C). Spread direction favors approach — reassess position and escape routes.`,
+              source: { fire: f.title, wind_kmh: f.wx.wind_speed_10m, wind_to: windTo, distance_km: Math.round(d) },
+            });
+            break; // one item per fire per sweep is enough
+          }
+        }
+      }
+    } catch { /* wind sampling unavailable */ }
+  }
+
+  // ---- CASCADE LAYER 2 (AI analysis): secondary and chained risks ----
+  // Claude examines the whole threat picture around each person —
+  // spread setups, post-seismic slides/mudflows, storm-flood chains.
+  // Throttled: runs when the picture changes or every 30 minutes.
+  if ((nearbyFires.length || nearbyQuakes.length) && anchors.length) {
+    try {
+      const picture = {
+        anchors: anchors.map(a => ({ label: a.label, lat: +a.lat.toFixed(3), lng: +a.lng.toFixed(3) })),
+        fires: fireWeather.length ? fireWeather.map(f => ({ title: f.title, lat: f.lat, lng: f.lng, dist_km: Math.round(f.dist), weather: f.wx }))
+          : nearbyFires.map(f => ({ title: f.title, lat: f.lat, lng: f.lng, dist_km: Math.round(f.dist) })),
+        quakes: nearbyQuakes.map(q => ({ place: q.place, mag: q.mag, lat: q.lat, lng: q.lng, dist_km: Math.round(q.dist) })),
+      };
+      const hash = JSON.stringify(picture);
+      let last = null;
+      try { last = JSON.parse(localStorage.getItem('wt-cascade-last') ?? 'null'); } catch { /* fresh */ }
+      const changed = !last || last.hash !== hash;
+      const stale = !last || Date.now() - last.at > 30 * 60 * 1000;
+      if (changed || stale) {
+        localStorage.setItem('wt-cascade-last', JSON.stringify({ hash, at: Date.now() }));
+        const { data } = await supabase.functions.invoke('field-assist', {
+          body: { mode: 'cascade', picture },
+        });
+        for (const w of data?.warnings ?? []) {
+          if (!w?.title) continue;
+          candidates.push({
+            dedupe_key: `cascade:${(w.key ?? w.title).slice(0, 80)}`,
+            severity: ['critical', 'warning', 'info'].includes(w.severity) ? w.severity : 'warning',
+            kind: 'cascade',
+            title: w.title.slice(0, 140),
+            detail: `${(w.detail ?? '').slice(0, 400)} — AI cascade analysis; verify before acting.`,
+          });
+        }
+      }
+    } catch { /* AI not configured or unreachable — geometric layer still ran */ }
   }
 
   // ---- Invitations expiring within 48h ----

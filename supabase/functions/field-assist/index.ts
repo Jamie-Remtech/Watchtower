@@ -24,9 +24,48 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { mode, patient, entries, question, context, history } = await req.json();
+    const { mode, patient, entries, question, context, history, picture } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY secret is not set' }, 500);
+
+    // ---- mode: cascade — secondary/chained risk analysis around people ----
+    if (mode === 'cascade') {
+      const prompt = `You are Watchtower's cascade-risk analyst for an emergency response team.
+Below is the live picture: anchors (people/assets with positions) and active threats nearby (fires with weather where available, earthquakes).
+
+Identify SECONDARY and CASCADING dangers that follow from these threats, per anchor where relevant:
+- fire spread setups: wind carrying fire toward an anchor, dry/hot corridors downwind
+- post-seismic chains: landslides, rockfall, dam/glacier/lahar-mudflow risk where the region plausibly has steep or glaciated terrain (judge from place names and latitude), aftershock exposure
+- weather chains: storm→flash flood in burned or steep areas, smoke→air quality downwind
+
+Rules:
+- Base every warning ONLY on the data given plus well-established physical reasoning. State the chain explicitly (X → Y → risk to Z).
+- Include rough distances/directions using the coordinates.
+- If nothing meaningful, return an empty list — silence is better than noise.
+- Respond with STRICT JSON only, no prose, no code fences:
+{"warnings":[{"severity":"critical|warning|info","title":"short, names the anchor when specific","detail":"the chain and what to do, 1-3 sentences","key":"short-stable-slug"}]}
+
+LIVE PICTURE:
+${JSON.stringify(picture ?? {}, null, 1)}`;
+
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 800, messages: [{ role: 'user', content: prompt }] }),
+      });
+      const data = await r.json();
+      if (!r.ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      let text = Array.isArray(data.content)
+        ? data.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n')
+        : '';
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+      try {
+        const parsed = JSON.parse(text);
+        return json({ warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [] });
+      } catch {
+        return json({ warnings: [], note: 'unparseable analysis' });
+      }
+    }
 
     // ---- mode: ask — voice Q&A over the live operational snapshot ----
     if (mode === 'ask') {
