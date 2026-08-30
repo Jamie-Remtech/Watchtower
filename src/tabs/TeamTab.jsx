@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { useTeam } from '../hooks/useTeam';
 import { usePresence } from '../hooks/usePresence';
-import { ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../auth/roles';
+import { useAuth } from '../auth/AuthContext';
+import { ROLE_LABELS, ROLE_DESCRIPTIONS, invitableRoles } from '../auth/roles';
 
 
 // ============================================
@@ -1182,6 +1183,8 @@ const InviteQR = ({ code }) => {
 // Invitation creation modal — in live mode this writes a real invitation
 // to Supabase and shows the code to hand to the new collaborator.
 const InviteModal = ({ isLive, onClose, onCreate }) => {
+  const { profile } = useAuth();
+  const roleOptions = invitableRoles(profile?.role);
   const [role, setRole] = useState('field');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1264,7 +1267,7 @@ const InviteModal = ({ isLive, onClose, onCreate }) => {
             <div>
               <label className="text-xs text-slate-400 block mb-1.5">Role</label>
               <div className="space-y-1">
-                {ROLES.map(r => (
+                {roleOptions.map(r => (
                   <button
                     key={r}
                     onClick={() => setRole(r)}

@@ -32,3 +32,8 @@ export const TAB_ACCESS = {
   viewer: ['world'],
 };
 export const allowedTabs = (role) => TAB_ACCESS[role] ?? ['world'];
+
+// Which roles an inviter may hand out: only admins can mint admins
+// or coordinators; coordinators invite the operational ranks below.
+export const invitableRoles = (inviterRole) =>
+  inviterRole === 'admin' ? ROLES : ROLES.filter(r => r !== 'admin' && r !== 'coordinator');
