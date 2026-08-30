@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Radio, Send, Loader2 } from 'lucide-react';
+import { Radio, Send, Loader2, Mic, MicOff } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
 import { useTeam } from '../hooks/useTeam';
 import { usePresence } from '../hooks/usePresence';
+import { useSpeech } from '../hooks/useSpeech';
 import { beep } from '../lib/speechFeedback';
+import { pushToTeam } from '../lib/push';
 
 // ============================================
 // COMMS — the org channel
@@ -77,9 +79,22 @@ export const CommsTab = () => {
     } else {
       setText('');
       setError(null);
+      // Reach closed apps too
+      pushToTeam({
+        kind: 'message',
+        title: `${profile?.display_name ?? 'Watchtower'} (Comms)`,
+        body: body.slice(0, 140),
+        url: '/',
+        tag: 'comms',
+      });
     }
     setSending(false);
   };
+
+  // Speak instead of typing — same engine as the Field Log.
+  const { supported: micSupported, listening, interim, start: micStart, stop: micStop } = useSpeech({
+    onFinal: (t) => setText(prev => (prev ? prev + ' ' : '') + t.trim()),
+  });
 
   const onlineCount = liveMembers.filter(m => onlineIds.has(m.id)).length;
 
@@ -126,12 +141,23 @@ export const CommsTab = () => {
         })}
       </div>
 
+      {interim && <p className="text-xs text-orange-300/80 italic flex-shrink-0">{interim}…</p>}
       <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={listening ? micStop : micStart}
+          disabled={!micSupported}
+          className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+            listening ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-br from-orange-500 to-orange-600 hover:scale-105'
+          } disabled:opacity-40`}
+          title={micSupported ? 'Dictate a message' : 'Speech recognition not supported here'}
+        >
+          {listening ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-white" />}
+        </button>
         <input
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send(); }}
-          placeholder={`Message the team${profile?.display_name ? ` as ${profile.display_name}` : ''}…`}
+          placeholder={listening ? 'Listening — speak your message…' : `Message the team${profile?.display_name ? ` as ${profile.display_name}` : ''}…`}
           className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
         />
         <button

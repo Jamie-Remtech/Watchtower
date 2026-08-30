@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
+import { pushToTeam } from './push';
 
 // ============================================
 // ATTENTION ENGINE v1
@@ -66,14 +67,31 @@ export async function runAttentionSweep() {
     }
   }
 
-  // ---- Fleet centroid for proximity rules ----
+  // ---- Anchors for proximity rules: the device fleet's centroid PLUS
+  // every crew member's fresh live position. Hazards are judged by the
+  // nearest anchor — the engine watches around PEOPLE, not just gear.
   const placed = (devices ?? []).filter(d => d.lat != null && d.lng != null);
-  const centroid = placed.length
-    ? {
-        lat: placed.reduce((a, d) => a + d.lat, 0) / placed.length,
-        lng: placed.reduce((a, d) => a + d.lng, 0) / placed.length,
-      }
-    : null;
+  const anchors = [];
+  if (placed.length) {
+    anchors.push({
+      lat: placed.reduce((a, d) => a + d.lat, 0) / placed.length,
+      lng: placed.reduce((a, d) => a + d.lng, 0) / placed.length,
+    });
+  }
+  try {
+    const { data: fixes } = await supabase
+      .from('positions').select('profile_id, lat, lng, at')
+      .order('at', { ascending: false }).limit(100);
+    const seen = new Set();
+    for (const p of fixes ?? []) {
+      if (seen.has(p.profile_id) || Date.now() - new Date(p.at) > 15 * 60 * 1000) continue;
+      seen.add(p.profile_id);
+      anchors.push({ lat: p.lat, lng: p.lng });
+    }
+  } catch { /* positions unavailable — fleet anchor still works */ }
+
+  const nearestDist = (pos) => Math.min(...anchors.map(a => haversine(a, pos)));
+  const centroid = anchors[0] ?? null;
 
   if (centroid) {
     // ---- Natural events near the fleet (NASA EONET) ----
@@ -85,7 +103,7 @@ export async function runAttentionSweep() {
         const coords = g?.type === 'Point' ? g.coordinates : g?.coordinates?.[0]?.[0];
         if (!Array.isArray(coords)) continue;
         const pos = { lng: coords[0], lat: coords[1] };
-        const dist = haversine(centroid, pos);
+        const dist = nearestDist(pos);
         const cat = e.categories?.[0]?.id;
         const isFire = cat === 'wildfires';
         const radius = isFire ? WILDFIRE_RADIUS_KM : HAZARD_RADIUS_KM;
@@ -109,7 +127,7 @@ export async function runAttentionSweep() {
       const data = await res.json();
       for (const f of data.features ?? []) {
         const [lng, lat] = f.geometry.coordinates;
-        const dist = haversine(centroid, { lat, lng });
+        const dist = nearestDist({ lat, lng });
         if (dist <= HAZARD_RADIUS_KM) {
           const mag = f.properties.mag;
           candidates.push({
@@ -173,6 +191,10 @@ export async function runAttentionSweep() {
     if (!error) {
       raised++;
       logEvent('attention.raised', { severity: c.severity, kind: c.kind, title: c.title }, c.dedupe_key);
+      // Critical anomalies reach pockets, not just open apps
+      if (c.severity === 'critical') {
+        pushToTeam({ kind: 'attention', title: `⚠ ${c.title}`, body: c.detail?.slice(0, 140) ?? '', url: '/', tag: c.dedupe_key });
+      }
     }
   }
 

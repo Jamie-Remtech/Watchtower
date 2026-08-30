@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic
 } from 'lucide-react';
@@ -11,6 +11,8 @@ import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
 import { usePresence } from './hooks/usePresence';
 import { startTracking, isTrackingPaused } from './lib/tracker';
+import { supabase } from './lib/supabase';
+import { enableNotifications, ensureSubscribed, notificationPermission, localNotify } from './lib/push';
 import { AttentionPanel } from './components/AttentionPanel';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -46,6 +48,36 @@ const WatchtowerPortal = () => {
       startTracking();
     }
   }, [profile?.role]);
+
+  // Notifications: re-register this device for push whenever permission
+  // is already granted; show incoming-message alerts + unread badge.
+  const [notifPerm, setNotifPerm] = useState(notificationPermission());
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  useEffect(() => {
+    if (notifPerm === 'granted') ensureSubscribed();
+  }, [notifPerm]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('messages-shell')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (payload.new.sender === user?.id) return;
+        if (activeTabRef.current !== 'comms') {
+          setUnreadMsgs(n => n + 1);
+          localNotify('Watchtower — new message', payload.new.text?.slice(0, 120) ?? '', '/');
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'comms') setUnreadMsgs(0);
+  }, [activeTab]);
   const [attnOpen, setAttnOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -191,11 +223,22 @@ const WatchtowerPortal = () => {
               {item.id === 'streams' && activeAlerts === 0 && tendedAlerts > 0 && (
                 <span className="ml-auto px-1.5 py-0.5 bg-orange-500 rounded text-xs font-bold">{tendedAlerts}</span>
               )}
+              {item.id === 'comms' && unreadMsgs > 0 && (
+                <span className="ml-auto px-1.5 py-0.5 bg-orange-500 rounded text-xs font-bold">{unreadMsgs}</span>
+              )}
             </button>
           ))}
         </nav>
         
-        <div className="px-2 py-2 border-t border-slate-800">
+        <div className="px-2 py-2 border-t border-slate-800 space-y-1">
+          {notifPerm === 'default' && (
+            <button
+              onClick={async () => { await enableNotifications(); setNotifPerm(notificationPermission()); }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-medium"
+            >
+              <Bell className="w-3.5 h-3.5" />Enable notifications
+            </button>
+          )}
           <button onClick={() => setAiOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-400 text-xs font-medium">
             <Zap className="w-3.5 h-3.5" />AI Assistant
           </button>
