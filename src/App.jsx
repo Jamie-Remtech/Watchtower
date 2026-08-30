@@ -14,6 +14,7 @@ import { startTracking, isTrackingPaused } from './lib/tracker';
 import { supabase } from './lib/supabase';
 import { enableNotifications, ensureSubscribed, notificationPermission, localNotify } from './lib/push';
 import { AttentionPanel } from './components/AttentionPanel';
+import { RequestAccess } from './components/RequestAccess';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
 import { CommsTab } from './tabs/CommsTab';
@@ -235,6 +236,7 @@ const WatchtowerPortal = () => {
         </nav>
         
         <div className="px-2 py-2 border-t border-slate-800 space-y-1">
+          <RequestAccess />
           {notifPerm === 'default' && (
             <button
               onClick={async () => { await enableNotifications(); setNotifPerm(notificationPermission()); }}

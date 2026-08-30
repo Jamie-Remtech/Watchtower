@@ -6,7 +6,7 @@ import {
 import { useTeam } from '../hooks/useTeam';
 import { usePresence } from '../hooks/usePresence';
 import { useAuth } from '../auth/AuthContext';
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, invitableRoles } from '../auth/roles';
+import { ROLES as ROLE_OPTIONS_ALL, ROLE_LABELS, ROLE_DESCRIPTIONS, invitableRoles } from '../auth/roles';
 
 
 // ============================================
@@ -97,8 +97,18 @@ export const TeamTab = () => {
   };
   
   // Live team only, with REAL presence: online = has Watchtower open now.
-  const { isLive, liveMembers, invitations, createInvitation, revokeInvitation } = useTeam();
+  const { isLive, liveMembers, invitations, createInvitation, revokeInvitation, dropMember, setMemberRole } = useTeam();
   const onlineIds = usePresence();
+  const { profile, session } = useAuth();
+  const myId = session?.user?.id;
+  const isAdmin = profile?.role === 'admin';
+  const [confirmDropId, setConfirmDropId] = useState(null);
+  // Who the current user may stand down: admins → anyone but admins;
+  // coordinators → the field ranks. Mirrors the drop_member function.
+  const canDrop = (targetRole) =>
+    isAdmin ? targetRole !== 'admin'
+    : profile?.role === 'coordinator' ? ['viewer', 'field', 'operator'].includes(targetRole)
+    : false;
   const teamMembers = liveMembers.map(m => ({
     ...m,
     status: onlineIds.has(m.id) ? 'online' : 'offline',
@@ -328,6 +338,41 @@ export const TeamTab = () => {
                   )}
                 </div>
                 
+                {/* Lifecycle controls: stand down / restore */}
+                {user.id !== myId && canDrop(user.role) && user.role !== 'viewer' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirmDropId === user.id) {
+                        dropMember(user.id).catch(() => {});
+                        setConfirmDropId(null);
+                      } else {
+                        setConfirmDropId(user.id);
+                        setTimeout(() => setConfirmDropId(c => (c === user.id ? null : c)), 3000);
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs border ${
+                      confirmDropId === user.id
+                        ? 'bg-red-500/20 border-red-500/40 text-red-400 font-bold'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-red-400'
+                    }`}
+                    title="Stand down to Viewer (world map only) — account stays, access can be restored"
+                  >
+                    {confirmDropId === user.id ? 'Confirm stand-down?' : 'Stand down'}
+                  </button>
+                )}
+                {isAdmin && user.id !== myId && (
+                  <select
+                    value={user.role}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { e.stopPropagation(); setMemberRole(user.id, e.target.value).catch(() => {}); }}
+                    className="text-xs px-2 py-1.5 rounded-lg border bg-slate-900 border-slate-700 text-slate-300 focus:outline-none"
+                    title="Set role (admin)"
+                  >
+                    {ROLE_OPTIONS_ALL.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                )}
+
                 {/* Stats */}
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-white">{user.alertsHandled} alerts</p>

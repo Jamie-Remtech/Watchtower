@@ -31,6 +31,9 @@ const TYPE_META = {
   'mapview.removed': { icon: '🗺️', label: 'View removed' },
   'ai.asked': { icon: '🤖', label: 'Asked the AI' },
   'org.updated': { icon: '⚙️', label: 'Org settings' },
+  'member.dropped': { icon: '👥', label: 'Member stood down' },
+  'member.role_changed': { icon: '👥', label: 'Role changed' },
+  'access.requested': { icon: '🔑', label: 'Access requested' },
 };
 
 const FILTERS = [
@@ -63,6 +66,9 @@ const summarize = (e) => {
   if (e.type === 'invitation.created') return `role: ${p.role}${p.email ? ` for ${p.email}` : ''}`;
   if (e.type === 'user.joined') return `via ${p.via ?? 'signup'} as ${p.role ?? 'member'}`;
   if (e.type === 'org.updated') return [p.name, p.region].filter(Boolean).join(' · ');
+  if (e.type === 'member.dropped') return `${p.name ?? 'member'} (was ${p.was})`;
+  if (e.type === 'member.role_changed') return `${p.name ?? 'member'}: ${p.from} → ${p.to}`;
+  if (e.type === 'access.requested') return p.message ?? '';
   const s = JSON.stringify(p);
   return s === '{}' ? '' : s.slice(0, 120);
 };

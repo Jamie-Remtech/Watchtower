@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { logEvent } from '../lib/eventLog';
 import { ROLE_LABELS } from '../auth/roles';
 
 // Maps a Supabase profile row into the full member shape the Team UI expects.
@@ -91,5 +92,24 @@ export const useTeam = () => {
     await refresh();
   }, [refresh]);
 
-  return { isLive, liveMembers, invitations, loading, error, refresh, createInvitation, revokeInvitation };
+  // Stand a member down to viewer (world map only). Rank rules are
+  // enforced server-side in drop_member.
+  const dropMember = useCallback(async (id) => {
+    const m = liveMembers.find(x => x.id === id);
+    const { error } = await supabase.rpc('drop_member', { target: id });
+    if (error) throw error;
+    logEvent('member.dropped', { name: m?.name, was: m?.role }, id);
+    await refresh();
+  }, [liveMembers, refresh]);
+
+  // Admin-only: set any member's role (used to restore dropped users).
+  const setMemberRole = useCallback(async (id, role) => {
+    const m = liveMembers.find(x => x.id === id);
+    const { error } = await supabase.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    logEvent('member.role_changed', { name: m?.name, from: m?.role, to: role }, id);
+    await refresh();
+  }, [liveMembers, refresh]);
+
+  return { isLive, liveMembers, invitations, loading, error, refresh, createInvitation, revokeInvitation, dropMember, setMemberRole };
 };
