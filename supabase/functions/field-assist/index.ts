@@ -51,12 +51,12 @@ ${JSON.stringify(picture ?? {}, null, 1)}`;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 800, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
       });
       const data = await r.json();
       if (!r.ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
       let text = Array.isArray(data.content)
-        ? data.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n')
+        ? data.content.filter((c: { text?: string }) => typeof c.text === 'string').map((c: { text: string }) => c.text).join('\n')
         : '';
       text = text.replace(/```(?:json)?/gi, '').trim();
       // Parse strictly, then fall back to the outermost JSON object anywhere
@@ -67,7 +67,11 @@ ${JSON.stringify(picture ?? {}, null, 1)}`;
         if (m) { try { parsed = JSON.parse(m[0]); } catch { /* still bad */ } }
       }
       if (parsed && Array.isArray(parsed.warnings)) return json({ warnings: parsed.warnings });
-      return json({ warnings: [], note: 'unparseable analysis', raw: text.slice(0, 300) });
+      return json({
+        warnings: [], note: 'unparseable analysis', raw: text.slice(0, 300),
+        stop_reason: data.stop_reason,
+        block_types: Array.isArray(data.content) ? data.content.map((c: { type: string }) => c.type) : null,
+      });
     }
 
     // ---- mode: ask — voice Q&A over the live operational snapshot ----
