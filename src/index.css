@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Map popups: a close button you can actually hit on a phone */
+.maplibregl-popup-close-button {
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  line-height: 1;
+  color: #475569;
+  border-radius: 8px;
+  top: 2px;
+  right: 2px;
+}
+.maplibregl-popup-close-button:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.maplibregl-popup-content {
+  padding-right: 34px;
+}

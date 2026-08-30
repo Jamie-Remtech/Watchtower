@@ -456,6 +456,15 @@ export const WorldTab = () => {
         });
       }
 
+      // One popup at a time; tapping the bare map dismisses whatever is open
+      let activePopup = null;
+      const trackPopup = (popup) => {
+        activePopup?.remove();
+        activePopup = popup;
+        popup.on('close', () => { if (activePopup === popup) activePopup = null; });
+        return popup;
+      };
+
       // EONET natural events (fires, volcanoes, storms)
       map.addSource('eonet', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
@@ -471,7 +480,7 @@ export const WorldTab = () => {
       });
       map.on('click', 'eonet-circles', (e) => {
         const f = e.features[0];
-        new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+        trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' }))
           .setLngLat(f.geometry.coordinates)
           .setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
@@ -502,7 +511,7 @@ export const WorldTab = () => {
       map.on('click', 'quake-circles', (e) => {
         const f = e.features[0];
         const [lng, lat, depth] = f.geometry.coordinates;
-        new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+        trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' }))
           .setLngLat([lng, lat])
           .setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
@@ -520,8 +529,10 @@ export const WorldTab = () => {
       // Click anywhere -> live point weather from Open-Meteo
       map.on('click', async (e) => {
         if (map.queryRenderedFeatures(e.point, { layers: ['quake-circles', 'eonet-circles'] }).length) return;
+        // A tap on the bare map while a popup is open just dismisses it
+        if (activePopup) { activePopup.remove(); activePopup = null; return; }
         const { lng, lat } = e.lngLat;
-        const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
+        const popup = trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '260px' }))
           .setLngLat(e.lngLat)
           .setHTML('<div style="font-size:12px;color:#334155">Fetching live weather…</div>')
           .addTo(map);
