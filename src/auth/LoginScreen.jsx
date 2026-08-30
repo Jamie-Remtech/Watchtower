@@ -10,12 +10,17 @@ const MODES = [
   { id: 'invite', label: 'Join with invite' },
 ];
 
+// A ?join=CODE link (from the invite QR) opens sign-up with the code filled in
+const joinParam = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search).get('join')
+  : null;
+
 export const LoginScreen = () => {
   const { signInWithPassword, signInWithMagicLink, signUpWithInvite } = useAuth();
-  const [mode, setMode] = useState('password');
+  const [mode, setMode] = useState(joinParam ? 'invite' : 'password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCode, setInviteCode] = useState(joinParam ?? '');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);

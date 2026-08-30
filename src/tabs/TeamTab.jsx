@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import {
   Video, Users, CreditCard, Settings, AlertTriangle, Eye, Camera, CheckCircle, XCircle, X, UserPlus, FileText, MapPin, Download, Edit, Mail, Phone, Shield, Database, ChevronRight, Activity, Radio, Grid, List, User, Navigation, Layers, Map, Satellite, Info, Copy, Ticket, Loader2
 } from 'lucide-react';
@@ -1160,6 +1161,24 @@ export const TeamTab = () => {
   );
 };
 
+// QR that encodes the join link — scan with any phone camera and the
+// app opens straight onto sign-up with the code prefilled. Built for
+// onboarding a crew in the field, screen to screen.
+const InviteQR = ({ code }) => {
+  const [dataUrl, setDataUrl] = useState(null);
+  useEffect(() => {
+    const url = `${window.location.origin}/?join=${encodeURIComponent(code)}`;
+    QRCode.toDataURL(url, { width: 240, margin: 1 }).then(setDataUrl).catch(() => {});
+  }, [code]);
+  if (!dataUrl) return null;
+  return (
+    <div className="flex flex-col items-center gap-1.5 py-1">
+      <img src={dataUrl} alt="Scan to join Watchtower" className="rounded-lg border-4 border-white w-[200px] h-[200px]" />
+      <p className="text-[10px] text-slate-500">Scan with the phone camera → sign-up opens with the code filled in</p>
+    </div>
+  );
+};
+
 // Invitation creation modal — in live mode this writes a real invitation
 // to Supabase and shows the code to hand to the new collaborator.
 const InviteModal = ({ isLive, onClose, onCreate }) => {
@@ -1198,7 +1217,9 @@ const InviteModal = ({ isLive, onClose, onCreate }) => {
           </p>
         ) : created ? (
           <div className="space-y-3">
-            <p className="text-xs text-slate-300">Invitation created. Give this code to your collaborator — they sign up with <span className="text-orange-300 font-medium">Join with invite</span>:</p>
+            <p className="text-xs text-slate-300">Invitation created. <span className="text-orange-300 font-medium">Let them scan this</span> — or send the code:</p>
+            <InviteQR code={created.code} />
+            <p className="text-xs text-slate-300">Or they sign up with <span className="text-orange-300 font-medium">Join with invite</span> using:</p>
             <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800 border border-orange-500/30 rounded-lg">
               <code className="text-base font-mono text-orange-300 flex-1">{created.code}</code>
               <button

@@ -23,7 +23,7 @@ export const hasAtLeast = (role, required) =>
 // Which tabs each role can open. Viewers get the World tab only (for
 // now) — friends and family can watch the world without touching
 // operations. Unknown/loading roles default to the safest set.
-const ALL_TABS = ['streams', 'tactical', 'world', 'log', 'comms', 'team', 'billing', 'settings'];
+const ALL_TABS = ['streams', 'tactical', 'world', 'log', 'comms', 'activity', 'team', 'billing', 'settings'];
 export const TAB_ACCESS = {
   admin: ALL_TABS,
   coordinator: ALL_TABS,
