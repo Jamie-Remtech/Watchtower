@@ -23,7 +23,19 @@ const gibsDate = (daysBack = 1) => {
 };
 
 // Native max zoom per raster source (beyond these the providers have no data)
-const RASTER_MAXZOOM = { radar: 7, basemap: 9, bluemarble: 8, aerosol: 6, chlorophyll: 7, lst: 7 };
+const RASTER_MAXZOOM = { radar: 7, basemap: 9, bluemarble: 8, aerosol: 6, chlorophyll: 7, lst: 7, 'geo-east': 7, 'geo-west': 7, 'geo-him': 7 };
+
+// Geostationary birds: true cloud motion in 10-minute frames via NASA GIBS.
+// GOES GeoColor covers the Americas day+night; Himawari Band13 IR covers
+// Asia-Pacific (no GeoColor in GIBS). Publication lags ~30-40 min.
+const GEO_SATS = [
+  { id: 'geo-east', layer: 'GOES-East_ABI_GeoColor' },
+  { id: 'geo-west', layer: 'GOES-West_ABI_GeoColor' },
+  { id: 'geo-him', layer: 'Himawari_AHI_Band13_Clean_Infrared' },
+];
+const GEO_LAG_S = 40 * 60;
+const geoTime = (unixSec) =>
+  new Date(Math.floor((unixSec - GEO_LAG_S) / 600) * 600 * 1000).toISOString().slice(0, 19) + 'Z';
 
 // Daily true color: VIIRS (wide 3000 km swath — no equatorial gaps),
 // layered over static Blue Marble so missing tiles show Earth, not void.
@@ -72,6 +84,11 @@ const OVERLAYS = [
     id: 'radar', name: 'Precipitation radar', icon: CloudRain, defaultOn: true,
     source: 'RainViewer (global radar composite, ~10 min refresh)',
     desc: 'Live rain & snow radar — scrub the loop below the globe',
+  },
+  {
+    id: 'geoclouds', name: 'Cloud movement (live satellite)', icon: Cloud, defaultOn: false,
+    source: 'NOAA GOES-East/West GeoColor + Himawari IR via NASA GIBS, 10-min frames (~40 min lag)',
+    desc: 'True cloud motion — play the orange loop to watch it',
   },
   {
     id: 'wind', name: 'Wind field', icon: Navigation2, defaultOn: false,
@@ -583,13 +600,44 @@ export const WorldTab = () => {
     if (ready && myWx) showMyMarker(myWx.pos);
   }, [ready, myWx, showMyMarker]);
 
-  // ---------- radar time loop ----------
+  // ---------- radar time loop (drives the cloud loop too) ----------
   useEffect(() => {
     if (!ready || !frames) return;
     const idx = frameIdx === -1 ? frames.list.length - 1 : Math.min(frameIdx, frames.list.length - 1);
     const f = frames.list[idx];
-    if (f) setRasterTiles('radar', radarTiles(frames.host, f.path), 'quake-circles');
-  }, [ready, frames, frameIdx, setRasterTiles]);
+    if (!f) return;
+    setRasterTiles('radar', radarTiles(frames.host, f.path), 'quake-circles');
+    if (enabled.geoclouds) {
+      const t = geoTime(f.time);
+      for (const s of GEO_SATS) setRasterTiles(s.id, [GIBS(s.layer, 7, 'png', t)], 'radar');
+    }
+  }, [ready, frames, frameIdx, setRasterTiles, enabled.geoclouds]);
+
+  // ---------- geostationary cloud layers ----------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (enabled.geoclouds && !map.getSource('geo-east')) {
+      const t = geoTime(Date.now() / 1000);
+      // Under the radar layer: rain paints on top of cloud
+      const before = map.getLayer('radar') ? 'radar' : (map.getLayer('quake-circles') ? 'quake-circles' : undefined);
+      for (const s of GEO_SATS) {
+        map.addSource(s.id, {
+          type: 'raster', tileSize: 256, maxzoom: 7,
+          tiles: [GIBS(s.layer, 7, 'png', t)],
+          attribution: 'NOAA · NASA GIBS',
+        });
+        map.addLayer({
+          id: s.id, type: 'raster', source: s.id,
+          layout: { visibility: 'visible' },
+          paint: { 'raster-opacity': 0.85 },
+        }, before);
+      }
+    }
+    for (const s of GEO_SATS) {
+      if (map.getLayer(s.id)) map.setLayoutProperty(s.id, 'visibility', enabled.geoclouds ? 'visible' : 'none');
+    }
+  }, [enabled.geoclouds, ready]);
 
   useEffect(() => {
     if (!playing || !frames) return;
@@ -814,7 +862,7 @@ export const WorldTab = () => {
     setEnabled(prev => {
       const next = { ...prev, [id]: !prev[id] };
       const map = mapRef.current;
-      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'] }[id] ?? [id];
+      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'] }[id] ?? [id];
       for (const layerId of layerIds) {
         if (map?.getLayer(layerId)) {
           map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
