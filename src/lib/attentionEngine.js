@@ -24,8 +24,9 @@ const haversine = (a, b) => {
   return 2 * KM * Math.asin(Math.sqrt(s));
 };
 
-const HAZARD_RADIUS_KM = 300;   // seismic / general events
-const WILDFIRE_RADIUS_KM = 150; // wildfires get a tighter, more serious radius
+// Default watch ranges — admins can override per-org in Settings
+const DEFAULT_HAZARD_RADIUS_KM = 300;   // seismic / general events
+const DEFAULT_WILDFIRE_RADIUS_KM = 150; // wildfires: tighter, more serious
 
 export async function runAttentionSweep() {
   if (!isSupabaseConfigured) return { raised: 0 };
@@ -37,6 +38,17 @@ export async function runAttentionSweep() {
 
   const { data: devices } = await supabase.from('devices').select('*');
   const { data: invites } = await supabase.from('invitations').select('*').eq('status', 'pending');
+
+  // Org-configurable watch ranges (Settings → Organization)
+  let WILDFIRE_RADIUS_KM = DEFAULT_WILDFIRE_RADIUS_KM;
+  let HAZARD_RADIUS_KM = DEFAULT_HAZARD_RADIUS_KM;
+  try {
+    const { data: org } = await supabase.from('organizations').select('settings').limit(1).single();
+    const s = org?.settings ?? {};
+    if (Number.isFinite(+s.wildfire_radius_km) && +s.wildfire_radius_km > 0) WILDFIRE_RADIUS_KM = +s.wildfire_radius_km;
+    if (Number.isFinite(+s.hazard_radius_km) && +s.hazard_radius_km > 0) HAZARD_RADIUS_KM = +s.hazard_radius_km;
+  } catch { /* settings column absent — defaults apply */ }
+
   const candidates = [];
 
   // ---- Device conditions ----

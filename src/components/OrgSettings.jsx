@@ -12,6 +12,8 @@ export const OrgSettings = () => {
   const [org, setOrg] = useState(null);
   const [name, setName] = useState('');
   const [region, setRegion] = useState('');
+  const [fireKm, setFireKm] = useState('');
+  const [hazardKm, setHazardKm] = useState('');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -19,7 +21,13 @@ export const OrgSettings = () => {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('organizations').select('*').limit(1).single();
-      if (data) { setOrg(data); setName(data.name ?? ''); setRegion(data.region ?? ''); }
+      if (data) {
+        setOrg(data);
+        setName(data.name ?? '');
+        setRegion(data.region ?? '');
+        setFireKm(data.settings?.wildfire_radius_km ?? '');
+        setHazardKm(data.settings?.hazard_radius_km ?? '');
+      }
     })();
   }, []);
 
@@ -27,7 +35,12 @@ export const OrgSettings = () => {
     if (!org) return;
     setBusy(true);
     setError(null);
-    const patch = { name: name.trim() || 'Watchtower', region: region.trim() || null };
+    const settings = {
+      ...(org.settings ?? {}),
+      wildfire_radius_km: +fireKm > 0 ? +fireKm : undefined,
+      hazard_radius_km: +hazardKm > 0 ? +hazardKm : undefined,
+    };
+    const patch = { name: name.trim() || 'Watchtower', region: region.trim() || null, settings };
     const { error: err } = await supabase.from('organizations').update(patch).eq('id', org.id);
     if (err) {
       setError(err.message);
@@ -70,6 +83,37 @@ export const OrgSettings = () => {
           />
         </div>
       </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-slate-400 block mb-1.5">
+            Wildfire watch radius (km) <span className="text-slate-600">— default 150</span>
+          </label>
+          <input
+            type="number" min="1"
+            value={fireKm}
+            onChange={e => setFireKm(e.target.value)}
+            disabled={!isAdmin}
+            placeholder="150"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500 disabled:opacity-60"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-400 block mb-1.5">
+            Hazard watch radius (km) <span className="text-slate-600">— quakes/storms, default 300</span>
+          </label>
+          <input
+            type="number" min="1"
+            value={hazardKm}
+            onChange={e => setHazardKm(e.target.value)}
+            disabled={!isAdmin}
+            placeholder="300"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500 disabled:opacity-60"
+          />
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-600">
+        The attention engine alarms on threats inside these ranges of any device or crew member. Applies to everyone in the org on the next sweep (≤5 min).
+      </p>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {isAdmin && (
         <button
