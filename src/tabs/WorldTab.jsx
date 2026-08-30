@@ -674,9 +674,21 @@ export const WorldTab = () => {
     const map = mapRef.current;
     const data = fcstRef.current;
     if (!map || !data || !map.getSource('fcst')) return;
+    // Each sample point becomes a model grid CELL (geographic polygon),
+    // so the field tiles the view seamlessly and scales with zoom.
+    const { latStep, lngStep } = data;
     const features = data.pts.map((p, i) => ({
       type: 'Feature',
-      geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [p.lng - lngStep / 2, p.lat - latStep / 2],
+          [p.lng + lngStep / 2, p.lat - latStep / 2],
+          [p.lng + lngStep / 2, p.lat + latStep / 2],
+          [p.lng - lngStep / 2, p.lat + latStep / 2],
+          [p.lng - lngStep / 2, p.lat - latStep / 2],
+        ]],
+      },
       properties: {
         p: data.precip[i]?.[hour] ?? 0,
         c: data.cloud[i]?.[hour] ?? 0,
@@ -691,18 +703,22 @@ export const WorldTab = () => {
     const b = map.getBounds();
     const south = Math.max(-80, b.getSouth()), north = Math.min(80, b.getNorth());
     const west = b.getWest(), east = b.getEast();
+    const ROWS = 7, COLS = 11;
+    const latStep = (north - south) / ROWS;
+    const lngStep = (east - west) / COLS;
     const pts = [];
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 8; c++) {
-        const lat = south + (north - south) * (r + 0.5) / 5;
-        const lng = ((west + (east - west) * (c + 0.5) / 8 + 540) % 360) - 180;
-        pts.push({ lat, lng });
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const lat = south + latStep * (r + 0.5);
+        const lng = west + lngStep * (c + 0.5); // raw for geometry
+        const qlng = ((lng + 540) % 360) - 180; // wrapped for the API
+        pts.push({ lat, lng, qlng });
       }
     }
     try {
       const res = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(p => p.lat.toFixed(2)).join(',')}` +
-        `&longitude=${pts.map(p => p.lng.toFixed(2)).join(',')}&hourly=precipitation,cloud_cover&forecast_days=3&timezone=UTC`
+        `&longitude=${pts.map(p => p.qlng.toFixed(2)).join(',')}&hourly=precipitation,cloud_cover&forecast_days=3&timezone=UTC`
       );
       const j = await res.json();
       const arr = Array.isArray(j) ? j : [j];
@@ -710,7 +726,7 @@ export const WorldTab = () => {
       const nowIso = new Date().toISOString().slice(0, 13);
       const startIdx = Math.max(0, (arr[0]?.hourly?.time ?? []).findIndex(t => t.startsWith(nowIso)));
       fcstRef.current = {
-        pts,
+        pts, latStep, lngStep,
         precip: arr.map(row => (row?.hourly?.precipitation ?? []).slice(startIdx)),
         cloud: arr.map(row => (row?.hourly?.cloud_cover ?? []).slice(startIdx)),
       };
@@ -724,22 +740,20 @@ export const WorldTab = () => {
       map.addSource('fcst', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       const before = map.getLayer('eonet-circles') ? 'eonet-circles' : undefined;
       map.addLayer({
-        id: 'fcst-clouds', type: 'circle', source: 'fcst',
+        id: 'fcst-clouds', type: 'fill', source: 'fcst',
         paint: {
-          'circle-radius': 26,
-          'circle-color': '#94a3b8',
-          'circle-blur': 1,
-          'circle-opacity': ['*', ['/', ['get', 'c'], 100], 0.4],
+          'fill-color': '#94a3b8',
+          'fill-opacity': ['*', ['/', ['get', 'c'], 100], 0.35],
+          'fill-antialias': false,
         },
       }, before);
       map.addLayer({
-        id: 'fcst-precip', type: 'circle', source: 'fcst',
+        id: 'fcst-precip', type: 'fill', source: 'fcst',
         filter: ['>', ['get', 'p'], 0.05],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['get', 'p'], 0.05, 5, 1, 9, 5, 16, 15, 26],
-          'circle-color': ['interpolate', ['linear'], ['get', 'p'], 0.05, '#7dd3fc', 1, '#3b82f6', 5, '#8b5cf6', 15, '#e11d48'],
-          'circle-blur': 0.5,
-          'circle-opacity': 0.55,
+          'fill-color': ['interpolate', ['linear'], ['get', 'p'], 0.05, '#7dd3fc', 1, '#3b82f6', 5, '#8b5cf6', 15, '#e11d48'],
+          'fill-opacity': 0.5,
+          'fill-antialias': false,
         },
       }, before);
     }

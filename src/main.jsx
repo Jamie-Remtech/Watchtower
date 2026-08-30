@@ -8,6 +8,9 @@ import { UpdateBanner } from './components/UpdateBanner.jsx'
 import { InstallPrompt } from './components/InstallPrompt.jsx'
 import './index.css'
 
+// Bundle executed fine — re-arm the white-screen recovery in index.html
+try { sessionStorage.removeItem('wt-recovered') } catch { /* private mode */ }
+
 // ?pop=tactical opens the tactical map alone in its own window,
 // sharing the session and realtime data with the main app.
 const isPopTactical = new URLSearchParams(window.location.search).get('pop') === 'tactical'

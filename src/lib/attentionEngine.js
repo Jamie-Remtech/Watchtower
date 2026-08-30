@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
-import { pushToTeam } from './push';
+import { pushToTeam, localNotify } from './push';
 
 // ============================================
 // ATTENTION ENGINE v1
@@ -271,6 +271,74 @@ export async function runAttentionSweep() {
     } catch { /* AI not configured or unreachable — geometric layer still ran */ }
   }
 
+  // ---- Hyperlocal rain nowcast at every anchor (Open-Meteo 15-min model) ----
+  // Regional forecasts generalize rain over whole areas; this checks the
+  // exact positions of the crew and gear and warns minutes ahead — when
+  // rain is about to hit, when it turns heavy, and when it will clear.
+  if (anchors.length) {
+    try {
+      const pts = anchors.slice(0, 12);
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${pts.map(a => (+a.lat).toFixed(3)).join(',')}` +
+        `&longitude=${pts.map(a => (+a.lng).toFixed(3)).join(',')}` +
+        `&minutely_15=precipitation&forecast_minutely_15=8&timezone=UTC`
+      );
+      const j = await res.json();
+      const rows = Array.isArray(j) ? j : [j];
+      const hourBucket = new Date().toISOString().slice(0, 13);
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        const m = rows[i]?.minutely_15;
+        if (!m?.time?.length) continue;
+        // Current 15-min step = last one whose start time is not in the future
+        let idx = 0;
+        for (let k = 0; k < m.time.length; k++) {
+          if (new Date(m.time[k] + 'Z') <= Date.now()) idx = k; else break;
+        }
+        const cur = m.precipitation[idx] ?? 0;
+        const next = m.precipitation.slice(idx + 1, idx + 5); // the coming hour
+        const label = a.label ?? 'crew member';
+        if (cur < 0.1) {
+          const onset = next.findIndex(v => v >= 0.2);
+          if (onset >= 0) {
+            const mins = (onset + 1) * 15;
+            const peakRate = Math.max(...next.map(v => v ?? 0)) * 4; // mm per 15 min -> mm/h
+            candidates.push({
+              dedupe_key: `rain:${label}:${hourBucket}`,
+              severity: peakRate >= 2 ? 'critical' : 'warning',
+              kind: 'weather',
+              title: `Rain reaching ${label} in ~${mins} min`,
+              detail: `Point nowcast at this exact position: up to ${peakRate.toFixed(1)} mm/h within the hour. Regional forecasts may not show this. Source: Open-Meteo 15-minute model.`,
+              source: { lat: a.lat, lng: a.lng, minutes: mins, rate_mmh: +peakRate.toFixed(1) },
+            });
+          }
+        } else {
+          if (cur * 4 >= 8) {
+            candidates.push({
+              dedupe_key: `rainheavy:${label}:${hourBucket}`,
+              severity: 'critical',
+              kind: 'weather',
+              title: `Heavy rain at ${label} (${(cur * 4).toFixed(0)} mm/h)`,
+              detail: 'Intense precipitation at this position right now. Watch footing, visibility and flash runoff. Source: Open-Meteo 15-minute model.',
+              source: { lat: a.lat, lng: a.lng, rate_mmh: +(cur * 4).toFixed(1) },
+            });
+          }
+          const dry = next.findIndex(v => v < 0.1);
+          if (dry >= 0 && next.slice(dry).every(v => v < 0.1)) {
+            candidates.push({
+              dedupe_key: `rainend:${label}:${hourBucket}`,
+              severity: 'info',
+              kind: 'weather',
+              title: `Rain clearing at ${label} in ~${(dry + 1) * 15} min`,
+              detail: 'The 15-minute model shows precipitation ending at this position within the hour. Source: Open-Meteo.',
+              source: { lat: a.lat, lng: a.lng, minutes: (dry + 1) * 15 },
+            });
+          }
+        }
+      }
+    } catch { /* nowcast unavailable — sweep continues */ }
+  }
+
   // ---- Invitations expiring within 48h ----
   for (const inv of invites ?? []) {
     const msLeft = new Date(inv.expires_at) - Date.now();
@@ -298,9 +366,11 @@ export async function runAttentionSweep() {
     if (!error) {
       raised++;
       logEvent('attention.raised', { severity: c.severity, kind: c.kind, title: c.title }, c.dedupe_key);
-      // Critical anomalies reach pockets, not just open apps
+      // Critical anomalies reach pockets, not just open apps. push-notify
+      // excludes the calling device, so notify this user locally too.
       if (c.severity === 'critical') {
         pushToTeam({ kind: 'attention', title: `⚠ ${c.title}`, body: c.detail?.slice(0, 140) ?? '', url: '/', tag: c.dedupe_key });
+        localNotify(`⚠ ${c.title}`, c.detail?.slice(0, 140) ?? '');
       }
     }
   }
