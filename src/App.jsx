@@ -49,6 +49,13 @@ const WatchtowerPortal = () => {
     }
   }, [profile?.role]);
 
+  const [attnOpen, setAttnOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('world');
+  const [activeAlerts, setActiveAlerts] = useState(0);
+  const [tendedAlerts, setTendedAlerts] = useState(0);
+
   // Notifications: re-register this device for push whenever permission
   // is already granted; show incoming-message alerts + unread badge.
   const [notifPerm, setNotifPerm] = useState(notificationPermission());
@@ -78,12 +85,6 @@ const WatchtowerPortal = () => {
   useEffect(() => {
     if (activeTab === 'comms') setUnreadMsgs(0);
   }, [activeTab]);
-  const [attnOpen, setAttnOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('world');
-  const [activeAlerts, setActiveAlerts] = useState(0);
-  const [tendedAlerts, setTendedAlerts] = useState(0);
 
   // Listen for alert count updates from StreamsTab
   useEffect(() => {
