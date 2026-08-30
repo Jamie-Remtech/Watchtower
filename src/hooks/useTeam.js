@@ -20,7 +20,7 @@ const profileToMember = (p) => ({
   radioCallsign: p.callsign ?? '—',
   radioFrequency: '—',
   badge: '—',
-  status: 'online',
+  status: 'offline', // real presence overrides this where it's shown
   location: { lat: '—', lng: '—', lastUpdate: 'no locator yet', accuracy: '—' },
   locatorEnabled: false,
   locatorType: 'mobile_app',

@@ -9,6 +9,7 @@ import { ROLE_LABELS, allowedTabs } from './auth/roles';
 import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
+import { usePresence } from './hooks/usePresence';
 import { AttentionPanel } from './components/AttentionPanel';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -34,6 +35,7 @@ const WatchtowerPortal = () => {
   const org = useOrg();
   const { devices } = useDevices();
   const attention = useAttention();
+  usePresence(); // register this session as online for the whole team
   const [attnOpen, setAttnOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);

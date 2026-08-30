@@ -3,6 +3,7 @@ import {
   Video, Users, CreditCard, Settings, AlertTriangle, Eye, Camera, CheckCircle, XCircle, X, UserPlus, FileText, MapPin, Download, Edit, Mail, Phone, Shield, Database, ChevronRight, Activity, Radio, Grid, List, User, Navigation, Layers, Map, Satellite, Info, Copy, Ticket, Loader2
 } from 'lucide-react';
 import { useTeam } from '../hooks/useTeam';
+import { usePresence } from '../hooks/usePresence';
 import { ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS } from '../auth/roles';
 
 
@@ -93,9 +94,14 @@ export const TeamTab = () => {
     },
   };
   
-  // Live team only — the demo roster is gone for good.
+  // Live team only, with REAL presence: online = has Watchtower open now.
   const { isLive, liveMembers, invitations, createInvitation, revokeInvitation } = useTeam();
-  const teamMembers = liveMembers;
+  const onlineIds = usePresence();
+  const teamMembers = liveMembers.map(m => ({
+    ...m,
+    status: onlineIds.has(m.id) ? 'online' : 'offline',
+    lastActive: onlineIds.has(m.id) ? 'now' : m.lastActive,
+  }));
 
   // Role configurations (covers demo roles and the live role ladder)
   const roleConfigs = {
