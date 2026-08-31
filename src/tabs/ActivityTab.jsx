@@ -35,6 +35,13 @@ const TYPE_META = {
   'member.dropped': { icon: '👥', label: 'Member stood down' },
   'member.role_changed': { icon: '👥', label: 'Role changed' },
   'access.requested': { icon: '🔑', label: 'Access requested' },
+  'protocol.created': { icon: '📋', label: 'Protocol created' },
+  'protocol.updated': { icon: '📋', label: 'Protocol updated' },
+  'protocol.deleted': { icon: '📋', label: 'Protocol deleted' },
+  'protocol.run_started': { icon: '▶️', label: 'Protocol started' },
+  'protocol.step_done': { icon: '☑️', label: 'Step completed' },
+  'protocol.run_completed': { icon: '✅', label: 'Protocol completed' },
+  'protocol.run_aborted': { icon: '⏹️', label: 'Protocol aborted' },
 };
 
 const FILTERS = [
@@ -42,6 +49,7 @@ const FILTERS = [
   { id: 'field', label: 'Field & patients', match: t => t.startsWith('field.') || t.startsWith('patient.') },
   { id: 'map', label: 'Map', match: t => t.startsWith('marker.') || t.startsWith('mapview.') },
   { id: 'alerts', label: 'Alerts', match: t => t.startsWith('attention.') },
+  { id: 'protocols', label: 'Protocols', match: t => t.startsWith('protocol.') },
   { id: 'system', label: 'Team & system', match: t => t.startsWith('device.') || t.startsWith('invitation') || t.startsWith('user.') || t.startsWith('org.') || t.startsWith('ai.') },
 ];
 
@@ -71,6 +79,9 @@ const summarize = (e) => {
   if (e.type === 'member.dropped') return `${p.name ?? 'member'} (was ${p.was})`;
   if (e.type === 'member.role_changed') return `${p.name ?? 'member'}: ${p.from} → ${p.to}`;
   if (e.type === 'access.requested') return p.message ?? '';
+  if (e.type === 'protocol.step_done') return `${p.run}: ${p.step}`;
+  if (e.type.startsWith('protocol.run_')) return `${p.name}${p.total ? ` (${p.done}/${p.total} steps)` : ''}`;
+  if (e.type.startsWith('protocol.')) return p.name ?? '';
   const s = JSON.stringify(p);
   return s === '{}' ? '' : s.slice(0, 120);
 };

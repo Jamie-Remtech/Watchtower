@@ -24,9 +24,79 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { mode, patient, entries, question, context, history, picture } = await req.json();
+    const { mode, patient, entries, question, context, history, picture, situation, run, events } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY secret is not set' }, 500);
+
+    const callClaude = async (body: Record<string, unknown>) => {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-sonnet-5', ...body }),
+      });
+      const data = await r.json();
+      return { ok: r.ok, data };
+    };
+    const textOf = (data: { content?: Array<{ text?: string }> }) =>
+      Array.isArray(data.content)
+        ? data.content.filter((c) => typeof c.text === 'string').map((c) => c.text).join('\n')
+        : '';
+    const parseJson = (raw: string) => {
+      const t = raw.replace(/```(?:json)?/gi, '').trim();
+      try { return JSON.parse(t); } catch {
+        const m = t.match(/\{[\s\S]*\}/);
+        if (m) { try { return JSON.parse(m[0]); } catch { /* still bad */ } }
+      }
+      return null;
+    };
+
+    // ---- mode: protocol_draft — turn a situation into a playbook ----
+    if (mode === 'protocol_draft') {
+      const prompt = `You are Watchtower's protocol author for an emergency response organization.
+Draft a response protocol (an actionable checklist the crew executes together) for the situation below.
+
+Rules:
+- 5 to 12 steps. Each step is ONE concrete action a responder can check off — start with a verb.
+- Order matters: life safety first (account for people, escape routes), then containment/mitigation, then communication/logging.
+- Include a step to notify the coordinator and a final step to stand down / debrief.
+- Ground the steps in the situation given; no generic filler.
+- Respond with STRICT JSON only, no prose, no code fences:
+{"name":"short protocol name","trigger_kind":"wildfire|seismic|weather|medical|custom","description":"one sentence on when to run this","steps":["step 1","step 2"]}
+
+SITUATION:
+${String(situation ?? '').slice(0, 1500)}
+
+LIVE CONTEXT (may be empty):
+${JSON.stringify(context ?? {}, null, 1).slice(0, 2000)}`;
+
+      const { ok, data } = await callClaude({ max_tokens: 1500, messages: [{ role: 'user', content: prompt }] });
+      if (!ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      const parsed = parseJson(textOf(data));
+      if (parsed && Array.isArray(parsed.steps)) return json(parsed);
+      return json({ error: 'unparseable draft', raw: textOf(data).slice(0, 300) }, 502);
+    }
+
+    // ---- mode: debrief — after-action summary of a completed run ----
+    if (mode === 'debrief') {
+      const prompt = `You are Watchtower's after-action analyst. A response protocol run just ended.
+Write a debrief the coordinator will keep on file — this is how the organization learns patterns.
+
+Rules:
+- Plain text, no markdown. Four short labeled sections: WHAT HAPPENED / TIMELINE HIGHLIGHTS / WHAT WORKED / IMPROVE NEXT TIME.
+- Use ONLY the run data and event log given. Note steps skipped or done out of order, and gaps between steps that look long.
+- Name people by the names given when crediting actions.
+- Under 200 words total.
+
+RUN:
+${JSON.stringify(run ?? {}, null, 1).slice(0, 4000)}
+
+ORG EVENT LOG DURING THE RUN (may be empty):
+${JSON.stringify(events ?? [], null, 1).slice(0, 3000)}`;
+
+      const { ok, data } = await callClaude({ max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+      if (!ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      return json({ debrief: textOf(data).trim() });
+    }
 
     // ---- mode: cascade — secondary/chained risk analysis around people ----
     if (mode === 'cascade') {
