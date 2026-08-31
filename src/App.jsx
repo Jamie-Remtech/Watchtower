@@ -13,6 +13,7 @@ import { usePresence } from './hooks/usePresence';
 import { startTracking, isTrackingPaused } from './lib/tracker';
 import { supabase } from './lib/supabase';
 import { enableNotifications, ensureSubscribed, notificationPermission, localNotify } from './lib/push';
+import { findProtocolForItem, startProtocolRun } from './lib/protocols';
 import { AttentionPanel } from './components/AttentionPanel';
 import { RequestAccess } from './components/RequestAccess';
 import { alertAnimationStyles } from './styles/alertAnimations';
@@ -335,6 +336,20 @@ const WatchtowerPortal = () => {
         lastSweep={attention.lastSweep}
         onSweep={attention.sweep}
         onAcknowledge={attention.acknowledge}
+        canRunProtocols={['field', 'operator', 'coordinator', 'admin'].includes(profile?.role)}
+        onRunProtocol={async (item) => {
+          // One tap from alert to action: start the matching playbook
+          // with the alert attached as context, then show the checklist.
+          const protocol = await findProtocolForItem(item);
+          if (protocol) {
+            await startProtocolRun(protocol, {
+              attention: { title: item.title, severity: item.severity, key: item.dedupe_key },
+            });
+          }
+          setAttnOpen(false);
+          setActiveTab('protocols');
+          if (!protocol) throw new Error('No playbook matches this alert yet — create one in the library');
+        }}
       />
       
       {!aiOpen && (

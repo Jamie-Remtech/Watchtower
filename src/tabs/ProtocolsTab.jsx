@@ -189,6 +189,12 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
         </div>
       </div>
 
+      {run.context?.attention?.title && (
+        <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
+          Triggered by alert: {run.context.attention.title}
+        </p>
+      )}
+
       <div className="space-y-1">
         {run.steps.map(s => (
           <button

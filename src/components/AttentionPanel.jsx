@@ -1,4 +1,6 @@
-import { AlertTriangle, AlertCircle, Info, X, RefreshCw, Check, BellOff } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, AlertCircle, Info, X, RefreshCw, Check, BellOff, Play, Loader2 } from 'lucide-react';
+import { matchTriggerKind } from '../lib/protocols';
 
 const SEVERITY_META = {
   critical: { icon: AlertTriangle, row: 'border-red-500/40 bg-red-500/10', text: 'text-red-400', label: 'CRITICAL' },
@@ -17,11 +19,24 @@ const timeAgo = (iso) => {
 // Slide-over inbox for the attention queue. Ranked by severity;
 // acknowledge keeps an item visible but quiet; device conditions
 // auto-resolve when they clear.
-export const AttentionPanel = ({ open, onClose, items, sweeping, lastSweep, onSweep, onAcknowledge }) => {
+export const AttentionPanel = ({ open, onClose, items, sweeping, lastSweep, onSweep, onAcknowledge, onRunProtocol, canRunProtocols }) => {
+  const [launching, setLaunching] = useState(null);
+  const [launchError, setLaunchError] = useState(null);
   if (!open) return null;
 
   const openItems = items.filter(i => i.status === 'open');
   const acked = items.filter(i => i.status === 'acknowledged');
+
+  const launch = async (item) => {
+    setLaunching(item.id);
+    setLaunchError(null);
+    try {
+      await onRunProtocol(item);
+    } catch (e) {
+      setLaunchError(e.message ?? 'Could not start protocol');
+    }
+    setLaunching(null);
+  };
 
   return (
     <>
@@ -76,7 +91,21 @@ export const AttentionPanel = ({ open, onClose, items, sweeping, lastSweep, onSw
                     {item.detail && <p className="text-[11px] text-slate-400 mt-1 break-words">{item.detail}</p>}
                   </div>
                 </div>
-                <div className="flex justify-end mt-2">
+                <div className="flex justify-end items-center gap-1.5 mt-2">
+                  {launchError && launching === null && (
+                    <span className="text-[9px] text-red-400 mr-auto">{launchError}</span>
+                  )}
+                  {canRunProtocols && onRunProtocol && matchTriggerKind(item) && (
+                    <button
+                      onClick={() => launch(item)}
+                      disabled={launching === item.id}
+                      className="px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-[10px] font-medium text-orange-300 flex items-center gap-1.5 disabled:opacity-50"
+                      title="Start the matching playbook — the whole team gets the checklist"
+                    >
+                      {launching === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      Run protocol
+                    </button>
+                  )}
                   <button
                     onClick={() => onAcknowledge(item.id)}
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-[10px] font-medium text-slate-200 flex items-center gap-1.5"

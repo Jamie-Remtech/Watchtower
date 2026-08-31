@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
-import { pushToTeam } from '../lib/push';
+import { startProtocolRun } from '../lib/protocols';
 
 // ============================================
 // PROTOCOLS — playbooks the team executes together.
@@ -141,25 +141,7 @@ export const useProtocols = () => {
 
   // Start a live run — snapshot the steps, alert the whole team.
   const startRun = useCallback(async (protocol, context = {}) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const orgId = await orgIdOf();
-    const { data, error: err } = await supabase.from('protocol_runs').insert({
-      org_id: orgId,
-      protocol_id: protocol.id,
-      name: protocol.name,
-      steps: (protocol.steps ?? []).map(s => ({ ...s, done: false, by: null, by_name: null, at: null })),
-      context,
-      started_by: user?.id,
-    }).select().single();
-    if (err) throw err;
-    logEvent('protocol.run_started', { name: protocol.name, run_id: data.id });
-    pushToTeam({
-      kind: 'attention',
-      title: `▶ Protocol started: ${protocol.name}`,
-      body: 'Open Watchtower → Protocols to work the checklist with the team.',
-      url: '/',
-      tag: `protocol:${data.id}`,
-    });
+    const data = await startProtocolRun(protocol, context);
     await refresh();
     return data;
   }, [refresh]);
