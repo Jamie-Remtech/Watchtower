@@ -1,8 +1,9 @@
 // ============================================================
 // Watchtower edge function: push-notify
-// Delivers Web Push notifications to every registered device in the
-// caller's organization (except the caller). Used for team messages
-// and critical attention items.
+// Delivers Web Push notifications to registered devices in the
+// caller's organization. Chat messages skip the sender's own devices;
+// attention/safety alerts skip only the single device that raised
+// them (via exclude_endpoint) so the person at risk is still alerted.
 //
 // Deploy: Supabase Dashboard → Edge Functions → New function
 //   name: push-notify → paste this file → Deploy
@@ -23,7 +24,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { title, body, url, kind, tag } = await req.json();
+    const { title, body, url, kind, tag, exclude_endpoint } = await req.json();
     const supaUrl = Deno.env.get('SUPABASE_URL');
     const svc = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const vapidJson = Deno.env.get('VAPID_KEYS_JSON');
@@ -43,10 +44,18 @@ Deno.serve(async (req) => {
     const orgId = profs?.[0]?.org_id;
     if (!orgId) return json({ error: 'caller has no organization' }, 400);
 
-    const subs = await q(
-      `push_subscriptions?org_id=eq.${orgId}&profile_id=neq.${uid}&select=endpoint,p256dh,auth`
+    // Chat messages: skip the sender's own devices (you don't need a ping
+    // for your own words). Everything else (attention/safety alerts): reach
+    // EVERY device except the one that raised it — the person at risk is
+    // usually the one whose device detected the danger.
+    const profileFilter = kind === 'message' ? `&profile_id=neq.${uid}` : '';
+    const all = await q(
+      `push_subscriptions?org_id=eq.${orgId}${profileFilter}&select=endpoint,p256dh,auth`
     );
-    if (!Array.isArray(subs) || subs.length === 0) return json({ sent: 0, failed: 0, note: 'no subscribed devices' });
+    const subs = (Array.isArray(all) ? all : []).filter(
+      (s: { endpoint: string }) => s.endpoint !== exclude_endpoint
+    );
+    if (subs.length === 0) return json({ sent: 0, failed: 0, note: 'no subscribed devices' });
 
     const vapidKeys = await webpush.importVapidKeys(JSON.parse(vapidJson), { extractable: false });
     const appServer = await webpush.ApplicationServer.new({

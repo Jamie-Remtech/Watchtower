@@ -73,8 +73,16 @@ export async function localNotify(title, body, url = '/') {
   } catch { /* no SW — best effort */ }
 }
 
-// Ask the server to push to the rest of the org (fire-and-forget).
-export function pushToTeam(payload) {
+// Ask the server to push to the org (fire-and-forget). Sends this
+// device's own push endpoint so the server can skip just THIS device
+// (which already saw the event) instead of the whole profile — your
+// other devices must still be alerted about danger at your position.
+export async function pushToTeam(payload) {
   if (!isSupabaseConfigured) return;
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub?.endpoint) payload = { ...payload, exclude_endpoint: sub.endpoint };
+  } catch { /* no SW — send without exclusion */ }
   supabase.functions.invoke('push-notify', { body: payload }).catch(() => {});
 }
