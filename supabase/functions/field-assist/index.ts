@@ -144,10 +144,12 @@ ${JSON.stringify(picture ?? {}, null, 1)}`;
       });
     }
 
-    // ---- mode: ask — voice Q&A over the live operational snapshot ----
+    // ---- mode: ask — voice Q&A over the live operational snapshot,
+    // with real actions the client executes under the asker's own
+    // permissions (RLS): start a protocol, message the team, raise an alert.
     if (mode === 'ask') {
       const system = `You are Watchtower, the tactical coordination AI for an emergency response team.
-You answer questions from coordinators and field responders about THEIR live operation.
+You answer questions from coordinators and field responders about THEIR live operation, and you can ACT.
 
 Rules:
 - Answer ONLY from the live state snapshot below. If something isn't tracked there, say so plainly.
@@ -156,25 +158,62 @@ Rules:
 - Safety first: if the state shows critical attention items or red-triage patients relevant to the question, mention them.
 - Times in the snapshot are ISO/UTC; phrase them as minutes/hours ago relative to "now".
 
+Actions:
+- Use a tool ONLY when the user clearly asks for that action (start/run a protocol, tell/message the team, raise/log an alert) — never speculatively. If they merely describe a situation, answer and OFFER the action instead.
+- start_protocol only with a name from available_protocols; if none fits, say so.
+- When you use a tool, also say in words what you are doing.
+
 LIVE STATE SNAPSHOT:
 ${JSON.stringify(context ?? {}, null, 1)}`;
+
+      const tools = [
+        {
+          name: 'start_protocol',
+          description: "Start a live run of one of the organization's response protocols. The whole team is alerted and gets the shared checklist.",
+          input_schema: {
+            type: 'object',
+            properties: { protocol_name: { type: 'string', description: 'Exact name from available_protocols' } },
+            required: ['protocol_name'],
+          },
+        },
+        {
+          name: 'send_team_message',
+          description: 'Send a message to the whole team in Comms (also pushed to their phones).',
+          input_schema: {
+            type: 'object',
+            properties: { text: { type: 'string', description: 'The message, radio-brief' } },
+            required: ['text'],
+          },
+        },
+        {
+          name: 'raise_alert',
+          description: 'Raise an attention item for coordinators. Critical severity also pushes to pockets.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              detail: { type: 'string' },
+              severity: { type: 'string', enum: ['critical', 'warning', 'info'] },
+            },
+            required: ['title', 'severity'],
+          },
+        },
+      ];
 
       const msgs = [
         ...(Array.isArray(history) ? history.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })) : []),
         { role: 'user', content: String(question ?? '') },
       ];
 
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 400, system, messages: msgs }),
-      });
-      const data = await r.json();
-      if (!r.ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      const { ok, data } = await callClaude({ max_tokens: 600, system, messages: msgs, tools });
+      if (!ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
       const answer = Array.isArray(data.content)
         ? data.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('\n')
         : '';
-      return json({ answer });
+      const actions = Array.isArray(data.content)
+        ? data.content.filter((c: { type: string }) => c.type === 'tool_use').map((c: { name: string; input: unknown }) => ({ name: c.name, input: c.input }))
+        : [];
+      return json({ answer, actions });
     }
 
     if (mode !== 'handoff') return json({ error: 'unknown mode' }, 400);

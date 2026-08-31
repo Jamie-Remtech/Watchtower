@@ -5,6 +5,7 @@ import { gatherContext } from '../lib/aiContext';
 import { useSpeech } from '../hooks/useSpeech';
 import { say } from '../lib/speechFeedback';
 import { logEvent } from '../lib/eventLog';
+import { executeAiAction } from '../lib/aiActions';
 
 // ============================================
 // WATCHTOWER AI — voice Q&A over the live operation
@@ -15,9 +16,10 @@ import { logEvent } from '../lib/eventLog';
 
 const SUGGESTIONS = [
   'What is the situation right now?',
-  'Where is the nearest water source?',
   'Which patients are still red?',
   'Any open alerts I should know about?',
+  'Start the severe weather protocol',
+  'Tell the team to check in',
 ];
 
 export const AIAssistant = ({ isOpen, onClose }) => {
@@ -47,10 +49,24 @@ export const AIAssistant = ({ isOpen, onClose }) => {
       const { data, error } = await supabase.functions.invoke('field-assist', {
         body: { mode: 'ask', question: q, context, history },
       });
-      if (error || !data?.answer) throw error ?? new Error(data?.error ?? 'no answer');
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
-      if (speakRef.current) say(data.answer);
-      logEvent('ai.asked', { question: q });
+      if (error || (!data?.answer && !data?.actions?.length)) throw error ?? new Error(data?.error ?? 'no answer');
+      if (data.answer) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+        if (speakRef.current) say(data.answer);
+      }
+      // Execute any actions with THIS user's session — RLS applies,
+      // and each outcome is confirmed in the chat (and spoken).
+      for (const action of data.actions ?? []) {
+        let outcome;
+        try {
+          outcome = await executeAiAction(action, q);
+        } catch (e) {
+          outcome = `Action failed: ${e.message ?? 'unknown error'}`;
+        }
+        setMessages(prev => [...prev, { role: 'assistant', content: `⚡ ${outcome}`, action: true }]);
+        if (speakRef.current) say(outcome);
+      }
+      logEvent('ai.asked', { question: q, actions: (data.actions ?? []).map(a => a.name) });
     } catch (err) {
       const msg = /ANTHROPIC_API_KEY|unknown mode/i.test(err?.message ?? '')
         ? 'The AI function needs updating — redeploy field-assist with the latest code.'
@@ -121,7 +137,9 @@ export const AIAssistant = ({ isOpen, onClose }) => {
                 ? 'bg-orange-500/20 border border-orange-500/30 text-orange-100'
                 : m.error
                   ? 'bg-red-500/10 border border-red-500/30 text-red-300'
-                  : 'bg-slate-800 border border-slate-700 text-slate-100'
+                  : m.action
+                    ? 'bg-purple-500/10 border border-purple-500/30 text-purple-200'
+                    : 'bg-slate-800 border border-slate-700 text-slate-100'
             }`}>
               {m.content}
             </div>

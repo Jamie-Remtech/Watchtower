@@ -20,7 +20,7 @@ const quickPosition = () =>
 export async function gatherContext() {
   if (!isSupabaseConfigured) return null;
 
-  const [me, org, devices, patients, positions, markers, attention, events, views] = await Promise.all([
+  const [me, org, devices, patients, positions, markers, attention, events, views, protocols, activeRuns] = await Promise.all([
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return null;
       const { data } = await supabase.from('profiles').select('display_name, role, callsign').eq('id', user.id).single();
@@ -35,6 +35,8 @@ export async function gatherContext() {
     supabase.from('events').select('type, subject, payload, at')
       .in('type', ['field.report', 'patient.entry']).order('at', { ascending: false }).limit(15).then(r => r.data ?? []),
     supabase.from('map_views').select('name, lat, lng').then(r => r.data ?? []),
+    supabase.from('protocols').select('name, trigger_kind, description').then(r => r.data ?? []),
+    supabase.from('protocol_runs').select('name, status, steps, started_at').eq('status', 'active').then(r => r.data ?? []),
   ]);
 
   // Latest fresh position per person, with names
@@ -75,5 +77,10 @@ export async function gatherContext() {
     recent_field_log: events.map(e => ({ at: e.payload?.at_client ?? e.at, text: e.payload?.text, patient: e.subject ? 'yes' : null })),
     saved_views: views,
     weather_at_user: weather,
+    available_protocols: protocols,
+    active_protocol_runs: activeRuns.map(r => ({
+      name: r.name, started_at: r.started_at,
+      progress: `${(r.steps ?? []).filter(s => s.done).length}/${(r.steps ?? []).length} steps`,
+    })),
   };
 }

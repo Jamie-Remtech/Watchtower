@@ -14,6 +14,7 @@ export const OrgSettings = () => {
   const [region, setRegion] = useState('');
   const [fireKm, setFireKm] = useState('');
   const [hazardKm, setHazardKm] = useState('');
+  const [autoProtocols, setAutoProtocols] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -27,6 +28,7 @@ export const OrgSettings = () => {
         setRegion(data.region ?? '');
         setFireKm(data.settings?.wildfire_radius_km ?? '');
         setHazardKm(data.settings?.hazard_radius_km ?? '');
+        setAutoProtocols(data.settings?.auto_run_protocols === true);
       }
     })();
   }, []);
@@ -39,6 +41,7 @@ export const OrgSettings = () => {
       ...(org.settings ?? {}),
       wildfire_radius_km: +fireKm > 0 ? +fireKm : undefined,
       hazard_radius_km: +hazardKm > 0 ? +hazardKm : undefined,
+      auto_run_protocols: autoProtocols,
     };
     const patch = { name: name.trim() || 'Watchtower', region: region.trim() || null, settings };
     const { error: err } = await supabase.from('organizations').update(patch).eq('id', org.id);
@@ -114,6 +117,21 @@ export const OrgSettings = () => {
       <p className="text-[10px] text-slate-600">
         The attention engine alarms on threats inside these ranges of any device or crew member. Applies to everyone in the org on the next sweep (≤5 min).
       </p>
+      <label className={`flex items-start gap-2.5 p-3 rounded-lg border ${autoProtocols ? 'bg-purple-500/10 border-purple-500/30' : 'bg-slate-800/40 border-slate-700'} ${isAdmin ? 'cursor-pointer' : 'opacity-60'}`}>
+        <input
+          type="checkbox"
+          checked={autoProtocols}
+          disabled={!isAdmin}
+          onChange={e => setAutoProtocols(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-purple-500"
+        />
+        <span className="min-w-0">
+          <span className="block text-xs font-medium text-white">Watchtower may auto-start protocols</span>
+          <span className="block text-[10px] text-slate-500 mt-0.5">
+            On a critical alert with a matching playbook, the run starts by itself and the team gets the checklist immediately — no human tap. Off: alerts point at the playbook and a person launches it.
+          </span>
+        </span>
+      </label>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {isAdmin && (
         <button

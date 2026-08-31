@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
 import { pushToTeam, localNotify } from './push';
+import { findProtocolForItem, startProtocolRun } from './protocols';
 
 // ============================================
 // ATTENTION ENGINE v1
@@ -56,11 +57,13 @@ export async function runAttentionSweep() {
   // Org-configurable watch ranges (Settings → Organization)
   let WILDFIRE_RADIUS_KM = DEFAULT_WILDFIRE_RADIUS_KM;
   let HAZARD_RADIUS_KM = DEFAULT_HAZARD_RADIUS_KM;
+  let AUTO_RUN_PROTOCOLS = false;
   try {
     const { data: org } = await supabase.from('organizations').select('settings').limit(1).single();
     const s = org?.settings ?? {};
     if (Number.isFinite(+s.wildfire_radius_km) && +s.wildfire_radius_km > 0) WILDFIRE_RADIUS_KM = +s.wildfire_radius_km;
     if (Number.isFinite(+s.hazard_radius_km) && +s.hazard_radius_km > 0) HAZARD_RADIUS_KM = +s.hazard_radius_km;
+    AUTO_RUN_PROTOCOLS = s.auto_run_protocols === true;
   } catch { /* settings column absent — defaults apply */ }
 
   const candidates = [];
@@ -369,8 +372,33 @@ export async function runAttentionSweep() {
       // Critical anomalies reach pockets, not just open apps. push-notify
       // excludes the calling device, so notify this user locally too.
       if (c.severity === 'critical') {
-        pushToTeam({ kind: 'attention', title: `⚠ ${c.title}`, body: c.detail?.slice(0, 140) ?? '', url: '/', tag: c.dedupe_key });
-        localNotify(`⚠ ${c.title}`, c.detail?.slice(0, 140) ?? '');
+        // Protocols answer alerts: point at the matching playbook, or —
+        // when the org has opted in — start it automatically.
+        let protocolNote = '';
+        try {
+          const proto = await findProtocolForItem(c);
+          if (proto) {
+            if (AUTO_RUN_PROTOCOLS) {
+              const { data: active } = await supabase
+                .from('protocol_runs').select('id')
+                .eq('protocol_id', proto.id).eq('status', 'active').limit(1);
+              if (!active?.length) {
+                await startProtocolRun(proto, {
+                  attention: { title: c.title, severity: c.severity, key: c.dedupe_key },
+                  auto: true,
+                });
+                protocolNote = ` — protocol "${proto.name}" auto-started`;
+              } else {
+                protocolNote = ` — protocol "${proto.name}" already running`;
+              }
+            } else {
+              protocolNote = ` — playbook ready: "${proto.name}" (bell → Run protocol)`;
+            }
+          }
+        } catch { /* protocols unavailable — the alert still goes out */ }
+        const body = `${c.detail?.slice(0, 120) ?? ''}${protocolNote}`;
+        pushToTeam({ kind: 'attention', title: `⚠ ${c.title}`, body, url: '/', tag: c.dedupe_key });
+        localNotify(`⚠ ${c.title}`, body);
       }
     }
   }

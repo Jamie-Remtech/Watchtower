@@ -42,6 +42,7 @@ const TYPE_META = {
   'protocol.step_done': { icon: '☑️', label: 'Step completed' },
   'protocol.run_completed': { icon: '✅', label: 'Protocol completed' },
   'protocol.run_aborted': { icon: '⏹️', label: 'Protocol aborted' },
+  'ai.action': { icon: '⚡', label: 'AI acted' },
 };
 
 const FILTERS = [
@@ -82,6 +83,7 @@ const summarize = (e) => {
   if (e.type === 'protocol.step_done') return `${p.run}: ${p.step}`;
   if (e.type.startsWith('protocol.run_')) return `${p.name}${p.total ? ` (${p.done}/${p.total} steps)` : ''}`;
   if (e.type.startsWith('protocol.')) return p.name ?? '';
+  if (e.type === 'ai.action') return `${p.action}: ${p.protocol ?? p.title ?? p.text ?? ''}`;
   const s = JSON.stringify(p);
   return s === '{}' ? '' : s.slice(0, 120);
 };
