@@ -101,6 +101,11 @@ const OVERLAYS = [
     desc: 'Elevation hillshade — ridges, valleys, drainage',
   },
   {
+    id: 'lidar', name: 'Lidar terrain', icon: Mountain, defaultOn: false,
+    source: 'Esri World Hillshade (global, lidar where flown) + NRCan HRDEM lidar (Canada, 1-2 m)',
+    desc: 'High-resolution relief — gullies, slopes, drainage paths',
+  },
+  {
     id: 'fcst', name: 'Forecast precip & clouds', icon: Cloud, defaultOn: false,
     source: 'Open-Meteo model blend (ICON/GFS/AROME…), hourly to +48 h',
     desc: 'Predicted rain and cloud cover — scrub the green slider',
@@ -613,6 +618,45 @@ export const WorldTab = () => {
     }
   }, [ready, frames, frameIdx, setRasterTiles, enabled.geoclouds]);
 
+  // ---------- lidar terrain: global hillshade + Canadian HRDEM ----------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (enabled.lidar && !map.getSource('lidar-world')) {
+      const before = map.getLayer('streets') ? 'streets' : undefined;
+      // Global: Esri World Hillshade — assembled from the best available
+      // elevation per country, lidar-derived wherever it has been flown.
+      map.addSource('lidar-world', {
+        type: 'raster', tileSize: 256, maxzoom: 15,
+        tiles: ['https://services.arcgisonline.com/arcgis/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}'],
+        attribution: '© Esri — World Hillshade',
+      });
+      map.addLayer({
+        id: 'lidar-world', type: 'raster', source: 'lidar-world',
+        layout: { visibility: 'visible' },
+        paint: { 'raster-opacity': 0.65 },
+      }, before);
+      // Canada: NRCan HRDEM, the national lidar program (1-2 m).
+      // Transparent where there is no coverage, so it simply sharpens
+      // the picture wherever the lidar exists.
+      map.addSource('lidar-hrdem', {
+        type: 'raster', tileSize: 256, maxzoom: 17,
+        tiles: [
+          'https://datacube.services.geo.ca/ows/elevation?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=dtm-hillshade&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE',
+        ],
+        attribution: 'NRCan HRDEM lidar',
+      });
+      map.addLayer({
+        id: 'lidar-hrdem', type: 'raster', source: 'lidar-hrdem',
+        layout: { visibility: 'visible' },
+        paint: { 'raster-opacity': 0.75 },
+      }, before);
+    }
+    for (const l of ['lidar-world', 'lidar-hrdem']) {
+      if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', enabled.lidar ? 'visible' : 'none');
+    }
+  }, [enabled.lidar, ready]);
+
   // ---------- geostationary cloud layers ----------
   useEffect(() => {
     const map = mapRef.current;
@@ -862,7 +906,7 @@ export const WorldTab = () => {
     setEnabled(prev => {
       const next = { ...prev, [id]: !prev[id] };
       const map = mapRef.current;
-      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'] }[id] ?? [id];
+      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'], lidar: ['lidar-world', 'lidar-hrdem'] }[id] ?? [id];
       for (const layerId of layerIds) {
         if (map?.getLayer(layerId)) {
           map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
