@@ -21,7 +21,9 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title ?? 'Watchtower', {
       body: data.body ?? '',
       icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      // Monochrome white-on-transparent: Android renders the badge from
+      // the alpha channel only — an opaque icon becomes a black square.
+      badge: '/badge-96.png',
       tag: data.tag ?? data.kind ?? 'watchtower',
       renotify: true,
       data: { url: data.url ?? '/' },

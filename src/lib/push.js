@@ -68,7 +68,7 @@ export async function localNotify(title, body, url = '/') {
   try {
     const reg = await navigator.serviceWorker.ready;
     reg.showNotification(title, {
-      body, icon: '/icon-192.png', badge: '/icon-192.png', tag: url, renotify: true, data: { url },
+      body, icon: '/icon-192.png', badge: '/badge-96.png', tag: url, renotify: true, data: { url },
     });
   } catch { /* no SW — best effort */ }
 }
