@@ -43,6 +43,13 @@ const TYPE_META = {
   'protocol.run_completed': { icon: '✅', label: 'Protocol completed' },
   'protocol.run_aborted': { icon: '⏹️', label: 'Protocol aborted' },
   'ai.action': { icon: '⚡', label: 'AI acted' },
+  'team.created': { icon: '🧩', label: 'Team created' },
+  'team.removed': { icon: '🧩', label: 'Team removed' },
+  'member.team_changed': { icon: '🧩', label: 'Team assignment' },
+  'platform.company_created': { icon: '🏢', label: 'Company created' },
+  'platform.member_moved': { icon: '🏢', label: 'Member moved' },
+  'platform.invoice_created': { icon: '🧾', label: 'Invoice created' },
+  'platform.link_created': { icon: '🔗', label: 'Companies linked' },
 };
 
 const FILTERS = [
@@ -84,6 +91,12 @@ const summarize = (e) => {
   if (e.type.startsWith('protocol.run_')) return `${p.name}${p.total ? ` (${p.done}/${p.total} steps)` : ''}`;
   if (e.type.startsWith('protocol.')) return p.name ?? '';
   if (e.type === 'ai.action') return `${p.action}: ${p.protocol ?? p.title ?? p.text ?? ''}`;
+  if (e.type.startsWith('team.')) return p.name ?? '';
+  if (e.type === 'member.team_changed') return `${p.name ?? 'member'} → ${p.team}`;
+  if (e.type === 'platform.member_moved') return `${p.name} → ${p.to} (${p.role})`;
+  if (e.type === 'platform.invoice_created') return `${p.company}: ${p.label} — $${p.amount}`;
+  if (e.type === 'platform.link_created') return `${p.a} ⇄ ${p.b}`;
+  if (e.type.startsWith('platform.')) return p.name ?? '';
   const s = JSON.stringify(p);
   return s === '{}' ? '' : s.slice(0, 120);
 };

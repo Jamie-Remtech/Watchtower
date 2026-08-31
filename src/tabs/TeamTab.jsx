@@ -20,7 +20,7 @@ export const TeamTab = () => {
   const [viewMode, setViewMode] = useState('list'); // list, grid, map
 
   // Live team only, with REAL presence: online = has Watchtower open now.
-  const { isLive, liveMembers, invitations, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact } = useTeam();
+  const { isLive, liveMembers, invitations, teams, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact, createTeam, removeTeam, setMemberTeam } = useTeam();
   const onlineIds = usePresence();
   const { profile, session } = useAuth();
   const myId = session?.user?.id;
@@ -32,6 +32,11 @@ export const TeamTab = () => {
     isAdmin ? targetRole !== 'admin'
     : profile?.role === 'coordinator' ? ['viewer', 'field', 'operator'].includes(targetRole)
     : false;
+  const canManageTeams = ['coordinator', 'admin'].includes(profile?.role);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [confirmTeamDelete, setConfirmTeamDelete] = useState(null);
+  const teamName = (id) => teams.find(t => t.id === id)?.name ?? null;
   const teamMembers = liveMembers.map(m => ({
     ...m,
     status: onlineIds.has(m.id) ? 'online' : 'offline',
@@ -151,6 +156,64 @@ export const TeamTab = () => {
         </div>
       </div>
       
+      {/* TEAMS — parallel operations inside the company */}
+      {canManageTeams && (
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-sky-400" />Teams
+              <span className="text-[10px] font-normal text-slate-500">assign members below · everyone can be watched at once</span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <input
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter' && newTeamName.trim() && !teamBusy) {
+                    setTeamBusy(true);
+                    try { await createTeam(newTeamName.trim()); setNewTeamName(''); } catch { /* surfaced via hook error */ }
+                    setTeamBusy(false);
+                  }
+                }}
+                placeholder="New team name…"
+                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500 w-36"
+              />
+              <button
+                onClick={async () => {
+                  if (!newTeamName.trim() || teamBusy) return;
+                  setTeamBusy(true);
+                  try { await createTeam(newTeamName.trim()); setNewTeamName(''); } catch { /* surfaced via hook error */ }
+                  setTeamBusy(false);
+                }}
+                disabled={teamBusy || !newTeamName.trim()}
+                className="px-3 py-1.5 bg-sky-500/20 border border-sky-500/40 text-sky-300 rounded-lg text-xs font-medium disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+          {teams.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {teams.map(t => {
+                const count = teamMembers.filter(m => m.teamId === t.id).length;
+                return (
+                  <span key={t.id} className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 bg-sky-500/10 border border-sky-500/30 rounded-lg text-xs text-sky-200">
+                    {t.name} <span className="text-sky-400/70">({count})</span>
+                    {confirmTeamDelete === t.id ? (
+                      <button onClick={() => { removeTeam(t.id).catch(() => {}); setConfirmTeamDelete(null); }}
+                        className="px-1 text-[10px] font-bold text-red-400">sure?</button>
+                    ) : (
+                      <button onClick={() => { setConfirmTeamDelete(t.id); setTimeout(() => setConfirmTeamDelete(c => (c === t.id ? null : c)), 2500); }}
+                        className="p-0.5 text-sky-500/60 hover:text-red-400"><X className="w-3 h-3" /></button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* PENDING INVITATIONS (live mode) */}
       {isLive && invitations.length > 0 && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
@@ -218,6 +281,11 @@ export const TeamTab = () => {
                     <span className={`px-2 py-0.5 rounded text-xs border ${roleConfigs[user.role].color}`}>
                       {roleConfigs[user.role].label}
                     </span>
+                    {teamName(user.teamId) && (
+                      <span className="px-2 py-0.5 bg-sky-500/15 text-sky-300 border border-sky-500/30 rounded text-xs">
+                        {teamName(user.teamId)}
+                      </span>
+                    )}
                     {user.locatorEnabled && user.location && (
                       <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs flex items-center gap-1">
                         <MapPin className="w-3 h-3" /> Live
@@ -283,6 +351,18 @@ export const TeamTab = () => {
                     title="Set role (admin)"
                   >
                     {ROLE_OPTIONS_ALL.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                )}
+                {canManageTeams && teams.length > 0 && user.role !== 'viewer' && (
+                  <select
+                    value={user.teamId ?? ''}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { e.stopPropagation(); setMemberTeam(user.id, e.target.value || null).catch(() => {}); }}
+                    className="text-xs px-2 py-1.5 rounded-lg border bg-slate-900 border-slate-700 text-sky-300 focus:outline-none hidden sm:block"
+                    title="Assign to a team"
+                  >
+                    <option value="">No team</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 )}
 

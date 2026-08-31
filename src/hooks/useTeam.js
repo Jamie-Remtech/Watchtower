@@ -12,6 +12,8 @@ const profileToMember = (p) => ({
   initials: (p.display_name || p.email || '?')
     .split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join(''),
   role: p.role,
+  teamId: p.team_id ?? null,
+  platformOwner: p.platform_owner === true,
   title: ROLE_LABELS[p.role] ?? p.role,
   department: '—',
   email: p.email ?? '—',
@@ -51,20 +53,23 @@ export const useTeam = () => {
   const isLive = isSupabaseConfigured;
   const [liveMembers, setLiveMembers] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(isLive);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!isLive) return;
     setError(null);
-    const [profilesRes, invitesRes] = await Promise.all([
+    const [profilesRes, invitesRes, teamsRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at'),
       supabase.from('invitations').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('teams').select('*').order('created_at'),
     ]);
     if (profilesRes.error) setError(profilesRes.error.message);
     setLiveMembers((profilesRes.data ?? []).map(profileToMember));
     // invitations read is coordinator+ only; a viewer just gets an empty list
     setInvitations(invitesRes.data ?? []);
+    setTeams(teamsRes.data ?? []); // absent table (pre-0018) → empty
     setLoading(false);
   }, [isLive]);
 
@@ -103,6 +108,37 @@ export const useTeam = () => {
     await refresh();
   }, [liveMembers, refresh]);
 
+  // Teams inside the company — parallel operations, micro-managed.
+  const createTeam = useCallback(async (name) => {
+    let orgId = localStorage.getItem('watchtower-org-id');
+    if (!orgId) {
+      const me = (await supabase.auth.getUser()).data?.user;
+      const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', me?.id).single();
+      orgId = prof?.org_id;
+    }
+    const { error } = await supabase.from('teams').insert({ org_id: orgId, name });
+    if (error) throw error;
+    logEvent('team.created', { name });
+    await refresh();
+  }, [refresh]);
+
+  const removeTeam = useCallback(async (id) => {
+    const t = teams.find(x => x.id === id);
+    const { error } = await supabase.from('teams').delete().eq('id', id);
+    if (error) throw error;
+    logEvent('team.removed', { name: t?.name });
+    await refresh();
+  }, [teams, refresh]);
+
+  const setMemberTeam = useCallback(async (memberId, teamId) => {
+    const m = liveMembers.find(x => x.id === memberId);
+    const t = teams.find(x => x.id === teamId);
+    const { error } = await supabase.rpc('set_member_team', { target: memberId, new_team: teamId || null });
+    if (error) throw error;
+    logEvent('member.team_changed', { name: m?.name, team: t?.name ?? 'unassigned' }, memberId);
+    await refresh();
+  }, [liveMembers, teams, refresh]);
+
   // Save contact/radio fields (self, or any member when admin — RLS
   // enforces it; the profiles_guard trigger keeps role/org locked).
   const updateContact = useCallback(async (id, patch) => {
@@ -125,5 +161,5 @@ export const useTeam = () => {
     await refresh();
   }, [liveMembers, refresh]);
 
-  return { isLive, liveMembers, invitations, loading, error, refresh, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact };
+  return { isLive, liveMembers, invitations, teams, loading, error, refresh, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact, createTeam, removeTeam, setMemberTeam };
 };

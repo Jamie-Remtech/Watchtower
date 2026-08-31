@@ -27,6 +27,7 @@ import { WorldTab } from './tabs/WorldTab';
 import { FieldLogTab } from './tabs/FieldLogTab';
 import { ActivityTab } from './tabs/ActivityTab';
 import { ProtocolsTab } from './tabs/ProtocolsTab';
+import { PlatformTab } from './tabs/PlatformTab';
 
 
 
@@ -115,8 +116,18 @@ const WatchtowerPortal = () => {
     };
   }, []);
   
+  // Keep the cached org id in sync with the profile — moving a member
+  // to another company must not leave stale ids behind.
+  useEffect(() => {
+    if (profile?.org_id) localStorage.setItem('watchtower-org-id', profile.org_id);
+  }, [profile?.org_id]);
+
   // Tabs are filtered by role — e.g. viewers see the World tab only.
-  const allowed = allowedTabs(profile?.role);
+  // The platform portal is creator-only, above the role ladder.
+  const allowed = [
+    ...allowedTabs(profile?.role),
+    ...(profile?.platform_owner ? ['platform'] : []),
+  ];
   const navItems = [
     { id: 'streams', name: 'Live Streams', icon: Video },
     { id: 'tactical', name: 'Tactical Map', icon: Map },
@@ -128,6 +139,7 @@ const WatchtowerPortal = () => {
     { id: 'team', name: 'Team', icon: Users },
     { id: 'billing', name: 'Billing', icon: CreditCard },
     { id: 'settings', name: 'Settings', icon: Settings },
+    { id: 'platform', name: 'Platform', icon: Building2 },
   ].filter(item => allowed.includes(item.id));
 
   // Never leave someone on a tab their role can't open
@@ -148,6 +160,7 @@ const WatchtowerPortal = () => {
       case 'team': return <TeamTab />;
       case 'billing': return <BillingTab />;
       case 'settings': return <SettingsTab />;
+      case 'platform': return <PlatformTab />;
       default: return <WorldTab />;
     }
   };
