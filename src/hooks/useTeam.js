@@ -16,10 +16,11 @@ const profileToMember = (p) => ({
   department: '—',
   email: p.email ?? '—',
   phone: p.phone ?? '—',
-  mobile: p.phone ?? '—',
-  emergencyPhone: '—',
+  mobile: p.mobile ?? '—',
+  emergencyPhone: p.emergency_phone ?? '—',
+  emergencyContact: p.emergency_contact ?? '—',
   radioCallsign: p.callsign ?? '—',
-  radioFrequency: '—',
+  radioFrequency: p.frequency ?? '—',
   badge: '—',
   status: 'offline', // real presence overrides this where it's shown
   location: { lat: '—', lng: '—', lastUpdate: 'no locator yet', accuracy: '—' },
@@ -102,6 +103,19 @@ export const useTeam = () => {
     await refresh();
   }, [liveMembers, refresh]);
 
+  // Save contact/radio fields (self, or any member when admin — RLS
+  // enforces it; the profiles_guard trigger keeps role/org locked).
+  const updateContact = useCallback(async (id, patch) => {
+    const m = liveMembers.find(x => x.id === id);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+    logEvent('member.updated', { name: patch.display_name || m?.name }, id);
+    await refresh();
+  }, [liveMembers, refresh]);
+
   // Admin-only: set any member's role (used to restore dropped users).
   const setMemberRole = useCallback(async (id, role) => {
     const m = liveMembers.find(x => x.id === id);
@@ -111,5 +125,5 @@ export const useTeam = () => {
     await refresh();
   }, [liveMembers, refresh]);
 
-  return { isLive, liveMembers, invitations, loading, error, refresh, createInvitation, revokeInvitation, dropMember, setMemberRole };
+  return { isLive, liveMembers, invitations, loading, error, refresh, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact };
 };

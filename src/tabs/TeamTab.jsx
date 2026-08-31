@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import {
-  Video, Users, CreditCard, Settings, AlertTriangle, Eye, Camera, CheckCircle, XCircle, X, UserPlus, FileText, MapPin, Download, Edit, Mail, Phone, Shield, Database, ChevronRight, Activity, Radio, Grid, List, User, Navigation, Layers, Map, Satellite, Info, Copy, Ticket, Loader2
+  Users, AlertTriangle, Eye, Camera, CheckCircle, X, UserPlus, MapPin, Mail, Phone, Shield, ChevronRight, Activity, Radio, Grid, List, Navigation, Map, Copy, Ticket, Loader2
 } from 'lucide-react';
 import { useTeam } from '../hooks/useTeam';
 import { usePresence } from '../hooks/usePresence';
@@ -16,88 +16,11 @@ import { ROLES as ROLE_OPTIONS_ALL, ROLE_LABELS, ROLE_DESCRIPTIONS, invitableRol
 export const TeamTab = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [activeUserTab, setActiveUserTab] = useState('profile'); // profile, devices, permissions, location, emergency
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // list, grid, map
-  const [activePermissionTab, setActivePermissionTab] = useState('liveStreams'); // For permissions sub-tabs
-  
-  // Permission module configurations with icons and descriptions
-  const permissionModules = {
-    liveStreams: { 
-      label: 'Live Streams', 
-      icon: Video, 
-      description: 'Monitor live video feeds from drones and cameras',
-      permissions: {
-        view: { label: 'View Feeds', desc: 'Watch live video streams' },
-        control: { label: 'Control Devices', desc: 'PTZ control, camera adjustments' },
-        acknowledge: { label: 'Acknowledge Alerts', desc: 'Respond to detection alerts' },
-      }
-    },
-    drones: { 
-      label: 'Drones', 
-      icon: Navigation, 
-      description: 'Drone fleet management and flight operations',
-      permissions: {
-        view: { label: 'View Status', desc: 'See drone locations and status' },
-        control: { label: 'Flight Control', desc: 'Pilot drones manually' },
-        emergency: { label: 'Emergency Actions', desc: 'Execute emergency commands (halt, RTB)' },
-        assign: { label: 'Assign Missions', desc: 'Create and assign flight paths' },
-      }
-    },
-    tacticalMap: { 
-      label: 'Tactical Map', 
-      icon: Map, 
-      description: 'Geographic operations and situational awareness',
-      permissions: {
-        view: { label: 'View Map', desc: 'Access tactical map display' },
-        edit: { label: 'Edit Layers', desc: 'Modify map overlays and settings' },
-        markers: { label: 'Manage Markers', desc: 'Create/edit tactical markers' },
-        geofences: { label: 'Manage Geofences', desc: 'Create/edit restricted zones' },
-      }
-    },
-    library: { 
-      label: 'Library', 
-      icon: Database, 
-      description: 'Historical recordings, incidents, and reports',
-      permissions: {
-        view: { label: 'View Records', desc: 'Access activity logs and recordings' },
-        export: { label: 'Export Data', desc: 'Download and share content' },
-        delete: { label: 'Delete Records', desc: 'Remove historical data' },
-      }
-    },
-    team: { 
-      label: 'Team', 
-      icon: Users, 
-      description: 'Personnel management and access control',
-      permissions: {
-        view: { label: 'View Team', desc: 'See team member profiles' },
-        edit: { label: 'Edit Members', desc: 'Modify user information' },
-        invite: { label: 'Invite Users', desc: 'Add new team members' },
-        remove: { label: 'Remove Users', desc: 'Deactivate team members' },
-      }
-    },
-    billing: { 
-      label: 'Billing', 
-      icon: CreditCard, 
-      description: 'Subscription and usage management',
-      permissions: {
-        view: { label: 'View Billing', desc: 'See invoices and usage' },
-        edit: { label: 'Manage Billing', desc: 'Update payment and subscription' },
-      }
-    },
-    settings: { 
-      label: 'Settings', 
-      icon: Settings, 
-      description: 'System configuration and preferences',
-      permissions: {
-        view: { label: 'View Settings', desc: 'See system configuration' },
-        edit: { label: 'Edit Settings', desc: 'Modify system settings' },
-      }
-    },
-  };
-  
+
   // Live team only, with REAL presence: online = has Watchtower open now.
-  const { isLive, liveMembers, invitations, createInvitation, revokeInvitation, dropMember, setMemberRole } = useTeam();
+  const { isLive, liveMembers, invitations, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact } = useTeam();
   const onlineIds = usePresence();
   const { profile, session } = useAuth();
   const myId = session?.user?.id;
@@ -132,19 +55,9 @@ export const TeamTab = () => {
     busy: { label: 'Busy', color: 'bg-red-500', dotColor: 'bg-red-500' },
     away: { label: 'Away', color: 'bg-yellow-500', dotColor: 'bg-yellow-500' },
   };
-  
-  // Device permission levels
-  const permissionLevels = {
-    full_control: { label: 'Full Control', color: 'text-green-400', desc: 'All operations including emergency' },
-    pilot: { label: 'Pilot', color: 'text-blue-400', desc: 'Flight control and camera operations' },
-    operator: { label: 'Operator', color: 'text-orange-400', desc: 'Camera control and monitoring' },
-    view_only: { label: 'View Only', color: 'text-slate-400', desc: 'Live feed viewing only' },
-  };
-  
   // Open user modal
   const openUserModal = (user) => {
     setSelectedUser(user);
-    setActiveUserTab('profile');
     setShowUserModal(true);
   };
   
@@ -523,676 +436,14 @@ export const TeamTab = () => {
         </div>
       )}
       
-      {/* User Detail Modal */}
+      {/* MEMBER MODAL — real fields, editable by the member or an admin */}
       {showUserModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-            {/* Header - Sticky */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800/50 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                    selectedUser.role === 'admin' ? 'bg-gradient-to-br from-purple-500 to-purple-700' :
-                    selectedUser.role === 'operator' ? 'bg-gradient-to-br from-orange-500 to-orange-700' :
-                    'bg-gradient-to-br from-slate-500 to-slate-700'
-                  }`}>
-                    {selectedUser.initials}
-                  </div>
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${statusConfigs[selectedUser.status].dotColor}`} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-white">{selectedUser.name}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs border ${roleConfigs[selectedUser.role].color}`}>
-                      {roleConfigs[selectedUser.role].label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">{selectedUser.title} • {selectedUser.department}</p>
-                </div>
-              </div>
-              <button onClick={() => setShowUserModal(false)} className="p-1.5 hover:bg-slate-700 rounded-lg">
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-            
-            {/* Tabs - Sticky */}
-            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-700 bg-slate-800/30 overflow-x-auto flex-shrink-0">
-              {[
-                { id: 'profile', label: 'Profile', icon: User },
-                { id: 'contact', label: 'Contact', icon: Phone },
-                { id: 'devices', label: 'Devices', icon: Radio },
-                { id: 'permissions', label: 'Permissions', icon: Shield },
-                { id: 'location', label: 'Location', icon: MapPin },
-                { id: 'activity', label: 'Activity', icon: Activity },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveUserTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap ${
-                    activeUserTab === tab.id 
-                      ? 'bg-orange-500 text-white' 
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            
-            {/* Tab Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4">
-              
-              {/* PROFILE Tab */}
-              {activeUserTab === 'profile' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Full Name</label>
-                      <p className="text-white mt-1">{selectedUser.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Title</label>
-                      <p className="text-white mt-1">{selectedUser.title}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Department</label>
-                      <p className="text-white mt-1">{selectedUser.department}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Badge Number</label>
-                      <p className="text-white mt-1">{selectedUser.badge}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Joined Date</label>
-                      <p className="text-white mt-1">{selectedUser.joinedDate}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide">Current Shift</label>
-                      <p className="text-white mt-1">{selectedUser.shifts.current} ({selectedUser.shifts.schedule})</p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide">Certifications</label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedUser.certifications.map((cert, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm border border-green-500/30">
-                          ✓ {cert}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide">Training Completed</label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedUser.trainingCompleted.map((training, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-sm">
-                          {training}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide">Notes</label>
-                    <p className="text-slate-300 mt-1">{selectedUser.notes}</p>
-                  </div>
-                  
-                  {/* Performance Stats */}
-                  <div className="grid grid-cols-3 gap-4 p-4 bg-slate-800/50 rounded-xl">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-400">{selectedUser.alertsHandled}</p>
-                      <p className="text-xs text-slate-400">Alerts Handled</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-green-400">{selectedUser.avgResponseTime}</p>
-                      <p className="text-xs text-slate-400">Avg Response</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-400">{selectedUser.devices.length}</p>
-                      <p className="text-xs text-slate-400">Devices Assigned</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* CONTACT & EMERGENCY Tab */}
-              {activeUserTab === 'contact' && (
-                <div className="space-y-6">
-                  {/* Contact Info */}
-                  <div>
-                    <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-orange-400" />
-                      Contact Information
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Email</label>
-                        <p className="text-white mt-1 flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-slate-400" />
-                          {selectedUser.email}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Office Phone</label>
-                        <p className="text-white mt-1 flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-slate-400" />
-                          {selectedUser.phone}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Mobile</label>
-                        <p className="text-white mt-1 flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-green-400" />
-                          {selectedUser.mobile}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                        <label className="text-xs text-red-400 uppercase tracking-wide">Emergency Phone</label>
-                        <p className="text-white mt-1 flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-red-400" />
-                          {selectedUser.emergencyPhone}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Radio Info */}
-                  <div>
-                    <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                      <Radio className="w-4 h-4 text-orange-400" />
-                      Radio Communications
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Callsign</label>
-                        <p className="text-white mt-1 text-lg font-mono">{selectedUser.radioCallsign}</p>
-                      </div>
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Frequency</label>
-                        <p className="text-white mt-1 text-lg font-mono">{selectedUser.radioFrequency}</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Emergency Contacts */}
-                  <div>
-                    <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
-                      Emergency Contacts
-                    </h4>
-                    <div className="space-y-3">
-                      {selectedUser.emergencyContacts.map((contact, idx) => (
-                        <div key={idx} className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between">
-                          <div>
-                            <p className="text-white font-medium">{contact.name}</p>
-                            <p className="text-sm text-slate-400">{contact.relation}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-mono">{contact.phone}</span>
-                            <button className="p-2 bg-red-500 hover:bg-red-600 rounded-lg">
-                              <Phone className="w-4 h-4 text-white" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* DEVICES Tab */}
-              {activeUserTab === 'devices' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-white font-medium flex items-center gap-2">
-                      <Radio className="w-4 h-4 text-orange-400" />
-                      Assigned Devices ({selectedUser.devices.length})
-                    </h4>
-                    <button className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-sm">
-                      + Assign Device
-                    </button>
-                  </div>
-                  
-                  {selectedUser.devices.length > 0 ? (
-                    <div className="space-y-3">
-                      {selectedUser.devices.map((device, idx) => (
-                        <div key={idx} className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              device.type === 'drone' ? 'bg-purple-500/20' : 'bg-blue-500/20'
-                            }`}>
-                              {device.type === 'drone' ? (
-                                <Navigation className="w-6 h-6 text-purple-400" />
-                              ) : (
-                                <Camera className="w-6 h-6 text-blue-400" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-white font-medium">{device.name}</p>
-                              <p className="text-sm text-slate-400 capitalize">{device.type}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-3 py-1 rounded-lg text-sm ${
-                              device.permission === 'full_control' ? 'bg-green-500/20 text-green-400' :
-                              device.permission === 'pilot' ? 'bg-blue-500/20 text-blue-400' :
-                              device.permission === 'operator' ? 'bg-orange-500/20 text-orange-400' :
-                              'bg-slate-500/20 text-slate-400'
-                            }`}>
-                              {permissionLevels[device.permission].label}
-                            </span>
-                            <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center bg-slate-800/30 rounded-xl">
-                      <Radio className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400">No devices assigned</p>
-                      <button className="mt-3 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
-                        Assign First Device
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Permission Levels Legend */}
-                  <div className="p-4 bg-slate-800/30 rounded-xl">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">Permission Levels</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {Object.entries(permissionLevels).map(([key, level]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <span className={`w-3 h-3 rounded-full ${
-                            key === 'full_control' ? 'bg-green-500' :
-                            key === 'pilot' ? 'bg-blue-500' :
-                            key === 'operator' ? 'bg-orange-500' :
-                            'bg-slate-500'
-                          }`} />
-                          <div>
-                            <p className="text-sm text-white">{level.label}</p>
-                            <p className="text-xs text-slate-500">{level.desc}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* PERMISSIONS Tab */}
-              {activeUserTab === 'permissions' && (
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-white font-medium flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-orange-400" />
-                      Application Permissions
-                    </h4>
-                    <span className={`px-3 py-1 rounded-lg text-sm border ${roleConfigs[selectedUser.role].color}`}>
-                      Role: {roleConfigs[selectedUser.role].label}
-                    </span>
-                  </div>
-                  
-                  {/* Permission Module Tabs - Scrollable */}
-                  <div className="overflow-x-auto pb-2">
-                    <div className="flex gap-1 p-1 bg-slate-800/50 rounded-xl min-w-max">
-                      {Object.entries(permissionModules).map(([key, module]) => {
-                        const IconComponent = module.icon;
-                        const modulePerms = selectedUser.permissions[key];
-                        const enabledCount = modulePerms ? Object.values(modulePerms).filter(Boolean).length : 0;
-                        const totalCount = modulePerms ? Object.keys(modulePerms).length : 0;
-                        
-                        return (
-                          <button
-                            key={key}
-                            onClick={() => setActivePermissionTab(key)}
-                            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                              activePermissionTab === key
-                                ? 'bg-orange-500 text-white'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                            }`}
-                          >
-                            <IconComponent className="w-3.5 h-3.5" />
-                            <span>{module.label}</span>
-                            <span className={`px-1 py-0.5 rounded text-[10px] ${
-                              activePermissionTab === key 
-                                ? 'bg-white/20' 
-                                : enabledCount === totalCount 
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : enabledCount === 0
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                            }`}>
-                              {enabledCount}/{totalCount}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  {/* Active Permission Module Content */}
-                  {permissionModules[activePermissionTab] && (
-                    <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
-                      {/* Module Header - Compact */}
-                      <div className="p-3 bg-slate-800/50 border-b border-slate-700">
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const IconComponent = permissionModules[activePermissionTab].icon;
-                            return <IconComponent className="w-5 h-5 text-orange-400" />;
-                          })()}
-                          <div>
-                            <h5 className="text-white font-bold text-sm">{permissionModules[activePermissionTab].label}</h5>
-                            <p className="text-xs text-slate-400">{permissionModules[activePermissionTab].description}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Permissions List - Compact */}
-                      <div className="p-3 space-y-2">
-                        {Object.entries(permissionModules[activePermissionTab].permissions).map(([permKey, permInfo]) => {
-                          const isEnabled = selectedUser.permissions[activePermissionTab]?.[permKey] || false;
-                          
-                          return (
-                            <div 
-                              key={permKey}
-                              className={`p-3 rounded-lg border transition-all ${
-                                isEnabled 
-                                  ? 'bg-green-500/10 border-green-500/30' 
-                                  : 'bg-slate-800/50 border-slate-700'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                    isEnabled ? 'bg-green-500/20' : 'bg-slate-700'
-                                  }`}>
-                                    {isEnabled ? (
-                                      <CheckCircle className="w-4 h-4 text-green-400" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4 text-slate-500" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <p className={`text-sm font-medium ${isEnabled ? 'text-white' : 'text-slate-400'}`}>
-                                      {permInfo.label}
-                                    </p>
-                                    <p className="text-xs text-slate-500">{permInfo.desc}</p>
-                                  </div>
-                                </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={isEnabled} 
-                                    className="sr-only peer"
-                                    readOnly
-                                  />
-                                  <div className={`w-9 h-5 rounded-full peer-focus:outline-none transition-all ${
-                                    isEnabled ? 'bg-green-500' : 'bg-slate-600'
-                                  }`}>
-                                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                                      isEnabled ? 'translate-x-4' : 'translate-x-0'
-                                    }`} />
-                                  </div>
-                                </label>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      
-                      {/* Module Summary - Compact */}
-                      <div className="p-3 bg-slate-800/50 border-t border-slate-700">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-xs">
-                            {(() => {
-                              const modulePerms = selectedUser.permissions[activePermissionTab];
-                              const enabledCount = modulePerms ? Object.values(modulePerms).filter(Boolean).length : 0;
-                              const totalCount = modulePerms ? Object.keys(modulePerms).length : 0;
-                              
-                              return (
-                                <>
-                                  <span className="text-green-400">✓ {enabledCount} Enabled</span>
-                                  <span className="text-slate-500">✗ {totalCount - enabledCount} Disabled</span>
-                                </>
-                              );
-                            })()}
-                          </div>
-                          <div className="flex gap-1">
-                            <button className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs">
-                              All On
-                            </button>
-                            <button className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs">
-                              All Off
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Quick Overview - Scrollable */}
-                  <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-                    <h5 className="text-white font-medium text-sm mb-2">Permissions Overview</h5>
-                    <div className="overflow-x-auto">
-                      <div className="flex gap-2 min-w-max">
-                        {Object.entries(permissionModules).map(([key, module]) => {
-                          const modulePerms = selectedUser.permissions[key];
-                          const enabledCount = modulePerms ? Object.values(modulePerms).filter(Boolean).length : 0;
-                          const totalCount = modulePerms ? Object.keys(modulePerms).length : 0;
-                          const percentage = totalCount > 0 ? Math.round((enabledCount / totalCount) * 100) : 0;
-                          const IconComponent = module.icon;
-                          
-                          return (
-                            <div 
-                              key={key}
-                              onClick={() => setActivePermissionTab(key)}
-                              className={`p-2 rounded-lg cursor-pointer transition-all text-center min-w-[70px] ${
-                                activePermissionTab === key 
-                                  ? 'bg-orange-500/20 border border-orange-500/50' 
-                                  : 'bg-slate-800/50 border border-transparent hover:border-slate-600'
-                              }`}
-                            >
-                              <IconComponent className={`w-4 h-4 mx-auto mb-1 ${
-                                percentage === 100 ? 'text-green-400' :
-                                percentage === 0 ? 'text-red-400' :
-                                'text-yellow-400'
-                              }`} />
-                              <p className="text-[10px] text-slate-400 truncate">{module.label}</p>
-                              <p className={`text-xs font-bold ${
-                                percentage === 100 ? 'text-green-400' :
-                                percentage === 0 ? 'text-red-400' :
-                                'text-yellow-400'
-                              }`}>{percentage}%</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Role Presets */}
-                  <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-                    <h5 className="text-white font-medium text-sm mb-2">Apply Role Preset</h5>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { role: 'admin', label: 'Admin', desc: 'Full access', color: 'purple' },
-                        { role: 'operator', label: 'Operator', desc: 'Operations', color: 'orange' },
-                        { role: 'pilot', label: 'Pilot', desc: 'Drone control', color: 'blue' },
-                        { role: 'viewer', label: 'Viewer', desc: 'View only', color: 'slate' },
-                      ].map(preset => (
-                        <button
-                          key={preset.role}
-                          className={`p-2 rounded-lg border text-left transition-all ${
-                            selectedUser.role === preset.role
-                              ? `bg-${preset.color}-500/20 border-${preset.color}-500/50`
-                              : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2.5 h-2.5 rounded-full bg-${preset.color}-500`} />
-                            <span className="text-white font-medium text-xs">{preset.label}</span>
-                            {selectedUser.role === preset.role && (
-                              <CheckCircle className="w-3 h-3 text-green-400 ml-auto" />
-                            )}
-                          </div>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{preset.desc}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* LOCATION Tab */}
-              {activeUserTab === 'location' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-white font-medium flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-orange-400" />
-                      Location Tracking
-                    </h4>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={selectedUser.locatorEnabled} className="w-4 h-4 rounded" readOnly />
-                      <span className="text-sm text-slate-300">Location Enabled</span>
-                    </label>
-                  </div>
-                  
-                  {selectedUser.location && selectedUser.locatorEnabled ? (
-                    <>
-                      <div className="h-64 bg-slate-800 rounded-xl relative overflow-hidden">
-                        {/* Map placeholder */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Map className="w-16 h-16 text-slate-700" />
-                        </div>
-                        {/* User marker */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold border-4 border-white shadow-lg ${
-                            selectedUser.role === 'admin' ? 'bg-purple-500' :
-                            selectedUser.role === 'operator' ? 'bg-orange-500' :
-                            'bg-slate-500'
-                          }`}>
-                            {selectedUser.initials}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 bg-slate-800/50 rounded-xl">
-                          <label className="text-xs text-slate-500 uppercase tracking-wide">Latitude</label>
-                          <p className="text-white mt-1 font-mono">{selectedUser.location.lat}</p>
-                        </div>
-                        <div className="p-4 bg-slate-800/50 rounded-xl">
-                          <label className="text-xs text-slate-500 uppercase tracking-wide">Longitude</label>
-                          <p className="text-white mt-1 font-mono">{selectedUser.location.lng}</p>
-                        </div>
-                        <div className="p-4 bg-slate-800/50 rounded-xl">
-                          <label className="text-xs text-slate-500 uppercase tracking-wide">Last Update</label>
-                          <p className="text-white mt-1">{selectedUser.location.lastUpdate}</p>
-                        </div>
-                        <div className="p-4 bg-slate-800/50 rounded-xl">
-                          <label className="text-xs text-slate-500 uppercase tracking-wide">Accuracy</label>
-                          <p className="text-white mt-1">{selectedUser.location.accuracy}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <label className="text-xs text-slate-500 uppercase tracking-wide">Locator Type</label>
-                        <div className="flex items-center gap-4 mt-2">
-                          {[
-                            { id: 'mobile_app', label: 'Mobile App', icon: Phone },
-                            { id: 'gps_tracker', label: 'GPS Tracker', icon: Satellite },
-                            { id: 'radio', label: 'Radio', icon: Radio },
-                          ].map(type => (
-                            <label key={type.id} className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer ${
-                              selectedUser.locatorType === type.id 
-                                ? 'bg-orange-500/20 border border-orange-500/50 text-orange-400' 
-                                : 'bg-slate-800 text-slate-400'
-                            }`}>
-                              <type.icon className="w-4 h-4" />
-                              <span>{type.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="p-8 text-center bg-slate-800/30 rounded-xl">
-                      <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400">Location tracking is disabled</p>
-                      <button className="mt-3 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm">
-                        Enable Location
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* ACTIVITY Tab */}
-              {activeUserTab === 'activity' && (
-                <div className="space-y-6">
-                  <h4 className="text-white font-medium flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-orange-400" />
-                    Recent Activity
-                  </h4>
-                  
-                  <div className="space-y-3">
-                    {[
-                      { time: '14:32', action: 'Acknowledged fire alert', device: 'Drone M3T', type: 'alert' },
-                      { time: '14:35', action: 'Took manual control', device: 'Drone M3T', type: 'control' },
-                      { time: '14:40', action: 'Created marker: Fire Origin', device: null, type: 'marker' },
-                      { time: '13:00', action: 'Started shift', device: null, type: 'session' },
-                      { time: '12:45', action: 'Reviewed incident report', device: null, type: 'review' },
-                    ].map((activity, idx) => (
-                      <div key={idx} className="flex items-center gap-4 p-3 bg-slate-800/30 rounded-lg">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          activity.type === 'alert' ? 'bg-red-500/20' :
-                          activity.type === 'control' ? 'bg-purple-500/20' :
-                          activity.type === 'marker' ? 'bg-blue-500/20' :
-                          'bg-slate-700'
-                        }`}>
-                          {activity.type === 'alert' && <AlertTriangle className="w-5 h-5 text-red-400" />}
-                          {activity.type === 'control' && <Navigation className="w-5 h-5 text-purple-400" />}
-                          {activity.type === 'marker' && <MapPin className="w-5 h-5 text-blue-400" />}
-                          {activity.type === 'session' && <User className="w-5 h-5 text-slate-400" />}
-                          {activity.type === 'review' && <FileText className="w-5 h-5 text-slate-400" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-white">{activity.action}</p>
-                          {activity.device && <p className="text-xs text-slate-500">{activity.device}</p>}
-                        </div>
-                        <span className="text-sm text-slate-400">{activity.time}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Footer */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-3 border-t border-slate-700 bg-slate-800/50">
-              <button className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs order-2 sm:order-1">
-                Deactivate
-              </button>
-              <div className="flex gap-2 order-1 sm:order-2">
-                <button
-                  onClick={() => setShowUserModal(false)}
-                  className="flex-1 sm:flex-none px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs"
-                >
-                  Close
-                </button>
-                <button className="flex-1 sm:flex-none px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium">
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <MemberModal
+          member={selectedUser}
+          canEdit={isAdmin || selectedUser.id === myId}
+          onSave={updateContact}
+          onClose={() => setShowUserModal(false)}
+        />
       )}
 
       {/* INVITE MODAL */}
@@ -1203,6 +454,129 @@ export const TeamTab = () => {
           onCreate={createInvitation}
         />
       )}
+    </div>
+  );
+};
+
+// Member detail — real profile fields only. The member edits their own
+// card; admins can edit anyone's. Everything else (role, stand-down)
+// lives on the roster list.
+const raw = (v) => (v && v !== '—' ? v : '');
+
+const MemberModal = ({ member, canEdit, onSave, onClose }) => {
+  const [form, setForm] = useState({
+    display_name: raw(member.name === 'Unnamed' ? '' : member.name),
+    callsign: raw(member.radioCallsign),
+    frequency: raw(member.radioFrequency),
+    phone: raw(member.phone),
+    mobile: raw(member.mobile),
+    emergency_phone: raw(member.emergencyPhone),
+    emergency_contact: raw(member.emergencyContact),
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const set = (k) => (e) => { setSaved(false); setForm(f => ({ ...f, [k]: e.target.value })); };
+
+  const FIELDS = [
+    ['display_name', 'Full name', 'How you appear across Watchtower'],
+    ['callsign', 'Callsign', 'Radio identity, e.g. WT-1'],
+    ['frequency', 'Radio frequency', 'e.g. 146.520 MHz'],
+    ['phone', 'Phone', ''],
+    ['mobile', 'Mobile', ''],
+    ['emergency_phone', 'Emergency phone', 'Reach in a life-safety situation'],
+    ['emergency_contact', 'Emergency contact', 'Name & relation, e.g. Chris — spouse'],
+  ];
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const patch = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim() || null]));
+      await onSave(member.id, patch);
+      setSaved(true);
+    } catch (e) {
+      setError(e.message ?? 'Could not save');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 p-4 border-b border-slate-700">
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center text-white font-bold">
+            {member.initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-white truncate">{form.display_name || member.name}</h3>
+              <span className="px-2 py-0.5 rounded text-[10px] bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                {ROLE_LABELS[member.role] ?? member.role}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 truncate">{member.email} · joined {member.joinedDate}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg">
+            <X className="w-4 h-4 text-slate-400" />
+          </button>
+        </div>
+
+        {/* Fields */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {!canEdit && (
+            <p className="text-[11px] text-slate-500 mb-3">
+              Contact card — the member (or an admin) keeps it up to date.
+            </p>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {FIELDS.map(([key, label, hint]) => (
+              <div key={key} className={key === 'emergency_contact' ? 'sm:col-span-2' : ''}>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</label>
+                {canEdit ? (
+                  <input
+                    value={form[key]}
+                    onChange={set(key)}
+                    placeholder={hint || '—'}
+                    className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                  />
+                ) : (
+                  <p className="text-sm text-white mt-1 px-3 py-2 bg-slate-800/50 rounded-lg min-h-[36px]">
+                    {form[key] || '—'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 p-3 border-t border-slate-700">
+          <div className="text-xs">
+            {error && <span className="text-red-400">{error}</span>}
+            {saved && !error && <span className="text-green-400 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Saved — the whole team sees it</span>}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs">
+              Close
+            </button>
+            {canEdit && (
+              <button
+                onClick={save}
+                disabled={busy}
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Save
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
