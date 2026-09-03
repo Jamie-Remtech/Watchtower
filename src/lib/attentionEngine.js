@@ -274,6 +274,76 @@ export async function runAttentionSweep() {
     } catch { /* AI not configured or unreachable — geometric layer still ran */ }
   }
 
+  // ---- RADAR TRUTH: sample the actual radar over every anchor ----
+  // Forecast models can miss pop-up convection entirely (they did);
+  // the radar composite is measurement. We read the latest frame's
+  // pixel at each person's exact position. BW scheme: value = (dBZ+32)*2.
+  if (anchors.length && typeof document !== 'undefined') {
+    try {
+      const meta = await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
+      const frame = meta?.radar?.past?.at(-1);
+      if (frame) {
+        const hourBucket = new Date().toISOString().slice(0, 13);
+        const tileCache = new Map();
+        for (const a of anchors.slice(0, 12)) {
+          const z = 7, n = 2 ** z;
+          const xf = ((a.lng + 180) / 360) * n;
+          const latRad = (a.lat * Math.PI) / 180;
+          const yf = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+          const tx = Math.floor(xf), ty = Math.floor(yf);
+          const key = `${tx},${ty}`;
+          let data = tileCache.get(key);
+          if (data === undefined) {
+            try {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src = `${meta.host}${frame.path}/256/${z}/${tx}/${ty}/0/0_0.png`;
+              await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+              const cv = document.createElement('canvas');
+              cv.width = 256; cv.height = 256;
+              const ctx = cv.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              data = ctx.getImageData(0, 0, 256, 256).data;
+            } catch { data = null; }
+            tileCache.set(key, data);
+          }
+          if (!data) continue;
+          const px = Math.floor((xf - tx) * 256), py = Math.floor((yf - ty) * 256);
+          let maxV = -1;
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              const X = Math.min(255, Math.max(0, px + dx));
+              const Y = Math.min(255, Math.max(0, py + dy));
+              const i = (Y * 256 + X) * 4;
+              if (data[i + 3] > 0 && data[i] > maxV) maxV = data[i];
+            }
+          }
+          const dbz = maxV >= 0 ? maxV / 2 - 32 : null;
+          const label = a.label ?? 'crew member';
+          if (dbz != null && dbz >= 40) {
+            candidates.push({
+              dedupe_key: `radar-storm:${label}:${hourBucket}`,
+              severity: 'critical',
+              kind: 'weather',
+              title: `Intense cell over ${label} (radar ${Math.round(dbz)} dBZ)`,
+              detail: 'Radar measures a strong precipitation cell at this exact position right now — torrential rain, possible hail and lightning. Source: RainViewer radar composite.',
+              source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz), frame: frame.time },
+            });
+          } else if (dbz != null && dbz >= 10) {
+            candidates.push({
+              dedupe_key: `radar-rain:${label}:${hourBucket}`,
+              severity: 'critical',
+              kind: 'weather',
+              title: `Rain over ${label} now (radar)`,
+              detail: `Radar shows precipitation at this exact position (${Math.round(dbz)} dBZ). Source: RainViewer radar composite.`,
+              source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz), frame: frame.time },
+            });
+          }
+        }
+      }
+    } catch { /* radar unreachable — nowcast below still runs */ }
+  }
+
   // ---- Hyperlocal rain nowcast at every anchor (Open-Meteo 15-min model) ----
   // Regional forecasts generalize rain over whole areas; this checks the
   // exact positions of the crew and gear and warns minutes ahead — when
@@ -293,11 +363,14 @@ export async function runAttentionSweep() {
         const a = pts[i];
         const m = rows[i]?.minutely_15;
         if (!m?.time?.length) continue;
-        // Current 15-min step = last one whose start time is not in the future
+        // Current 15-min step = last one whose start time is not in the future.
+        // If the labels don't bracket "now" (timezone quirks), trust the API
+        // contract that the array starts at the current interval.
         let idx = 0;
         for (let k = 0; k < m.time.length; k++) {
           if (new Date(m.time[k] + 'Z') <= Date.now()) idx = k; else break;
         }
+        if (idx > m.time.length - 5) idx = 0;
         const cur = m.precipitation[idx] ?? 0;
         const next = m.precipitation.slice(idx + 1, idx + 5); // the coming hour
         const label = a.label ?? 'crew member';
