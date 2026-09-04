@@ -123,10 +123,11 @@ const WatchtowerPortal = () => {
   }, [profile?.org_id]);
 
   // Tabs are filtered by role — e.g. viewers see the World tab only.
-  // The platform portal is creator-only, above the role ladder.
+  // The platform portal is for system admins (owner + staff) only.
+  const isPlatformStaff = ['owner', 'staff'].includes(profile?.platform_role) || profile?.platform_owner === true;
   const allowed = [
     ...allowedTabs(profile?.role),
-    ...(profile?.platform_owner ? ['platform'] : []),
+    ...(isPlatformStaff ? ['platform'] : []),
   ];
   const navItems = [
     { id: 'streams', name: 'Live Streams', icon: Video },

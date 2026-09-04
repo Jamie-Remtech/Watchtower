@@ -6,7 +6,7 @@ export const ROLE_LABELS = {
   field: 'Field Collaborator',
   operator: 'Operator',
   coordinator: 'Coordinator',
-  admin: 'Administrator',
+  admin: 'Company Admin',
 };
 
 export const ROLE_DESCRIPTIONS = {
@@ -14,7 +14,7 @@ export const ROLE_DESCRIPTIONS = {
   field: 'Collaborator app: position, reports, comms',
   operator: 'Drives feeds and devices, manages detections',
   coordinator: 'Runs operations, tasks protocols, handles attention queue',
-  admin: 'Organization management, devices, billing',
+  admin: 'Runs their company: members, devices, billing (org-scoped)',
 };
 
 export const hasAtLeast = (role, required) =>

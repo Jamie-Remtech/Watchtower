@@ -56,7 +56,7 @@ export const PlatformTab = () => {
   const refresh = useCallback(async () => {
     const [o, p, inv, l, iv] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at'),
-      supabase.from('profiles').select('id, display_name, email, role, org_id, team_id').order('created_at'),
+      supabase.from('profiles').select('id, display_name, email, role, org_id, team_id, platform_role').order('created_at'),
       supabase.from('invoices').select('*').order('created_at', { ascending: false }),
       supabase.from('org_links').select('*').order('created_at', { ascending: false }),
       supabase.from('invitations').select('id, org_id, code, role, status, expires_at').eq('status', 'pending'),
@@ -71,8 +71,9 @@ export const PlatformTab = () => {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (!profile?.platform_owner) {
-    return <p className="text-sm text-slate-500 text-center py-12">Platform portal is reserved for the app creator.</p>;
+  const myPlatformRole = profile?.platform_role ?? (profile?.platform_owner ? 'owner' : null);
+  if (!['owner', 'staff'].includes(myPlatformRole)) {
+    return <p className="text-sm text-slate-500 text-center py-12">Platform portal is reserved for system administrators.</p>;
   }
 
   const orgName = (id) => orgs.find(o => o.id === id)?.name ?? '?';
@@ -172,7 +173,9 @@ export const PlatformTab = () => {
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Building2 className="w-6 h-6 text-purple-400" />
           Platform
-          <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">creator</span>
+          <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            {myPlatformRole === 'owner' ? 'creator' : 'system admin'}
+          </span>
         </h2>
         <div className="flex items-center gap-2">
           <input
@@ -216,8 +219,13 @@ export const PlatformTab = () => {
                     {members.map(m => (
                       <div key={m.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/50 rounded-lg">
                         <span className="text-xs text-white flex-1 truncate">{m.display_name || m.email}</span>
+                        {m.platform_role && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            {m.platform_role === 'owner' ? 'creator' : 'system admin'}
+                          </span>
+                        )}
                         <span className="text-[10px] text-slate-500">{ROLE_LABELS[m.role] ?? m.role}</span>
-                        {!m.platform_owner && m.id !== profile.id && (
+                        {!m.platform_role && m.id !== profile.id && (
                           <button
                             onClick={() => { setMoving(m); setMoveOrg(''); setMoveRole(m.role === 'viewer' ? 'field' : m.role); }}
                             className="p-1 text-slate-500 hover:text-purple-300" title="Move to another company">
