@@ -40,8 +40,16 @@ Deno.serve(async (req) => {
     const vapidJson = Deno.env.get('VAPID_KEYS_JSON');
     if (!supaUrl || !svc) return json({ error: 'missing env' }, 500);
 
-    const q = async (path: string) =>
-      (await fetch(`${supaUrl}/rest/v1/${path}`, { headers: { apikey: svc, Authorization: `Bearer ${svc}` } })).json();
+    const qErrors: string[] = [];
+    const q = async (path: string) => {
+      const res = await fetch(`${supaUrl}/rest/v1/${path}`, { headers: { apikey: svc, Authorization: `Bearer ${svc}` } });
+      const body = await res.json();
+      if (!res.ok || !Array.isArray(body)) {
+        qErrors.push(`${path.split('?')[0]}: ${res.status} ${JSON.stringify(body).slice(0, 120)}`);
+        return [];
+      }
+      return body;
+    };
     const insert = (path: string, body: unknown) =>
       fetch(`${supaUrl}/rest/v1/${path}`, {
         method: 'POST',
@@ -273,7 +281,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ ok: true, orgs: (orgs ?? []).length, anchored_orgs: anchorsByOrg.size, raised, pushed });
+    return json({
+      ok: qErrors.length === 0,
+      orgs: (orgs ?? []).length,
+      anchored_orgs: anchorsByOrg.size,
+      raised,
+      pushed,
+      ...(qErrors.length ? { query_errors: qErrors } : {}),
+    });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
