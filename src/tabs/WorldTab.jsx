@@ -944,7 +944,7 @@ export const WorldTab = () => {
               className="flex items-center gap-1.5 px-2 py-1 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-[10px] font-medium hover:bg-sky-500/25 disabled:opacity-50"
             >
               {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
-              {myWx ? 'Update' : 'Use my GPS'}
+              {myWx ? 'My location' : 'Use my GPS'}
             </button>
           }
         >
