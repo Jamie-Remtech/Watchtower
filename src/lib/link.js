@@ -18,13 +18,13 @@ let failures = 0;
 let lastOkAt = null;
 let timer = null;
 const listeners = new Set();
-let state = compute();
+let state = null; // set below, once every helper exists
 
-const median = (a) => {
+function median(a) {
   if (!a.length) return null;
   const s = [...a].sort((x, y) => x - y);
   return s[Math.floor(s.length / 2)];
-};
+}
 
 // good | fair | poor | offline — from what was actually measured first,
 // the browser's estimate only as a tiebreaker
@@ -50,6 +50,7 @@ function compute() {
 }
 
 const emit = () => { state = compute(); listeners.forEach(fn => fn(state)); };
+state = compute();
 
 // Every timed request to Watchtower feeds the measurement
 export function reportRequest(ms, ok) {
