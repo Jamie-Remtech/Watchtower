@@ -586,6 +586,16 @@ Deno.serve(async (req) => {
       }
     ).catch(() => {});
 
+    // Heartbeat: tower-watchdog and the app alert staff if this goes stale
+    await fetch(`${supaUrl}/rest/v1/system_heartbeats?on_conflict=name`, {
+      method: 'POST',
+      headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        name: 'tower-sweep', at: new Date().toISOString(), ok: qErrors.length === 0,
+        detail: { orgs: (orgs ?? []).length, raised, pushed, errors: qErrors.slice(0, 5) },
+      }),
+    }).catch(() => {});
+
     return json({
       ok: qErrors.length === 0,
       orgs: (orgs ?? []).length,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun
+  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun, AlertTriangle
 } from 'lucide-react';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
@@ -164,6 +164,17 @@ const WatchtowerPortal = () => {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, [isStaff]);
+
+  // Platform staff: the tower's heartbeat. A stale tower means no automatic alerts.
+  const [towerAgeMin, setTowerAgeMin] = useState(null);
+  useEffect(() => {
+    if (!isStaff) return;
+    const check = () => supabase.from('system_heartbeats').select('at').eq('name', 'tower-sweep').maybeSingle()
+      .then(({ data, error }) => { if (!error) setTowerAgeMin(data ? (Date.now() - Date.parse(data.at)) / 60000 : Infinity); });
+    check();
+    const id = setInterval(check, 60000);
+    return () => clearInterval(id);
   }, [isStaff]);
 
   // Listen for alert count updates from StreamsTab
@@ -377,6 +388,14 @@ const WatchtowerPortal = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 pt-16 lg:pt-0">
+        {isStaff && towerAgeMin != null && towerAgeMin > 15 && (
+          <div className="bg-red-600 text-white text-xs font-semibold px-4 py-2 flex items-center gap-2 flex-shrink-0" role="alert">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {towerAgeMin === Infinity
+              ? 'The tower has not reported a sweep yet — automatic alerts may not be running.'
+              : `The tower has not swept for ${Math.round(towerAgeMin)} min — automatic alerts are paused. Check the tower-sweep schedule in Supabase.`}
+          </div>
+        )}
         <header className="hidden lg:flex bg-slate-900/80 border-b border-slate-800 px-4 py-2 items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-sm font-bold text-white">{navItems.find(n => n.id === activeTab)?.name}</h1>
