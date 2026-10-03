@@ -43,6 +43,7 @@ const TYPE_META = {
   'protocol.run_completed': { icon: '✅', label: 'Protocol completed' },
   'protocol.run_aborted': { icon: '⏹️', label: 'Protocol aborted' },
   'ai.action': { icon: '⚡', label: 'AI acted' },
+  'brief.sent': { icon: '☀️', label: 'Daily brief' },
   'team.created': { icon: '🧩', label: 'Team created' },
   'team.removed': { icon: '🧩', label: 'Team removed' },
   'member.team_changed': { icon: '🧩', label: 'Team assignment' },
@@ -91,6 +92,7 @@ const summarize = (e) => {
   if (e.type.startsWith('protocol.run_')) return `${p.name}${p.total ? ` (${p.done}/${p.total} steps)` : ''}`;
   if (e.type.startsWith('protocol.')) return p.name ?? '';
   if (e.type === 'ai.action') return `${p.action}: ${p.protocol ?? p.title ?? p.text ?? ''}`;
+  if (e.type === 'brief.sent') return `${p.label}: ${p.brief}`;
   if (e.type.startsWith('team.')) return p.name ?? '';
   if (e.type === 'member.team_changed') return `${p.name ?? 'member'} → ${p.team}`;
   if (e.type === 'platform.member_moved') return `${p.name} → ${p.to} (${p.role})`;

@@ -23,6 +23,17 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
 
+const WX_CODES: Record<number, string> = {
+  0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Overcast',
+  45: 'Fog', 48: 'Icy fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
+  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Heavy freezing rain',
+  71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains',
+  80: 'Rain showers', 81: 'Showers', 82: 'Violent showers', 85: 'Snow showers', 86: 'Heavy snow showers',
+  95: 'Thunderstorms', 96: 'Thunderstorms w/ hail', 99: 'Severe thunderstorms w/ hail',
+};
+const DAY_WORD = (i: number, dateStr: string) =>
+  i === 0 ? 'today' : i === 1 ? 'tomorrow' : new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-CA', { weekday: 'long' });
+
 const KM = 6371;
 const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -58,28 +69,39 @@ Deno.serve(async (req) => {
       });
 
     // ---------- gather platform state ----------
-    const freshCut = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const freshCutMs = Date.now() - 15 * 60 * 1000;
+    const dayCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     const [orgs, profiles, positions, devices, existing, subs] = await Promise.all([
       q('organizations?select=id,name,settings'),
       q('profiles?select=id,display_name,org_id'),
-      q(`positions?select=profile_id,org_id,lat,lng,at&at=gte.${freshCut}&order=at.desc&limit=1000`),
+      q(`positions?select=profile_id,org_id,lat,lng,at&at=gte.${dayCut}&order=at.desc&limit=2000`),
       q('devices?select=org_id,lat,lng,name'),
       q('attention_items?select=org_id,dedupe_key&status=neq.resolved'),
-      q('push_subscriptions?select=org_id,endpoint,p256dh,auth'),
+      q('push_subscriptions?select=org_id,profile_id,endpoint,p256dh,auth'),
     ]);
     const nameOf = Object.fromEntries((profiles ?? []).map((p: { id: string; display_name: string }) => [p.id, p.display_name]));
     const liveKeys = new Set((existing ?? []).map((i: { org_id: string; dedupe_key: string }) => `${i.org_id}|${i.dedupe_key}`));
     const hourBucket = new Date().toISOString().slice(0, 13);
 
-    // Anchors per org: fresh crew positions (latest per person) + device fleet centroid
+    // Anchors per org: fresh crew positions (latest per person, <15 min)
+    // drive the live radar/nowcast checks; the last KNOWN position per
+    // person (<48 h) drives daily briefs and the forward outlook — a
+    // crew member's phone may sleep, but their environment does not.
     const anchorsByOrg = new Map<string, Array<{ lat: number; lng: number; label: string }>>();
+    const peopleByOrg = new Map<string, Array<{ lat: number; lng: number; label: string; profileId: string }>>();
     const seen = new Set<string>();
     for (const p of positions ?? []) {
       if (!p.org_id || seen.has(p.profile_id)) continue;
       seen.add(p.profile_id);
-      const arr = anchorsByOrg.get(p.org_id) ?? [];
-      arr.push({ lat: p.lat, lng: p.lng, label: nameOf[p.profile_id] ?? 'crew member' });
-      anchorsByOrg.set(p.org_id, arr);
+      const label = nameOf[p.profile_id] ?? 'crew member';
+      if (new Date(p.at).getTime() >= freshCutMs) {
+        const arr = anchorsByOrg.get(p.org_id) ?? [];
+        arr.push({ lat: p.lat, lng: p.lng, label });
+        anchorsByOrg.set(p.org_id, arr);
+      }
+      const ppl = peopleByOrg.get(p.org_id) ?? [];
+      ppl.push({ lat: p.lat, lng: p.lng, label, profileId: p.profile_id });
+      peopleByOrg.set(p.org_id, ppl);
     }
     for (const org of orgs ?? []) {
       const placed = (devices ?? []).filter((d: { org_id: string; lat: number | null }) => d.org_id === org.id && d.lat != null);
@@ -166,7 +188,8 @@ Deno.serve(async (req) => {
 
     for (const org of orgs ?? []) {
       const anchors = (anchorsByOrg.get(org.id) ?? []).slice(0, 12);
-      if (!anchors.length) continue;
+      const people = (peopleByOrg.get(org.id) ?? []).slice(0, 12);
+      if (!anchors.length && !people.length) continue;
       const s = org.settings ?? {};
       const FIRE_KM = +s.wildfire_radius_km > 0 ? +s.wildfire_radius_km : 150;
       const HAZ_KM = +s.hazard_radius_km > 0 ? +s.hazard_radius_km : 300;
@@ -193,7 +216,7 @@ Deno.serve(async (req) => {
       }
 
       // 2) rain nowcast (lead time, where the model has skill)
-      try {
+      if (anchors.length) try {
         const r = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${anchors.map(a => a.lat.toFixed(3)).join(',')}` +
           `&longitude=${anchors.map(a => a.lng.toFixed(3)).join(',')}&minutely_15=precipitation&forecast_minutely_15=8&timezone=UTC`
@@ -251,6 +274,88 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 5) daily brief + forward outlook at each person's last known position
+      if (people.length) {
+        try {
+          const r = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${people.map(p => p.lat.toFixed(3)).join(',')}` +
+            `&longitude=${people.map(p => p.lng.toFixed(3)).join(',')}` +
+            `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max` +
+            `&forecast_days=3&timezone=auto`
+          );
+          const j = await r.json();
+          const rows = Array.isArray(j) ? j : [j];
+          for (let i = 0; i < people.length; i++) {
+            const person = people[i];
+            const row = rows[i];
+            const d = row?.daily;
+            if (!d?.time?.length) continue;
+            const offset = row.utc_offset_seconds ?? 0;
+            const localNow = new Date((Date.now() / 1000 + offset) * 1000);
+            const localHour = localNow.getUTCHours();
+            const localDate = localNow.toISOString().slice(0, 10);
+
+            // Forward outlook: see trouble coming, day by day
+            for (let k = 0; k < d.time.length; k++) {
+              const date = d.time[k];
+              const day = DAY_WORD(k, date);
+              const gust = d.wind_gusts_10m_max?.[k] ?? 0;
+              const rain = d.precipitation_sum?.[k] ?? 0;
+              const prob = d.precipitation_probability_max?.[k] ?? 0;
+              const tmax = d.temperature_2m_max?.[k];
+              const tmin = d.temperature_2m_min?.[k];
+              const code = d.weather_code?.[k] ?? 0;
+              const flags: Array<{ tag: string; sev: string; title: string; detail: string }> = [];
+              if (gust >= 90) flags.push({ tag: 'wind', sev: 'critical', title: `Damaging winds ${day} at ${person.label} (gusts ${Math.round(gust)} km/h)`, detail: `Forecast gusts to ${Math.round(gust)} km/h ${day} (${date}) at this position. Secure equipment; expect treefall and debris. Source: Open-Meteo.` });
+              else if (gust >= 70) flags.push({ tag: 'wind', sev: 'warning', title: `Strong winds ${day} at ${person.label} (gusts ${Math.round(gust)} km/h)`, detail: `Forecast gusts to ${Math.round(gust)} km/h ${day} (${date}). Source: Open-Meteo.` });
+              if (rain >= 50) flags.push({ tag: 'rain', sev: 'critical', title: `Flood-level rain ${day} at ${person.label} (~${Math.round(rain)} mm)`, detail: `~${Math.round(rain)} mm forecast ${day} (${date}, ${prob}% probability). Watch drainages, burn scars and low crossings. Source: Open-Meteo.` });
+              else if (rain >= 25) flags.push({ tag: 'rain', sev: 'warning', title: `Heavy rain ${day} at ${person.label} (~${Math.round(rain)} mm)`, detail: `~${Math.round(rain)} mm forecast ${day} (${date}, ${prob}% probability). Source: Open-Meteo.` });
+              if (tmax != null && tmax >= 38) flags.push({ tag: 'heat', sev: 'critical', title: `Extreme heat ${day} at ${person.label} (${Math.round(tmax)}°C)`, detail: `Heat-illness risk ${day} (${date}) — plan hydration and work/rest cycles. Source: Open-Meteo.` });
+              else if (tmax != null && tmax >= 33) flags.push({ tag: 'heat', sev: 'warning', title: `Heat ${day} at ${person.label} (${Math.round(tmax)}°C)`, detail: `Plan hydration and shade ${day} (${date}). Source: Open-Meteo.` });
+              if (tmin != null && tmin <= -30) flags.push({ tag: 'cold', sev: 'critical', title: `Extreme cold ${day} at ${person.label} (${Math.round(tmin)}°C)`, detail: `Frostbite risk in minutes ${day} (${date}) — plan exposure limits. Source: Open-Meteo.` });
+              else if (tmin != null && tmin <= -22) flags.push({ tag: 'cold', sev: 'warning', title: `Severe cold ${day} at ${person.label} (${Math.round(tmin)}°C)`, detail: `Severe cold forecast ${day} (${date}). Source: Open-Meteo.` });
+              if (code >= 95 && prob >= 60) flags.push({ tag: 'tstorm', sev: gust >= 80 ? 'critical' : 'warning', title: `Thunderstorms ${day} at ${person.label}`, detail: `Thunderstorm day (${date}, ${prob}% precip probability${gust ? `, gusts to ${Math.round(gust)} km/h` : ''}). Lightning and sudden cells. Source: Open-Meteo.` });
+              for (const f of flags) {
+                cands.push({ dedupe_key: `wx-outlook:${person.label}:${date}:${f.tag}`, severity: f.sev, kind: 'weather', title: f.title, detail: f.detail });
+              }
+            }
+
+            // Morning brief: once per local day, pushed to that person only
+            if (localHour >= 6 && localHour < 10) {
+              const key = `brief:${person.label}:${localDate}`;
+              if (!liveKeys.has(`${org.id}|${key}`)) {
+                const desc = WX_CODES[d.weather_code?.[0] ?? 0] ?? 'Conditions';
+                const brief = `${desc} · ${Math.round(d.temperature_2m_min?.[0] ?? 0)} to ${Math.round(d.temperature_2m_max?.[0] ?? 0)}°C · rain ${(d.precipitation_sum?.[0] ?? 0).toFixed(1)} mm (${d.precipitation_probability_max?.[0] ?? 0}%) · gusts ${Math.round(d.wind_gusts_10m_max?.[0] ?? 0)} km/h`;
+                const res = await insert('attention_items', {
+                  org_id: org.id, dedupe_key: key, severity: 'info', kind: 'weather',
+                  title: `Daily brief — ${person.label}`,
+                  detail: `${brief}. At your last known position. Source: Open-Meteo.`,
+                });
+                if (res.ok) {
+                  liveKeys.add(`${org.id}|${key}`);
+                  raised++;
+                  await insert('events', {
+                    org_id: org.id, actor_kind: 'system', type: 'brief.sent',
+                    subject: key, payload: { label: person.label, brief },
+                  });
+                  if (appServer) {
+                    const mySubs = (subs ?? []).filter((x: { org_id: string; profile_id: string }) =>
+                      x.org_id === org.id && x.profile_id === person.profileId);
+                    const message = JSON.stringify({ kind: 'forecast', title: `☀ Your day — ${desc}`, body: brief, url: '/', tag: key });
+                    for (const sub of mySubs) {
+                      try {
+                        await appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }).pushTextMessage(message, {});
+                        pushed++;
+                      } catch { /* stale sub — pruned by the critical path */ }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch { /* forecast service down — live checks already ran */ }
+      }
+
       // ---------- raise + push ----------
       const fresh = cands.filter(c => !liveKeys.has(`${org.id}|${c.dedupe_key}`));
       for (const c of fresh) {
@@ -280,6 +385,17 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    // Housekeeping: weather items age out on their own (radar/rain/brief/
+    // outlook entries are moment-in-time; stale ones must not pile up)
+    await fetch(
+      `${supaUrl}/rest/v1/attention_items?kind=eq.weather&status=eq.open&created_at=lt.${new Date(Date.now() - 24 * 3600e3).toISOString()}`,
+      {
+        method: 'PATCH',
+        headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'resolved' }),
+      }
+    ).catch(() => {});
 
     return json({
       ok: qErrors.length === 0,
