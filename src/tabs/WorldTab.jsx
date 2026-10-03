@@ -4,7 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Globe, Layers, CloudRain, Flame, Wind, Droplets, Thermometer,
   Activity, AlertTriangle, RefreshCw, ChevronDown, ChevronRight, Info,
-  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud, Clock
+  LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud, Clock,
+  Satellite, MapPin, EyeOff, Focus
 } from 'lucide-react';
 
 // ============================================
@@ -80,6 +81,16 @@ const GIBS = (layer, level, ext, time) =>
 
 // Toggleable overlay layers. Every entry names its source — verifiability is the point.
 const OVERLAYS = [
+  {
+    id: 'satday', name: 'Satellite photo (latest day)', icon: Satellite, defaultOn: true,
+    source: 'NASA GIBS true-colour imagery, daily — pick older days with the blue slider',
+    desc: 'The real Earth as photographed: clouds, smoke, snow. Off = bare-earth globe',
+  },
+  {
+    id: 'places', name: 'Roads & place names', icon: MapPin, defaultOn: true,
+    source: 'Esri World Dark Gray (base + reference)',
+    desc: 'Labels everywhere, street detail when zoomed in',
+  },
   {
     id: 'radar', name: 'Precipitation radar', icon: CloudRain, defaultOn: true,
     source: 'RainViewer (global radar composite, ~10 min refresh)',
@@ -435,12 +446,13 @@ export const WorldTab = () => {
         layers: [
           { id: 'background', type: 'background', paint: { 'background-color': '#020617' } },
           { id: 'bluemarble', type: 'raster', source: 'bluemarble' },
-          { id: 'basemap', type: 'raster', source: 'basemap' },
+          { id: 'basemap', type: 'raster', source: 'basemap', layout: { visibility: enabled.satday ? 'visible' : 'none' } },
           {
             id: 'streets', type: 'raster', source: 'streets', minzoom: 8,
+            layout: { visibility: enabled.places ? 'visible' : 'none' },
             paint: { 'raster-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 10, 1] },
           },
-          { id: 'labels', type: 'raster', source: 'labels', paint: { 'raster-opacity': 0.9 } },
+          { id: 'labels', type: 'raster', source: 'labels', layout: { visibility: enabled.places ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.9 } },
         ],
       },
     });
@@ -902,19 +914,34 @@ export const WorldTab = () => {
   }, [enabled.wind, ready, fetchWind]);
 
   // ---------- layer toggling ----------
+  const LAYER_IDS = { satday: ['basemap'], places: ['labels', 'streets'], quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'], lidar: ['lidar-world', 'lidar-hrdem'] };
+  const applyVisibility = (next) => {
+    const map = mapRef.current;
+    for (const o of OVERLAYS) {
+      for (const layerId of LAYER_IDS[o.id] ?? [o.id]) {
+        if (map?.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', next[o.id] ? 'visible' : 'none');
+      }
+    }
+  };
   const toggle = (id) => {
     setEnabled(prev => {
       const next = { ...prev, [id]: !prev[id] };
-      const map = mapRef.current;
-      const layerIds = { quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'], lidar: ['lidar-world', 'lidar-hrdem'] }[id] ?? [id];
-      for (const layerId of layerIds) {
-        if (map?.getLayer(layerId)) {
-          map.setLayoutProperty(layerId, 'visibility', next[id] ? 'visible' : 'none');
-        }
-      }
+      applyVisibility(next);
       return next;
     });
   };
+  // Bare earth: every layer off — NASA Blue Marble alone. Solo: one view on it.
+  const setLayers = (onlyId) => {
+    const next = Object.fromEntries(OVERLAYS.map(o => [o.id, o.id === onlyId]));
+    applyVisibility(next);
+    setEnabled(next);
+  };
+  const resetLayers = () => {
+    const next = Object.fromEntries(OVERLAYS.map(o => [o.id, o.defaultOn]));
+    applyVisibility(next);
+    setEnabled(next);
+  };
+  const allOff = OVERLAYS.every(o => !enabled[o.id]);
 
   const flyTo = (coords) => mapRef.current?.flyTo({ center: coords, zoom: 5.5 });
 
@@ -1095,12 +1122,23 @@ export const WorldTab = () => {
           icon={<Layers className="w-3.5 h-3.5 text-orange-400" />}
           title="Layers"
         >
+          <div className="flex gap-1.5 mb-1.5">
+            <button onClick={() => setLayers(null)}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium border ${allOff ? 'bg-orange-500/15 border-orange-500/40 text-orange-300' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'}`}>
+              <EyeOff className="w-3.5 h-3.5" />Bare earth
+            </button>
+            <button onClick={resetLayers}
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium border bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white">
+              <RefreshCw className="w-3.5 h-3.5" />Default layers
+            </button>
+          </div>
+          {allOff && <p className="text-[10px] text-slate-500 mb-1.5">Bare-earth globe: NASA Blue Marble (cloud-free composite). Tap a layer to add it, or ◎ to view only that layer.</p>}
           <div className="space-y-1">
             {OVERLAYS.map(o => (
+              <div key={o.id} className="flex items-stretch gap-1">
               <button
-                key={o.id}
                 onClick={() => toggle(o.id)}
-                className={`w-full flex items-start gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                className={`flex-1 min-w-0 flex items-start gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
                   enabled[o.id] ? 'bg-orange-500/15 border border-orange-500/30' : 'bg-slate-800/40 border border-transparent hover:bg-slate-800'
                 }`}
               >
@@ -1115,6 +1153,11 @@ export const WorldTab = () => {
                   <span className="block text-[9px] text-slate-600 leading-tight">{o.source}</span>
                 </span>
               </button>
+              <button onClick={() => setLayers(o.id)} title={`Only ${o.name} on the bare globe`} aria-label={`Only ${o.name}`}
+                className="w-8 flex-shrink-0 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-500 hover:text-orange-300 flex items-center justify-center">
+                <Focus className="w-3.5 h-3.5" />
+              </button>
+              </div>
             ))}
           </div>
         </Section>

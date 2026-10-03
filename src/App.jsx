@@ -89,13 +89,16 @@ const WatchtowerPortal = () => {
   const [aiOpen, setAiOpen] = useState(false);
   // A notification can open a given tab (?tab=platform); the param is consumed
   const [activeTab, setActiveTab] = useState(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return tab && /^[a-z]+$/.test(tab) ? tab : 'world';
+  });
+  // consume ?tab= after mount (an early remount must still see it)
+  useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const tab = p.get('tab');
-    if (!tab) return 'world';
+    if (!p.has('tab')) return;
     p.delete('tab');
     window.history.replaceState({}, '', window.location.pathname + (p.toString() ? `?${p}` : ''));
-    return /^[a-z]+$/.test(tab) ? tab : 'world';
-  });
+  }, []);
   const [newRequests, setNewRequests] = useState(0);
   // Vehicle mode: a cab screen can be pinned to open straight into it
   const canVehicle = !!profile?.role && profile.role !== 'viewer';
@@ -235,9 +238,10 @@ const WatchtowerPortal = () => {
   ].filter(item => allowed.includes(item.id));
 
   // Never leave someone on a tab their role can't open
+  // (only once the profile is known — before that every role looks like a viewer)
   useEffect(() => {
-    if (!allowed.includes(activeTab)) setActiveTab(allowed[0] ?? 'world');
-  }, [allowed, activeTab]);
+    if (profile?.role && !allowed.includes(activeTab)) setActiveTab(allowed[0] ?? 'world');
+  }, [allowed, activeTab, profile?.role]);
 
   const renderTab = () => {
     if (!allowed.includes(activeTab)) return <WorldTab />;

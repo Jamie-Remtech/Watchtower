@@ -1,3 +1,4 @@
+import { rvPixelDbz } from './radarPalette';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
 import { pushToTeam, localNotify } from './push';
@@ -278,7 +279,8 @@ export async function runAttentionSweep() {
   // ---- RADAR TRUTH: sample the actual radar over every anchor ----
   // Forecast models can miss pop-up convection entirely (they did);
   // the radar composite is measurement. We read the latest frame's
-  // pixel at each person's exact position. BW scheme: value = (dBZ+32)*2.
+  // pixel at each person's exact position. Pixels are Universal Blue colours,
+  // mapped back to dBZ through RainViewer's own palette (rvPixelDbz).
   if (anchors.length && typeof document !== 'undefined') {
     try {
       const meta = await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
@@ -298,7 +300,7 @@ export async function runAttentionSweep() {
             try {
               const img = new Image();
               img.crossOrigin = 'anonymous';
-              img.src = `${meta.host}${frame.path}/256/${z}/${tx}/${ty}/0/0_0.png`;
+              img.src = `${meta.host}${frame.path}/256/${z}/${tx}/${ty}/2/0_0.png`;
               await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
               const cv = document.createElement('canvas');
               cv.width = 256; cv.height = 256;
@@ -310,16 +312,17 @@ export async function runAttentionSweep() {
           }
           if (!data) continue;
           const px = Math.floor((xf - tx) * 256), py = Math.floor((yf - ty) * 256);
-          let maxV = -1;
+          let best = null;
           for (let dy = -2; dy <= 2; dy++) {
             for (let dx = -2; dx <= 2; dx++) {
               const X = Math.min(255, Math.max(0, px + dx));
               const Y = Math.min(255, Math.max(0, py + dy));
               const i = (Y * 256 + X) * 4;
-              if (data[i + 3] > 0 && data[i] > maxV) maxV = data[i];
+              const v = rvPixelDbz(data[i], data[i + 1], data[i + 2], data[i + 3]);
+              if (v != null && (best == null || v > best)) best = v;
             }
           }
-          const dbz = maxV >= 0 ? maxV / 2 - 32 : null;
+          const dbz = best;
           const label = a.label ?? 'crew member';
           if (dbz != null && dbz >= 40) {
             candidates.push({

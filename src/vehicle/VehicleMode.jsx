@@ -155,7 +155,9 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
   const msgTr = useTranslations(foreign, lang, foreign.length > 0);
 
   // ---------- alerts: newest important one, spoken once ----------
-  const important = attentionItems.filter(i => i.status !== 'resolved' && i.severity !== 'info');
+  // only what is live: open (not acknowledged) and from the last 12 hours
+  const important = attentionItems.filter(i => i.status === 'open' && i.severity !== 'info'
+    && Date.now() - Date.parse(i.created_at) < 12 * 3600e3);
   const top = important[0] ?? null;
   const alertTexts = lang === 'en' ? [] : important.slice(0, 5).flatMap(i => [i.title, i.detail]).filter(Boolean);
   const alertTr = useTranslations(alertTexts, lang, alertTexts.length > 0);
