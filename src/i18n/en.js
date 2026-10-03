@@ -73,5 +73,8 @@ export const en = {
   'login.code': 'Invitation code', 'login.name': 'Your name', 'login.email': 'Email', 'login.password': 'Password',
   'login.sendMagic': 'Send magic link', 'login.create': 'Create account', 'login.magicSent': 'Check your email — your sign-in link is on its way.',
   'login.created': 'Account created. Check your email to confirm, then sign in.', 'login.provisioned': "Access is provisioned by your organization's administrator.",
+  'pub.about': 'About Watchtower', 'pub.tour': 'Tutorial', 'pub.homeTitle': 'Homepage',
+  'pub.showHome': 'Show the homepage before sign-in on this device',
+  'pub.showHomeNote': 'Signed-in members always go straight to their account.',
   'login.error': 'Something went wrong.',
 };

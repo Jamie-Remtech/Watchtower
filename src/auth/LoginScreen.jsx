@@ -3,6 +3,7 @@ import { Mail, KeyRound, Ticket, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { LogoMark } from '../components/common';
 import { useI18n, LANGUAGES } from '../i18n/index.jsx';
+import { go } from '../public/nav';
 
 // Three onboarding paths: password sign-in, magic link, invitation-code signup.
 const MODES = [
@@ -120,6 +121,10 @@ export const LoginScreen = () => {
         <p className="text-center text-slate-600 text-xs mt-4">
           {t('login.provisioned')}
         </p>
+        <div className="flex justify-center gap-4 mt-3 text-xs">
+          <button onClick={() => go('/about')} className="text-orange-400 hover:text-orange-300">{t('pub.about')}</button>
+          <button onClick={() => go('/tour')} className="text-slate-400 hover:text-slate-200">{t('pub.tour')}</button>
+        </div>
         <div className="flex justify-center mt-3">
           <select
             value={lang}

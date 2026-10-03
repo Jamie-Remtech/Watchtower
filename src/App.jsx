@@ -20,6 +20,7 @@ import { NotificationSettings } from './components/NotificationSettings';
 import { playAlert } from './lib/alertSound';
 import { shouldDeliver, categoryOfItem, withDefaults } from './lib/notifyPrefs';
 import { cachedOrgId } from './lib/org';
+import { go } from './public/nav';
 import { useI18n } from './i18n/index.jsx';
 import { useCheckins, CheckinsContext } from './hooks/useCheckins';
 import { RequestAccess } from './components/RequestAccess';
@@ -314,6 +315,10 @@ const WatchtowerPortal = () => {
           <button onClick={() => setAiOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-400 text-xs font-medium">
             <Zap className="w-3.5 h-3.5" />{t('shell.aiAssistant')}
           </button>
+          <div className="flex gap-3 px-2.5 pt-1 text-[10px]">
+            <button onClick={() => go('/about')} className="text-slate-500 hover:text-orange-300">{t('pub.about')}</button>
+            <button onClick={() => go('/tour')} className="text-slate-500 hover:text-orange-300">{t('pub.tour')}</button>
+          </div>
         </div>
 
         {/* Signed-in user */}

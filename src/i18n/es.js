@@ -62,5 +62,8 @@ export const es = {
   'login.code': 'Código de invitación', 'login.name': 'Tu nombre', 'login.email': 'Correo', 'login.password': 'Contraseña',
   'login.sendMagic': 'Enviar enlace mágico', 'login.create': 'Crear cuenta', 'login.magicSent': 'Revisa tu correo — tu enlace de acceso va en camino.',
   'login.created': 'Cuenta creada. Confirma en tu correo y luego inicia sesión.', 'login.provisioned': 'El acceso lo otorga el administrador de tu organización.',
+  'pub.about': 'Acerca de Watchtower', 'pub.tour': 'Tutorial', 'pub.homeTitle': 'Página de inicio',
+  'pub.showHome': 'Mostrar la página de inicio antes de iniciar sesión en este dispositivo',
+  'pub.showHomeNote': 'Los miembros con sesión iniciada siempre van directo a su cuenta.',
   'login.error': 'Algo salió mal.',
 };

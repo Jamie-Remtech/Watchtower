@@ -1,11 +1,24 @@
+import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { LoginScreen } from './LoginScreen';
+import { Landing } from '../public/Landing';
+import { Tour } from '../public/Tour';
+import { publicView, usePath } from '../public/nav';
 
 // Gates the app behind auth. Watchtower runs on real data only —
 // without Supabase configuration there is nothing to show.
+// Public homepage and tutorial sit in front for visitors; members who
+// are signed in go straight to the app.
 export const AuthGate = ({ children }) => {
   const { session, loading, isConfigured } = useAuth();
+  usePath();
+  const view = loading ? null : publicView(!!session);
+
+  // Signed in from /signin → the app lives at /
+  useEffect(() => {
+    if (session && window.location.pathname === '/signin') window.history.replaceState({}, '', '/');
+  }, [session]);
 
   if (!isConfigured) {
     return (
@@ -29,6 +42,8 @@ export const AuthGate = ({ children }) => {
     );
   }
 
+  if (view === 'home') return <Landing signedIn={!!session} />;
+  if (view === 'tour') return <Tour signedIn={!!session} />;
   if (!session) return <LoginScreen />;
 
   return children;

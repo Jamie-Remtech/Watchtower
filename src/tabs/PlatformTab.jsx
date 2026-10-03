@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Plus, Loader2, X, Check, ChevronDown, ChevronRight, UserPlus,
-  Link2, Receipt, Users, ArrowRightLeft, QrCode, Copy,
+  Link2, Receipt, Users, ArrowRightLeft, QrCode, Copy, Inbox,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { supabase } from '../lib/supabase';
@@ -40,6 +40,8 @@ export const PlatformTab = () => {
   const [invoices, setInvoices] = useState([]);
   const [links, setLinks] = useState([]);
   const [invites, setInvites] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [showClosed, setShowClosed] = useState(false);
   const [openOrg, setOpenOrg] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -54,13 +56,15 @@ export const PlatformTab = () => {
   const [linkDraft, setLinkDraft] = useState(null);       // {a, b, note}
 
   const refresh = useCallback(async () => {
-    const [o, p, inv, l, iv] = await Promise.all([
+    const [o, p, inv, l, iv, cr] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at'),
       supabase.from('profiles').select('id, display_name, email, role, org_id, team_id, platform_role').order('created_at'),
       supabase.from('invoices').select('*').order('created_at', { ascending: false }),
       supabase.from('org_links').select('*').order('created_at', { ascending: false }),
       supabase.from('invitations').select('id, org_id, code, role, status, expires_at').eq('status', 'pending'),
+      supabase.from('contact_requests').select('*').order('created_at', { ascending: false }).limit(100),
     ]);
+    setRequests(cr.data ?? []);
     if (o.error) setError(o.error.message);
     setOrgs(o.data ?? []);
     setPeople(p.data ?? []);
@@ -159,6 +163,11 @@ export const PlatformTab = () => {
       await refresh();
     } catch (e) { setError(e.message); }
     setBusy(false);
+  };
+
+  const setRequestStatus = async (id, status) => {
+    const { error: err } = await supabase.from('contact_requests').update({ status }).eq('id', id);
+    if (err) setError(err.message); else await refresh();
   };
 
   const toggleLink = async (link) => {
@@ -280,6 +289,42 @@ export const PlatformTab = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* CONTACT REQUESTS — from the public homepage */}
+      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Inbox className="w-4 h-4 text-orange-400" />Contact requests
+            {requests.filter(r => r.status === 'new').length > 0 && (
+              <span className="px-1.5 py-0.5 bg-orange-500 rounded text-[10px] font-bold text-white">{requests.filter(r => r.status === 'new').length} new</span>
+            )}
+          </h3>
+          <button onClick={() => setShowClosed(v => !v)} className="text-[11px] text-slate-400 hover:text-slate-200">
+            {showClosed ? 'Hide closed' : 'Show closed'}
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-600">Sent from the homepage contact form — access, dispatch/CAD connections, pricing, questions. Reply by email, then mark it.</p>
+        {requests.filter(r => showClosed || r.status !== 'closed').length === 0 && <p className="text-[11px] text-slate-500">No requests yet.</p>}
+        {requests.filter(r => showClosed || r.status !== 'closed').map(r => (
+          <div key={r.id} className={`px-3 py-2 rounded-lg border ${r.status === 'new' ? 'bg-orange-500/5 border-orange-500/30' : 'bg-slate-800/50 border-slate-800'}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold text-white">{r.name}</span>
+              <a href={`mailto:${r.email}`} className="text-[11px] text-sky-300 hover:underline break-all">{r.email}</a>
+              {r.organization && <span className="text-[11px] text-slate-400">· {r.organization}</span>}
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-300 border border-slate-600">{r.topic}</span>
+              {r.language && r.language !== 'en' && <span className="text-[9px] text-slate-500 uppercase">{r.language}</span>}
+              <span className="text-[10px] text-slate-500 ml-auto">{new Date(r.created_at).toLocaleString()}</span>
+            </div>
+            {r.message && <p className="text-xs text-slate-300 mt-1 whitespace-pre-wrap">{r.message}</p>}
+            <div className="flex gap-3 mt-1.5 text-[10px]">
+              <span className="text-slate-500">{r.status}</span>
+              {r.status === 'new' && <button onClick={() => setRequestStatus(r.id, 'replied')} className="text-green-300 hover:underline">mark replied</button>}
+              {r.status !== 'closed' && <button onClick={() => setRequestStatus(r.id, 'closed')} className="text-slate-400 hover:underline">close</button>}
+              {r.status === 'closed' && <button onClick={() => setRequestStatus(r.id, 'new')} className="text-slate-400 hover:underline">reopen</button>}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* LINKS */}

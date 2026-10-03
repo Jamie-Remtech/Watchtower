@@ -7,7 +7,8 @@ import { playAlert } from '../lib/alertSound';
 import { enableNotifications, notificationPermission } from '../lib/push';
 import { logEvent } from '../lib/eventLog';
 import { useI18n, LANGUAGES, hasDictionary } from '../i18n/index.jsx';
-import { Languages } from 'lucide-react';
+import { Languages, Home } from 'lucide-react';
+import { go, homeSkipped, setHomeSkipped } from '../public/nav';
 
 // Each member's own notification center: what reaches them, from what
 // severity up, and how it sounds. Check-ins and life-safety criticals
@@ -20,6 +21,7 @@ export const NotificationSettings = () => {
   const [error, setError] = useState(null);
   const [testNote, setTestNote] = useState(null);
   const [perm, setPerm] = useState(notificationPermission());
+  const [showHome, setShowHome] = useState(!homeSkipped());
   const { t, lang, setDeviceLang } = useI18n();
 
   const saveLanguage = async (code) => {
@@ -147,6 +149,22 @@ export const NotificationSettings = () => {
         <p className="text-[10px] text-slate-500">
           {t('ns.soundNote')}
         </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-[11px] text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><Home className="w-3.5 h-3.5" />{t('pub.homeTitle')}</p>
+        <label className={`${row} cursor-pointer border-slate-700 bg-slate-800/40`}>
+          <input type="checkbox" checked={showHome} onChange={e => { setShowHome(e.target.checked); setHomeSkipped(!e.target.checked); }}
+            className="mt-0.5 accent-orange-500" />
+          <span className="min-w-0">
+            <span className="block text-xs text-white font-medium">{t('pub.showHome')}</span>
+            <span className="block text-[10px] text-slate-500">{t('pub.showHomeNote')}</span>
+          </span>
+        </label>
+        <div className="flex gap-3 text-[11px]">
+          <button onClick={() => go('/about')} className="text-orange-300 hover:text-orange-200">{t('pub.about')}</button>
+          <button onClick={() => go('/tour')} className="text-orange-300 hover:text-orange-200">{t('pub.tour')}</button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
