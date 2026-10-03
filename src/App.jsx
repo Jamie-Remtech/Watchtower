@@ -86,7 +86,16 @@ const WatchtowerPortal = () => {
   prefsRef.current = profile?.notification_prefs;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('world');
+  // A notification can open a given tab (?tab=platform); the param is consumed
+  const [activeTab, setActiveTab] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    const tab = p.get('tab');
+    if (!tab) return 'world';
+    p.delete('tab');
+    window.history.replaceState({}, '', window.location.pathname + (p.toString() ? `?${p}` : ''));
+    return /^[a-z]+$/.test(tab) ? tab : 'world';
+  });
+  const [newRequests, setNewRequests] = useState(0);
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [tendedAlerts, setTendedAlerts] = useState(0);
 
@@ -138,6 +147,24 @@ const WatchtowerPortal = () => {
   useEffect(() => {
     if (activeTab === 'comms') setUnreadMsgs(0);
   }, [activeTab]);
+
+  // Platform staff: new homepage contact requests — badge + chime, live.
+  // (The push itself comes from the contact-notify function.)
+  const isStaff = ['owner', 'staff'].includes(profile?.platform_role);
+  useEffect(() => {
+    if (!isStaff) return;
+    const count = () => supabase.from('contact_requests').select('id', { count: 'exact', head: true }).eq('status', 'new')
+      .then(({ count: n }) => setNewRequests(n ?? 0));
+    count();
+    const channel = supabase
+      .channel('contact-requests-shell')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, (payload) => {
+        if (payload.eventType === 'INSERT') playAlert('chime');
+        count();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [isStaff]);
 
   // Listen for alert count updates from StreamsTab
   useEffect(() => {
@@ -300,6 +327,9 @@ const WatchtowerPortal = () => {
               )}
               {item.id === 'comms' && unreadMsgs > 0 && (
                 <span className="ml-auto px-1.5 py-0.5 bg-orange-500 rounded text-xs font-bold">{unreadMsgs}</span>
+              )}
+              {item.id === 'platform' && newRequests > 0 && (
+                <span className="ml-auto px-1.5 py-0.5 bg-orange-500 rounded text-xs font-bold">{newRequests}</span>
               )}
             </button>
           ))}
