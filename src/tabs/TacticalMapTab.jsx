@@ -71,12 +71,13 @@ export const TacticalMapTab = () => {
 
   const placed = devices.filter(d => d.lat != null && d.lng != null);
   const nameOf = Object.fromEntries(liveMembers.map(m => [m.id, m.name]));
+  const unitOf = Object.fromEntries(liveMembers.filter(m => m.radioCallsign && m.radioCallsign !== '—').map(m => [m.id, m.radioCallsign]));
 
   const teamMarkers = teamPositions
     .filter(p => Date.now() - new Date(p.at) < FRESH_MS)
     .map(p => ({
       id: `pos-${p.profile_id}`,
-      name: `${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
       type: 'person',
       status: 'live',
       position: { lat: p.lat, lng: p.lng },
@@ -446,7 +447,7 @@ export const TacticalMapTab = () => {
 
       <div
         ref={mapWrapRef}
-        className={`flex-1 min-h-[400px] rounded-xl overflow-hidden border relative ${drag.kind ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-slate-800'}`}
+        className={`flex-1 min-h-[260px] short:min-h-[200px] rounded-xl overflow-hidden border relative ${drag.kind ? 'border-orange-500 ring-2 ring-orange-500/40' : 'border-slate-800'}`}
       >
         <TacticalMap
           key={zeroKey}

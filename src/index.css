@@ -6,6 +6,23 @@ html, body {
   background: rgb(var(--c-slate-950));
 }
 
+/* Notches and rounded corners (viewport-fit=cover), portrait and landscape */
+.wt-safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.wt-safe-x-pad {
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
+}
+.wt-safe-top { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
+.wt-safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.wt-under-header { padding-top: calc(4rem + env(safe-area-inset-top)); }
+@media (max-height: 500px) {
+  .wt-safe-top { padding-top: calc(0.375rem + env(safe-area-inset-top)); }
+  .wt-under-header { padding-top: calc(3.25rem + env(safe-area-inset-top)); }
+}
+
 /* Night-vision: everything — maps and video included — in dim red */
 html[data-theme="night"]::after {
   content: '';

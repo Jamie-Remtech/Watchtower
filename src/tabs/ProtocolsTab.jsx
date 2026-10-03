@@ -73,7 +73,7 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90dvh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-orange-400" />

@@ -65,17 +65,18 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-slate-950/95 flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-4 text-center">
+    <div className="fixed inset-0 z-[120] bg-slate-950/95 flex items-center justify-center p-4 short:p-2 overflow-y-auto wt-safe-x">
+      <div className="w-full max-w-md short:max-w-2xl space-y-4 short:space-y-2 text-center my-auto">
         <p className="text-xs uppercase tracking-widest text-orange-400 font-bold">{t('ci.requested')}</p>
-        <h2 className="text-2xl font-bold text-white">{t('ci.areYouOk')}</h2>
+        <h2 className="text-2xl short:text-xl font-bold text-white">{t('ci.areYouOk')}</h2>
         {pending.message && <p className="text-sm text-slate-300">“{msgTr[pending.message] ?? pending.message}”</p>}
         <p className="text-[11px] text-slate-500">{t('ci.positionNote')}</p>
 
+        <div className="grid gap-4 short:gap-3 short:grid-cols-2">
         <button
           onClick={() => answer('ok')}
           disabled={!!busy}
-          className="w-full py-8 rounded-2xl bg-green-600 hover:bg-green-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
+          className="w-full py-8 short:py-5 rounded-2xl bg-green-600 hover:bg-green-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
         >
           {busy === 'ok' ? <Loader2 className="w-8 h-8 animate-spin" /> : <ShieldCheck className="w-8 h-8" />}
           {t('ci.ok')}
@@ -84,11 +85,12 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
         <button
           onClick={() => answer('help')}
           disabled={!!busy}
-          className="w-full py-8 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
+          className="w-full py-8 short:py-5 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
         >
           {busy === 'help' ? <Loader2 className="w-8 h-8 animate-spin" /> : <LifeBuoy className="w-8 h-8" />}
           {t('ci.help')}
         </button>
+        </div>
         {showNote ? (
           <input
             autoFocus

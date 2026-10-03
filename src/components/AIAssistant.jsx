@@ -84,7 +84,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[420px] bg-slate-900 sm:border sm:border-slate-700 sm:rounded-xl shadow-2xl z-50 flex flex-col sm:max-h-[600px] h-full sm:h-auto">
+    <div className="fixed inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[420px] bg-slate-900 sm:border sm:border-slate-700 sm:rounded-xl shadow-2xl z-50 flex flex-col sm:max-h-[min(600px,calc(100dvh-2rem))] h-full sm:h-auto">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-slate-700 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -111,7 +111,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
       </div>
 
       {/* Conversation */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[200px]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[120px]">
         {messages.length === 0 && (
           <div className="space-y-2">
             <p className="text-xs text-slate-400">

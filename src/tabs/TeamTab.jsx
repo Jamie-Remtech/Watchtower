@@ -466,7 +466,7 @@ export const TeamTab = () => {
       {/* MAP VIEW */}
       {viewMode === 'map' && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="h-96 bg-slate-800 relative">
+          <div className="h-[min(24rem,60dvh)] bg-slate-800 relative">
             {/* Map placeholder */}
             <div className="absolute inset-0 flex items-center justify-center">
               <Map className="w-24 h-24 text-slate-700" />
@@ -599,7 +599,7 @@ const MemberModal = ({ member, canEdit, onSave, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col"
+        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90dvh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

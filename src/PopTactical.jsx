@@ -10,14 +10,14 @@ export const PopTactical = () => {
 
   if (profile && !allowedTabs(profile.role).includes('tactical')) {
     return (
-      <div className="h-screen bg-slate-950 flex items-center justify-center">
+      <div className="h-dvh bg-slate-950 flex items-center justify-center">
         <p className="text-slate-400 text-sm">Your role doesn't include the tactical map.</p>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 p-2 flex flex-col">
+    <div className="h-dvh bg-slate-950 text-slate-100 p-2 flex flex-col">
       <TacticalMapTab />
     </div>
   );

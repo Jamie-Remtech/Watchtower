@@ -34,7 +34,10 @@ export default {
       paper: '#fff', // stays white in every theme (QR codes need a light quiet zone)
       ...themed,
     },
-    extend: {},
+    extend: {
+      // phones held sideways (and short cab screens): tighten vertical chrome
+      screens: { short: { raw: '(max-height: 500px)' } },
+    },
   },
   plugins: [
     plugin(({ addBase }) => {

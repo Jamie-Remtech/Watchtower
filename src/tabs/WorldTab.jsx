@@ -921,7 +921,7 @@ export const WorldTab = () => {
   return (
     <div className="h-full flex flex-col lg:flex-row gap-2 min-h-0">
       {/* Globe */}
-      <div className="flex-1 min-h-[300px] relative rounded-xl overflow-hidden border border-slate-800">
+      <div className="flex-1 min-h-[220px] relative rounded-xl overflow-hidden border border-slate-800">
         <div ref={containerRef} className="absolute inset-0" />
         {!ready && (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950">

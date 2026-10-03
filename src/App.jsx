@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun, AlertTriangle
+  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun, AlertTriangle, Truck
 } from 'lucide-react';
+import { VehicleMode, vehicleAutoStart } from './vehicle/VehicleMode';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
@@ -96,6 +97,9 @@ const WatchtowerPortal = () => {
     return /^[a-z]+$/.test(tab) ? tab : 'world';
   });
   const [newRequests, setNewRequests] = useState(0);
+  // Vehicle mode: a cab screen can be pinned to open straight into it
+  const canVehicle = !!profile?.role && profile.role !== 'viewer';
+  const [vehicleOpen, setVehicleOpen] = useState(() => vehicleAutoStart());
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [tendedAlerts, setTendedAlerts] = useState(0);
 
@@ -257,14 +261,20 @@ const WatchtowerPortal = () => {
   return (
     <CheckinsContext.Provider value={checkins}>
     <CheckInPrompt checkins={checkins.checkins} responses={checkins.responses} respond={checkins.respond} />
-    <div className="h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
+    {vehicleOpen && canVehicle && <VehicleMode attentionItems={attention.items} onExit={() => setVehicleOpen(false)} />}
+    <div className="h-dvh bg-slate-950 text-slate-100 flex overflow-hidden wt-safe-x">
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 px-4 py-3 z-40 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 py-3 short:py-1.5 wt-safe-top wt-safe-x-pad z-40 flex items-center justify-between">
         <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-slate-800 rounded-lg">
           <Menu className="w-6 h-6 text-slate-300" />
         </button>
         <Logo />
         <div className="flex items-center gap-1">
+        {canVehicle && (
+          <button onClick={() => setVehicleOpen(true)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={t('veh.open')} title={t('veh.open')}>
+            <Truck className="w-5 h-5 text-slate-300" />
+          </button>
+        )}
         {(
           <button onClick={() => setAttnOpen(true)} className="relative p-2 hover:bg-slate-800 rounded-lg">
             <Bell className={`w-5 h-5 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-300'}`} />
@@ -356,6 +366,11 @@ const WatchtowerPortal = () => {
               <Bell className="w-3.5 h-3.5" />{t('shell.enableNotifications')}
             </button>
           )}
+          {canVehicle && (
+            <button onClick={() => { setVehicleOpen(true); setSidebarOpen(false); }} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 text-xs font-medium hover:text-white">
+              <Truck className="w-3.5 h-3.5" />{t('veh.open')}
+            </button>
+          )}
           <button onClick={() => setNotifOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 text-xs font-medium hover:text-white">
             <Bell className="w-3.5 h-3.5" />{t('shell.mySettings')}
           </button>
@@ -387,7 +402,7 @@ const WatchtowerPortal = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-h-0 pt-16 lg:pt-0">
+      <main className="flex-1 flex flex-col min-h-0 wt-under-header lg:pt-0">
         {isStaff && towerAgeMin != null && towerAgeMin > 15 && (
           <div className="bg-red-600 text-white text-xs font-semibold px-4 py-2 flex items-center gap-2 flex-shrink-0" role="alert">
             <AlertTriangle className="w-4 h-4 shrink-0" />

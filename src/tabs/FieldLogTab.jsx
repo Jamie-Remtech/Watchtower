@@ -400,7 +400,7 @@ export const FieldLogTab = () => {
       {/* Handoff modal */}
       {handoff && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setHandoff(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-5 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-5 max-h-[85dvh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white">
                 Handoff — {patientLabel(handoff.patient)}

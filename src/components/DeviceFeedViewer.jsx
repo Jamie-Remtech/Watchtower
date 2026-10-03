@@ -34,7 +34,7 @@ const DeviceFeedViewer = ({ device, onClose }) => {
       className={`fixed bg-slate-900 border border-slate-700 shadow-2xl transition-all duration-300 ${
         isFullscreen
           ? 'inset-4'
-          : 'bottom-4 right-4 w-96 h-72'
+          : 'bottom-4 right-4 w-[min(24rem,calc(100vw-2rem))] h-[min(18rem,60dvh)]'
       }`}
       style={{
         backdropFilter: 'blur(10px)',

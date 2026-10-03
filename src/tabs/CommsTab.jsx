@@ -143,7 +143,7 @@ export const CommsTab = () => {
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 min-h-[300px] overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-xl p-3 space-y-2">
+      <div ref={scrollRef} className="flex-1 min-h-[160px] overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-xl p-3 space-y-2">
         {messages.length === 0 && !error && (
           <p className="text-xs text-slate-500 text-center py-8">
             {t('comms.empty')}
