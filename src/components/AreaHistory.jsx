@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { History, Flame, MapPin, Plus, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
@@ -60,7 +60,7 @@ export const AreaHistory = ({ pos, heavyRainSoon }) => {
   const thisYear = new Date().getFullYear();
   const view = useMemo(() => {
     if (!rows) return null;
-    const scars = rows.filter(r => r.kind === 'wildfire' && r.km <= 10 && r.year && r.year >= thisYear - 5)
+    const scars = rows.filter(r => r.kind === 'wildfire' && r.km <= 10 && r.year && r.year >= thisYear - 5 && Number(r.magnitude ?? 0) >= 10)
       .sort((a, b) => b.year - a.year || a.km - b.km);
     const recurrence = KINDS.map(k => {
       const radius = k === 'earthquake' ? 100 : 50;
@@ -131,7 +131,7 @@ export const AreaHistory = ({ pos, heavyRainSoon }) => {
             <div className={`p-3 rounded-lg border ${heavyRainSoon ? 'border-amber-500/50 bg-amber-500/10' : 'border-orange-500/30 bg-orange-500/5'}`}>
               <p className="text-xs text-white font-semibold flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-400" />
-                {t('ah.scar', { year: view.scars[0].year, ha: view.scars[0].magnitude ? Math.round(view.scars[0].magnitude).toLocaleString(lang) : '?', km: view.scars[0].km.toFixed(1) })}
+                {t('ah.scar', { year: view.scars[0].year, ha: Math.round(view.scars[0].magnitude).toLocaleString(lang), km: view.scars[0].km.toFixed(1) })}
                 {view.scars.length > 1 && <span className="font-normal text-slate-400"> {t('ah.moreScars', { n: view.scars.length - 1 })}</span>}
               </p>
               <p className="text-[11px] text-slate-300 mt-1">{t('ah.scarMeaning')}</p>

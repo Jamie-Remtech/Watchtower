@@ -293,7 +293,7 @@ Deno.serve(async (req) => {
         const thisYear = new Date().getUTCFullYear();
         const scars = fires
           .map(f => ({ ...f, km: kmToIncident(c, f), year: Number(f.details?.year ?? String(f.started_at ?? '').slice(0, 4)) }))
-          .filter(f => f.km <= 10 && f.year >= thisYear - 5)
+          .filter(f => f.km <= 10 && f.year >= thisYear - 5 && Number(f.magnitude ?? 0) >= 10) // tiny burns change nothing
           .sort((a, b) => b.year - a.year)
           .slice(0, 5)
           .map(f => ({ year: f.year, km: Math.round(f.km * 10) / 10, ha: f.magnitude, title: f.title }));
