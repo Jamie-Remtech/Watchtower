@@ -238,4 +238,8 @@ export const en = {
   'veh.noMessages': "No team messages yet.",
   'veh.someone': "Team member",
   'veh.failed': "Could not send — check the signal and try again.",
+  'veh.crashed': 'Vehicle mode hit a problem',
+  'veh.crashedNote': 'It has been reported. Your alerts and data are safe.',
+  'veh.tryAgain': 'Try again',
+  'veh.backToApp': 'Back to Watchtower',
 };

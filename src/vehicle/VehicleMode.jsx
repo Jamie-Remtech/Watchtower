@@ -37,7 +37,7 @@ const HOLD_MS = 1000;
 export const vehicleAutoStart = () => {
   try { return localStorage.getItem(AUTO_KEY) === '1'; } catch { return false; }
 };
-const setVehicleAutoStart = (on) => {
+export const setVehicleAutoStart = (on) => {
   try { on ? localStorage.setItem(AUTO_KEY, '1') : localStorage.removeItem(AUTO_KEY); } catch { /* private mode */ }
 };
 const readPref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
@@ -47,6 +47,11 @@ const km = (a, b) => {
   const R = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLng = (b.lng - a.lng) * Math.PI / 180;
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
+};
+// Google Maps throws (and takes the whole screen down) on a non-numeric position
+const validPos = (p) => {
+  const lat = Number(p?.lat), lng = Number(p?.lng);
+  return p && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
 };
 const wazeUrl = (p) => `https://waze.com/ul?ll=${p.lat.toFixed(6)},${p.lng.toFixed(6)}&navigate=yes`;
 const hhmm = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -61,11 +66,12 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
   const { markers, createMarker } = useMarkers();
 
   // ---------- my position ----------
-  const [me, setMe] = useState(() => getLastCoords());
-  useEffect(() => subscribeTracker(s => { if (s?.lastFix) setMe({ lat: s.lastFix.lat, lng: s.lastFix.lng }); }), []);
+  const [me, setMe] = useState(() => validPos(getLastCoords()));
+  // the tracker announces *that* a fix arrived (lastFix is a Date); the coordinates come from getLastCoords
+  useEffect(() => subscribeTracker(() => { const c = validPos(getLastCoords()); if (c) setMe(c); }), []);
   useEffect(() => {
     if (me || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(p => setMe({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 10000, maximumAge: 60000 });
+    navigator.geolocation.getCurrentPosition(p => { const c = validPos({ lat: p.coords.latitude, lng: p.coords.longitude }); if (c) setMe(c); }, () => {}, { timeout: 10000, maximumAge: 60000 });
   }, [me]);
   const [camKey, setCamKey] = useState(0);
   const centeredOnce = useRef(false);
@@ -172,7 +178,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attentionItems]);
-  const locOf = (i) => (i?.source?.lat != null && i?.source?.lng != null ? { lat: Number(i.source.lat), lng: Number(i.source.lng) } : null);
+  const locOf = (i) => validPos(i?.source);
 
   // ---------- check-in waiting for me ----------
   const pending = useMemo(() => {
@@ -282,9 +288,9 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
     for (const i of important) { const p = locOf(i); if (p) out.push({ id: `a-${i.id}`, icon: i.severity === 'critical' ? '🚨' : '⚠️', label: A(i.title), pos: p }); }
     const openIds = new Set((ck?.checkins ?? []).filter(c => c.status === 'open').map(c => c.id));
     for (const r of ck?.responses ?? []) {
-      if (r.status === 'help' && r.lat != null && openIds.has(r.checkin_id)) out.push({ id: `h-${r.checkin_id}-${r.profile_id}`, icon: '🆘', label: `${nameOf[r.profile_id] ?? t('veh.someone')} — ${t('veh.needsHelp')}`, pos: { lat: r.lat, lng: r.lng } });
+      if (r.status === 'help' && validPos(r) && openIds.has(r.checkin_id)) out.push({ id: `h-${r.checkin_id}-${r.profile_id}`, icon: '🆘', label: `${nameOf[r.profile_id] ?? t('veh.someone')} — ${t('veh.needsHelp')}`, pos: validPos(r) });
     }
-    for (const m of markers) out.push({ id: `m-${m.id}`, icon: markerMeta(m.kind).icon, label: m.label || markerMeta(m.kind).label, pos: { lat: m.lat, lng: m.lng } });
+    for (const m of markers.filter(x => validPos(x))) out.push({ id: `m-${m.id}`, icon: markerMeta(m.kind).icon, label: m.label || markerMeta(m.kind).label, pos: validPos(m) });
     const seen = new Set();
     return out
       .filter(d => (seen.has(d.id) ? false : seen.add(d.id)))
@@ -297,11 +303,11 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
 
   // ---------- map layers ----------
   const crew = positions
-    .filter(p => p.profile_id !== myId && Date.now() - new Date(p.at) < FRESH_MS)
-    .map(p => ({ id: `pos-${p.profile_id}`, name: `${nameOf[p.profile_id] ?? t('veh.someone')} (${hhmm(new Date(p.at))})`, type: 'person', status: 'live', position: { lat: p.lat, lng: p.lng }, icon: '🚒' }));
+    .filter(p => p.profile_id !== myId && Date.now() - new Date(p.at) < FRESH_MS && validPos(p))
+    .map(p => ({ id: `pos-${p.profile_id}`, name: `${nameOf[p.profile_id] ?? t('veh.someone')} (${hhmm(new Date(p.at))})`, type: 'person', status: 'live', position: validPos(p), icon: '🚒' }));
   const mapDevices = [...crew, ...(me ? [{ id: 'me', name: unit, type: 'person', status: 'here', position: me, icon: '📍' }] : [])];
   const mapMarkers = [
-    ...markers.map(m => ({ id: m.id, name: m.label || markerMeta(m.kind).label, icon: markerMeta(m.kind).icon, position: { lat: m.lat, lng: m.lng }, notes: m.notes, kindLabel: markerMeta(m.kind).label })),
+    ...markers.filter(m => validPos(m)).map(m => ({ id: m.id, name: m.label || markerMeta(m.kind).label, icon: markerMeta(m.kind).icon, position: validPos(m), notes: m.notes, kindLabel: markerMeta(m.kind).label })),
     ...important.map(i => ({ i, p: locOf(i) })).filter(x => x.p).map(({ i, p }) => ({ id: `alert-${i.id}`, name: A(i.title), icon: i.severity === 'critical' ? '🚨' : '⚠️', position: p, notes: A(i.detail) })),
   ];
   const center = me ?? crew[0]?.position ?? { lat: 46.8, lng: -71.2 };

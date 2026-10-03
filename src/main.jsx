@@ -7,6 +7,7 @@ import { AuthGate } from './auth/AuthGate.jsx'
 import { UpdateBanner } from './components/UpdateBanner.jsx'
 import { InstallPrompt } from './components/InstallPrompt.jsx'
 import { I18nProvider } from './i18n/index.jsx'
+import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import './index.css'
 import { applyAppearance, loadAppearance } from './theme/theme.js'
 
@@ -24,7 +25,7 @@ createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <I18nProvider>
       <AuthGate>
-        {isPopTactical ? <PopTactical /> : <App />}
+        <ErrorBoundary name="app">{isPopTactical ? <PopTactical /> : <App />}</ErrorBoundary>
       </AuthGate>
       {/* Update notice and install button render above everything, including the login screen */}
       <UpdateBanner />

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun, AlertTriangle, Truck
 } from 'lucide-react';
-import { VehicleMode, vehicleAutoStart } from './vehicle/VehicleMode';
+import { VehicleMode, vehicleAutoStart, setVehicleAutoStart } from './vehicle/VehicleMode';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
@@ -265,7 +266,21 @@ const WatchtowerPortal = () => {
   return (
     <CheckinsContext.Provider value={checkins}>
     <CheckInPrompt checkins={checkins.checkins} responses={checkins.responses} respond={checkins.respond} />
-    {vehicleOpen && canVehicle && <VehicleMode attentionItems={attention.items} onExit={() => setVehicleOpen(false)} />}
+    {vehicleOpen && canVehicle && (
+      <ErrorBoundary name="vehicle" fallback={({ reset }) => (
+        <div className="fixed inset-0 z-[130] bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full text-center space-y-4">
+            <p className="text-lg font-bold text-white">{t('veh.crashed')}</p>
+            <p className="text-sm text-slate-400">{t('veh.crashedNote')}</p>
+            <button onClick={reset} className="w-full h-14 rounded-2xl bg-orange-500 text-white text-lg font-bold">{t('veh.tryAgain')}</button>
+            <button onClick={() => { setVehicleAutoStart(false); setVehicleOpen(false); reset(); }}
+              className="w-full h-14 rounded-2xl bg-slate-800 border border-slate-700 text-slate-100 text-lg font-bold">{t('veh.backToApp')}</button>
+          </div>
+        </div>
+      )}>
+        <VehicleMode attentionItems={attention.items} onExit={() => setVehicleOpen(false)} />
+      </ErrorBoundary>
+    )}
     <div className="h-dvh bg-slate-950 text-slate-100 flex overflow-hidden wt-safe-x">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 py-3 short:py-1.5 wt-safe-top wt-safe-x-pad z-40 flex items-center justify-between">

@@ -227,4 +227,8 @@ export const es = {
   'veh.noMessages': "Aún no hay mensajes del equipo.",
   'veh.someone': "Miembro del equipo",
   'veh.failed': "No se pudo enviar — revisa la señal e inténtalo de nuevo.",
+  'veh.crashed': 'El modo vehículo tuvo un problema',
+  'veh.crashedNote': 'Se ha reportado. Tus alertas y datos están a salvo.',
+  'veh.tryAgain': 'Reintentar',
+  'veh.backToApp': 'Volver a Watchtower',
 };
