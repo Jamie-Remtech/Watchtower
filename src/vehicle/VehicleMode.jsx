@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Truck, ShieldCheck, LifeBuoy, Mic, Send, AlertTriangle, Navigation, X, Volume2, VolumeX,
-  Moon, Sun, SunMoon, LocateFixed, Pin, Wifi, WifiOff, Pencil, Loader2, Layers,
+  Moon, Sun, SunMoon, LocateFixed, Pin, Pencil, Loader2, Layers,
 } from 'lucide-react';
 import TacticalMap from '../components/TacticalMap';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,7 @@ import { pushToTeam } from '../lib/push';
 import { logEvent } from '../lib/eventLog';
 import { say, beep } from '../lib/speechFeedback';
 import { translateMany, useTranslations } from '../lib/translate';
+import { SignalPill } from '../components/SignalPill';
 
 // ============================================
 // VEHICLE MODE — one glanceable screen for a cab tablet / MDT.
@@ -80,12 +81,6 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
   // ---------- screen: awake, clock, signal, dim ----------
   const [now, setNow] = useState(new Date());
   useEffect(() => { const id = setInterval(() => setNow(new Date()), 15000); return () => clearInterval(id); }, []);
-  const [online, setOnline] = useState(navigator.onLine);
-  useEffect(() => {
-    const on = () => setOnline(true), off = () => setOnline(false);
-    window.addEventListener('online', on); window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
-  }, []);
   useEffect(() => {
     let lock = null;
     const grab = async () => { try { lock = await navigator.wakeLock?.request('screen'); } catch { /* not allowed */ } };
@@ -334,7 +329,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
           </button>
         )}
         <span className="ml-auto text-lg font-mono text-slate-300 tabular-nums">{hhmm(now)}</span>
-        {online ? <Wifi className="w-5 h-5 text-green-400" aria-label={t('veh.online')} /> : <WifiOff className="w-5 h-5 text-red-400" aria-label={t('veh.offline')} />}
+        <SignalPill compact large />
         <button onClick={toggleVoice} className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center" aria-label={voice ? t('veh.voiceOn') : t('veh.voiceOff')} title={voice ? t('veh.voiceOn') : t('veh.voiceOff')}>
           {voice ? <Volume2 className="w-5 h-5 text-green-300" /> : <VolumeX className="w-5 h-5 text-slate-500" />}
         </button>

@@ -1,4 +1,30 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { linkSnapshot, reportRequest } from './link';
+
+// Positions that could not be sent are where the signal was lost: keep
+// them (bounded) and upload them once back in coverage — dead zones
+// belong on the coverage map too.
+const GAPS_KEY = 'wt-link-gaps';
+const MAX_GAPS = 400;
+const readGaps = () => { try { return JSON.parse(localStorage.getItem(GAPS_KEY) ?? '[]'); } catch { return []; } };
+const rememberGap = (row) => {
+  try {
+    const gaps = readGaps();
+    const last = gaps.at(-1);
+    if (last && Date.parse(row.at) - Date.parse(last.at) < 60000) return; // one per minute is enough
+    localStorage.setItem(GAPS_KEY, JSON.stringify([...gaps, row].slice(-MAX_GAPS)));
+  } catch { /* storage full or unavailable */ }
+};
+let flushing = false;
+const flushGaps = async () => {
+  if (flushing) return;
+  const gaps = readGaps();
+  if (!gaps.length) return;
+  flushing = true;
+  const { error } = await supabase.from('positions').insert(gaps.slice(0, 200));
+  if (!error) { try { localStorage.setItem(GAPS_KEY, JSON.stringify(gaps.slice(200))); } catch { /* ignore */ } }
+  flushing = false;
+};
 
 // ============================================
 // AUTOMATIC POSITION TRACKING (singleton)
@@ -56,7 +82,7 @@ export async function startTracking() {
       lastCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, at: now };
       if (now - lastSentAt < SEND_MIN_MS) return;
       lastSentAt = now;
-      const { error } = await supabase.from('positions').insert({
+      const row = {
         org_id: orgId,
         profile_id: user.id,
         lat: pos.coords.latitude,
@@ -64,10 +90,18 @@ export async function startTracking() {
         accuracy: pos.coords.accuracy,
         heading: pos.coords.heading,
         speed: pos.coords.speed,
-      });
+        ...linkSnapshot(),
+      };
+      const t0 = performance.now();
+      let error;
+      try { ({ error } = await supabase.from('positions').insert(row)); } catch (e) { error = e; }
+      reportRequest(performance.now() - t0, !error);
       if (!error) {
         state = { ...state, lastFix: new Date(), error: null };
         emit();
+        flushGaps();
+      } else {
+        rememberGap({ ...row, at: new Date(now).toISOString(), net_quality: 'offline' });
       }
     },
     (err) => {

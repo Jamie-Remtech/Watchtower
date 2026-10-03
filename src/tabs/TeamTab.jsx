@@ -1,3 +1,4 @@
+import { CommsQualityBoard } from '../components/CommsQualityBoard';
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import {
@@ -117,6 +118,9 @@ export const TeamTab = () => {
         </div>
       </div>
       
+      {/* Communications quality — the control centre's view of every link */}
+      <CommsQualityBoard />
+
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 bg-slate-900/50 border border-slate-800 rounded-xl">

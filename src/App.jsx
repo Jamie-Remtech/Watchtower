@@ -4,6 +4,8 @@ import {
 } from 'lucide-react';
 import { VehicleMode, vehicleAutoStart, setVehicleAutoStart } from './vehicle/VehicleMode';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SignalPill } from './components/SignalPill';
+import { startLinkMonitor } from './lib/link';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
@@ -72,6 +74,7 @@ const WatchtowerPortal = () => {
   const attention = useAttention();
   const checkins = useCheckins();
   usePresence(); // register this session as online for the whole team
+  useEffect(() => { startLinkMonitor(); }, []); // this device's link quality, for everyone
 
   // Automatic position tracking for operational roles — no toggle needed.
   // Viewers are never tracked; an explicit pause (Field Log) is honored.
@@ -289,6 +292,7 @@ const WatchtowerPortal = () => {
         </button>
         <Logo />
         <div className="flex items-center gap-1">
+        <SignalPill compact />
         {canVehicle && (
           <button onClick={() => setVehicleOpen(true)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={t('veh.open')} title={t('veh.open')}>
             <Truck className="w-5 h-5 text-slate-300" />
@@ -436,6 +440,7 @@ const WatchtowerPortal = () => {
             <p className="text-xs text-slate-500">{org.name}{org.region && ` — ${org.region}`}</p>
           </div>
           <div className="flex items-center gap-3">
+            <SignalPill />
             {(
               <button onClick={() => setAttnOpen(true)} className="relative p-1.5 hover:bg-slate-800 rounded-lg" title={t('shell.attentionQueue')}>
                 <Bell className={`w-4 h-4 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-400'}`} />

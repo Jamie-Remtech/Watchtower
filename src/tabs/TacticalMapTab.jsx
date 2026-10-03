@@ -8,6 +8,10 @@ import { useMarkers, MARKER_KINDS, markerMeta } from '../hooks/useMarkers';
 import { useMapViews } from '../hooks/useMapViews';
 import { usePatients } from '../hooks/usePatients';
 import { TRIAGE_META } from '../lib/fieldCommands';
+import { supabase } from '../lib/supabase';
+import { getOrgId } from '../lib/org';
+import { memberLink } from '../lib/link';
+import { RadioTower } from 'lucide-react';
 
 // ============================================
 // TACTICAL MAP — the shared operational picture.
@@ -33,6 +37,27 @@ export const TacticalMapTab = () => {
     localStorage.setItem('wt-tac-radar', v ? '0' : '1');
     return !v;
   });
+  // Comms coverage layer: recorded link samples over the last N hours
+  const [showSignal, setShowSignal] = useState(() => localStorage.getItem('wt-tac-signal') === '1');
+  const [signalHours, setSignalHours] = useState(() => Number(localStorage.getItem('wt-tac-signal-h') ?? 6));
+  const [coverage, setCoverage] = useState(null);
+  const toggleSignal = () => setShowSignal(v => { localStorage.setItem('wt-tac-signal', v ? '0' : '1'); return !v; });
+  useEffect(() => {
+    if (!showSignal) { setCoverage(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      const org = await getOrgId();
+      const { data } = await supabase.from('positions').select('lat, lng, net_quality, at')
+        .eq('org_id', org).not('net_quality', 'is', null)
+        .gte('at', new Date(Date.now() - signalHours * 3600e3).toISOString())
+        .order('at', { ascending: false }).limit(3000);
+      if (!cancelled) setCoverage((data ?? []).map(d => ({ lat: d.lat, lng: d.lng, quality: d.net_quality })));
+    };
+    load();
+    const id = setInterval(load, 60000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [showSignal, signalHours]);
+  const coverageCounts = (coverage ?? []).reduce((a, c) => { a[c.quality] = (a[c.quality] ?? 0) + 1; return a; }, {});
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerBusy, setMarkerBusy] = useState(false);
   const [markerError, setMarkerError] = useState(null);
@@ -77,7 +102,7 @@ export const TacticalMapTab = () => {
     .filter(p => Date.now() - new Date(p.at) < FRESH_MS)
     .map(p => ({
       id: `pos-${p.profile_id}`,
-      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})${p.net_quality ? ` · 📶 ${memberLink(p).quality}${p.net_rtt_ms != null ? ` ${p.net_rtt_ms} ms` : ''}` : ''}`,
       type: 'person',
       status: 'live',
       position: { lat: p.lat, lng: p.lng },
@@ -330,6 +355,14 @@ export const TacticalMapTab = () => {
               <CloudRain className="w-3.5 h-3.5" />
               Radar
             </button>
+            <button
+              onClick={toggleSignal}
+              title="Communications coverage — where devices had good, weak or no link"
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${showSignal ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <RadioTower className="w-3.5 h-3.5" />
+              Signal
+            </button>
           </div>
         </div>
       </div>
@@ -453,6 +486,7 @@ export const TacticalMapTab = () => {
           key={zeroKey}
           mapMode={mapMode}
           showWeather={showWeather}
+          coverage={showSignal ? coverage : null}
           devices={mapDevices}
           center={center}
           zoom={zoom}
@@ -464,6 +498,26 @@ export const TacticalMapTab = () => {
           onMarkerDelete={(id) => removeMarker(id).catch(() => {})}
           onCameraChanged={(cam) => { if (cam?.center) cameraRef.current = cam; }}
         />
+        {showSignal && (
+          <div className="absolute left-2 bottom-8 bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-2 space-y-1.5 text-[10px]">
+            <div className="flex items-center gap-1">
+              <RadioTower className="w-3 h-3 text-green-400" />
+              <span className="text-slate-200 font-semibold">Coverage</span>
+              {[1, 6, 24].map(h => (
+                <button key={h} onClick={() => { setSignalHours(h); localStorage.setItem('wt-tac-signal-h', String(h)); }}
+                  className={`px-1.5 py-0.5 rounded ${signalHours === h ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>{h}h</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {[['good', '#22c55e', 'Good'], ['fair', '#eab308', 'Fair'], ['poor', '#f97316', 'Weak'], ['offline', '#ef4444', 'No signal']].map(([q, c, l]) => (
+                <span key={q} className="flex items-center gap-1 text-slate-300">
+                  <span className="w-2 h-2 rounded-full" style={{ background: c }} />{l} {coverageCounts[q] ?? 0}
+                </span>
+              ))}
+            </div>
+            {coverage && coverage.length === 0 && <p className="text-slate-500">No samples yet — they arrive with each tracked position.</p>}
+          </div>
+        )}
         {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
             <p className="text-[10px] text-slate-300">

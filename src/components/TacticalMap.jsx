@@ -32,6 +32,25 @@ const makeRadarMapType = (host, path) => ({
   releaseTile() {},
 });
 
+// Communications coverage: one dot per recorded link sample, coloured by
+// quality (green good → red no signal). Drawn as map circles so they
+// scale with the ground, not the screen.
+const COVERAGE_COLOR = { good: '#22c55e', fair: '#eab308', poor: '#f97316', offline: '#ef4444' };
+const CoverageOverlay = ({ samples }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !samples?.length || !window.google?.maps) return;
+    const circles = samples
+      .filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng) && COVERAGE_COLOR[s.quality])
+      .map(s => new window.google.maps.Circle({
+        map, center: { lat: s.lat, lng: s.lng }, radius: 45,
+        strokeWeight: 0, fillColor: COVERAGE_COLOR[s.quality], fillOpacity: 0.55, clickable: false,
+      }));
+    return () => circles.forEach(c => c.setMap(null));
+  }, [map, samples]);
+  return null;
+};
+
 const RadarOverlay = ({ visible }) => {
   const map = useMap();
   useEffect(() => {
@@ -136,6 +155,7 @@ const TacticalMap = ({
   onMarkerMove,      // (id, pos) => void — makes markers draggable
   onMarkerEdit,      // (id, {label, notes}) => void — editable popup
   onCameraChanged,   // (center {lat,lng}) => void — track current view
+  coverage = null,   // [{lat, lng, quality}] — comms coverage samples
 }) => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [activeFeed, setActiveFeed] = useState(null);
@@ -204,6 +224,7 @@ const TacticalMap = ({
         onCameraChanged={(e) => onCameraChanged?.({ center: e.detail?.center, zoom: e.detail?.zoom })}
       >
         <RadarOverlay visible={showWeather} />
+        {coverage && <CoverageOverlay samples={coverage} />}
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
             key={device.id}
