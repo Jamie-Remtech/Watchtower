@@ -30,7 +30,7 @@ const InviteQRBig = ({ code }) => {
     QRCode.toDataURL(`${window.location.origin}/?join=${encodeURIComponent(code)}`, { width: 200, margin: 1 })
       .then(setDataUrl).catch(() => {});
   }, [code]);
-  return dataUrl ? <img src={dataUrl} alt="Join code" className="rounded-lg border-4 border-white w-[160px] h-[160px]" /> : null;
+  return dataUrl ? <img src={dataUrl} alt="Join code" className="rounded-lg border-4 border-paper w-[160px] h-[160px]" /> : null;
 };
 
 export const PlatformTab = () => {

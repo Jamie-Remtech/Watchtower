@@ -17,6 +17,8 @@ import { findProtocolForItem, startProtocolRun } from './lib/protocols';
 import { AttentionPanel } from './components/AttentionPanel';
 import { CheckInPrompt } from './components/CheckInPrompt';
 import { NotificationSettings } from './components/NotificationSettings';
+import { AppearanceSettings } from './components/AppearanceSettings';
+import { saveAppearance, hasLocalAppearance, DEFAULT_APPEARANCE } from './theme/theme';
 import { playAlert } from './lib/alertSound';
 import { shouldDeliver, categoryOfItem, withDefaults } from './lib/notifyPrefs';
 import { cachedOrgId } from './lib/org';
@@ -59,6 +61,10 @@ const WatchtowerPortal = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
+  // A new device starts with the look this member chose elsewhere
+  useEffect(() => {
+    if (profile?.ui_prefs?.theme && !hasLocalAppearance()) saveAppearance({ ...DEFAULT_APPEARANCE, ...profile.ui_prefs });
+  }, [profile?.id, profile?.ui_prefs]);
   const org = useOrg();
   const { devices } = useDevices();
   const attention = useAttention();
@@ -401,7 +407,10 @@ const WatchtowerPortal = () => {
             <div className="flex justify-end mb-1">
               <button onClick={() => setNotifOpen(false)} className="p-1.5 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-            <NotificationSettings />
+            <div className="space-y-3">
+              <AppearanceSettings />
+              <NotificationSettings />
+            </div>
           </div>
         </div>
       )}

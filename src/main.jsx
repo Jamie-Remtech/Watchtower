@@ -8,6 +8,9 @@ import { UpdateBanner } from './components/UpdateBanner.jsx'
 import { InstallPrompt } from './components/InstallPrompt.jsx'
 import { I18nProvider } from './i18n/index.jsx'
 import './index.css'
+import { applyAppearance, loadAppearance } from './theme/theme.js'
+
+applyAppearance(loadAppearance())
 
 // Bundle executed fine — re-arm the white-screen recovery in index.html
 try { sessionStorage.removeItem('wt-recovered') } catch { /* private mode */ }

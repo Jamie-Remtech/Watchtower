@@ -688,7 +688,7 @@ const InviteQR = ({ code }) => {
   if (!dataUrl) return null;
   return (
     <div className="flex flex-col items-center gap-1.5 py-1">
-      <img src={dataUrl} alt="Scan to join Watchtower" className="rounded-lg border-4 border-white w-[200px] h-[200px]" />
+      <img src={dataUrl} alt="Scan to join Watchtower" className="rounded-lg border-4 border-paper w-[200px] h-[200px]" />
       <p className="text-[10px] text-slate-500">Scan with the phone camera → sign-up opens with the code filled in</p>
     </div>
   );

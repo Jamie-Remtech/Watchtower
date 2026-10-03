@@ -8,6 +8,17 @@
     <meta name="theme-color" content="#0f172a" />
     <title>Watchtower — Tactical Coordination Hub</title>
     <script>
+      // Apply the saved theme before anything paints (see src/theme/theme.js)
+      try {
+        var a = JSON.parse(localStorage.getItem('wt-theme') || 'null') || {};
+        var th = a.theme || 'dark';
+        if (th === 'system') th = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', th);
+        var v = JSON.parse(localStorage.getItem('wt-theme-vars') || '{}');
+        for (var k in v) document.documentElement.style.setProperty(k, v[k]);
+      } catch (e) { /* defaults */ }
+    </script>
+    <script>
       // If the app bundle fails to load (stale service-worker race right
       // after an update), refresh the worker and reload once instead of
       // leaving a white screen.

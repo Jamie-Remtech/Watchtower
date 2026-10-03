@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  background: rgb(var(--c-slate-950));
+}
+
+/* Night-vision: everything — maps and video included — in dim red */
+html[data-theme="night"]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgb(200 16 8);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 2147483647;
+}
+
 /* Map popups: a close button you can actually hit on a phone */
 .maplibregl-popup-close-button {
   width: 30px;
