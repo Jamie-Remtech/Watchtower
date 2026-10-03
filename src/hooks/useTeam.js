@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
+import { getOrgId } from '../lib/org';
 import { ROLE_LABELS } from '../auth/roles';
 
 // Maps a Supabase profile row into the full member shape the Team UI expects.
@@ -60,10 +61,12 @@ export const useTeam = () => {
   const refresh = useCallback(async () => {
     if (!isLive) return;
     setError(null);
+    const orgId = await getOrgId();
+    if (!orgId) { setLoading(false); return; }
     const [profilesRes, invitesRes, teamsRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at'),
-      supabase.from('invitations').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
-      supabase.from('teams').select('*').order('created_at'),
+      supabase.from('profiles').select('*').eq('org_id', orgId).order('created_at'),
+      supabase.from('invitations').select('*').eq('org_id', orgId).eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('teams').select('*').eq('org_id', orgId).order('created_at'),
     ]);
     if (profilesRes.error) setError(profilesRes.error.message);
     setLiveMembers((profilesRes.data ?? []).map(profileToMember));

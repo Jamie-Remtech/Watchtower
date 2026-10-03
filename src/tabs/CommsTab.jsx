@@ -7,6 +7,9 @@ import { usePresence } from '../hooks/usePresence';
 import { useSpeech } from '../hooks/useSpeech';
 import { beep } from '../lib/speechFeedback';
 import { pushToTeam } from '../lib/push';
+import { allowedTabs } from '../auth/roles';
+import { CheckInBoard } from '../components/CheckInBoard';
+import { useCheckinsShared } from '../hooks/useCheckins';
 
 // ============================================
 // COMMS — the org channel
@@ -18,8 +21,9 @@ const timeStr = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit',
 
 export const CommsTab = () => {
   const { profile, session } = useAuth();
-  const { liveMembers } = useTeam();
+  const { liveMembers, teams } = useTeam();
   const onlineIds = usePresence();
+  const checkinsShared = useCheckinsShared();
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -115,6 +119,21 @@ export const CommsTab = () => {
           <span className="text-[10px] text-slate-600">· {onlineCount} online</span>
         </div>
       </div>
+
+      {/* Field ranks can't open the Team tab; when their org lets them
+          request check-ins, the board lives here too */}
+      {checkinsShared && !allowedTabs(profile?.role).includes('team') && (
+        <div className="flex-shrink-0">
+          <CheckInBoard
+            members={liveMembers}
+            teams={teams}
+            checkins={checkinsShared.checkins}
+            responses={checkinsShared.responses}
+            requestCheckin={checkinsShared.requestCheckin}
+            closeCheckin={checkinsShared.closeCheckin}
+          />
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 min-h-[300px] overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-xl p-3 space-y-2">
         {messages.length === 0 && !error && (

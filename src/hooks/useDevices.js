@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
+import { getOrgId } from '../lib/org';
 
 // Device kinds with their channel costs (mirrors the device_kind enum).
 export const DEVICE_KINDS = [
@@ -22,7 +23,9 @@ export const useDevices = () => {
 
   const refresh = useCallback(async () => {
     if (!isLive) return;
-    const { data } = await supabase.from('devices').select('*').order('created_at');
+    const orgId = await getOrgId();
+    if (!orgId) return;
+    const { data } = await supabase.from('devices').select('*').eq('org_id', orgId).order('created_at');
     setDevices(data ?? []);
     setLoading(false);
   }, [isLive]);

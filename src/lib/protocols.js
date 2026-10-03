@@ -42,6 +42,8 @@ export async function startProtocolRun(protocol, context = {}) {
   logEvent('protocol.run_started', { name: protocol.name, run_id: data.id, from_alert: context?.attention?.title ?? null });
   pushToTeam({
     kind: 'attention',
+    category: 'protocols',
+    severity: 'warning',
     title: `▶ Protocol started: ${protocol.name}`,
     body: context?.attention?.title
       ? `Triggered by: ${context.attention.title}. Open Protocols to work the checklist.`

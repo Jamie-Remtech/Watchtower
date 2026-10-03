@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
 import { pushToTeam, localNotify } from './push';
+import { categoryOfItem } from './notifyPrefs';
 import { findProtocolForItem, startProtocolRun } from './protocols';
 
 // ============================================
@@ -51,15 +52,15 @@ export async function runAttentionSweep() {
   const orgId = prof?.org_id;
   if (!orgId) return { raised: 0 };
 
-  const { data: devices } = await supabase.from('devices').select('*');
-  const { data: invites } = await supabase.from('invitations').select('*').eq('status', 'pending');
+  const { data: devices } = await supabase.from('devices').select('*').eq('org_id', orgId);
+  const { data: invites } = await supabase.from('invitations').select('*').eq('org_id', orgId).eq('status', 'pending');
 
   // Org-configurable watch ranges (Settings → Organization)
   let WILDFIRE_RADIUS_KM = DEFAULT_WILDFIRE_RADIUS_KM;
   let HAZARD_RADIUS_KM = DEFAULT_HAZARD_RADIUS_KM;
   let AUTO_RUN_PROTOCOLS = false;
   try {
-    const { data: org } = await supabase.from('organizations').select('settings').limit(1).single();
+    const { data: org } = await supabase.from('organizations').select('settings').eq('id', orgId).single();
     const s = org?.settings ?? {};
     if (Number.isFinite(+s.wildfire_radius_km) && +s.wildfire_radius_km > 0) WILDFIRE_RADIUS_KM = +s.wildfire_radius_km;
     if (Number.isFinite(+s.hazard_radius_km) && +s.hazard_radius_km > 0) HAZARD_RADIUS_KM = +s.hazard_radius_km;
@@ -110,8 +111,8 @@ export async function runAttentionSweep() {
   if (anchors[0]) anchors[0].label = 'device fleet';
   try {
     const [{ data: fixes }, { data: profs }] = await Promise.all([
-      supabase.from('positions').select('profile_id, lat, lng, at').order('at', { ascending: false }).limit(100),
-      supabase.from('profiles').select('id, display_name'),
+      supabase.from('positions').select('profile_id, lat, lng, at').eq('org_id', orgId).order('at', { ascending: false }).limit(100),
+      supabase.from('profiles').select('id, display_name').eq('org_id', orgId),
     ]);
     const nameOf = Object.fromEntries((profs ?? []).map(p => [p.id, p.display_name]));
     const seen = new Set();
@@ -470,7 +471,7 @@ export async function runAttentionSweep() {
           }
         } catch { /* protocols unavailable — the alert still goes out */ }
         const body = `${c.detail?.slice(0, 120) ?? ''}${protocolNote}`;
-        pushToTeam({ kind: 'attention', title: `⚠ ${c.title}`, body, url: '/', tag: c.dedupe_key });
+        pushToTeam({ kind: 'attention', category: categoryOfItem(c), severity: 'critical', title: `⚠ ${c.title}`, body, url: '/', tag: c.dedupe_key });
         localNotify(`⚠ ${c.title}`, body);
       }
     }

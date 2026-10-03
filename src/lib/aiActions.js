@@ -71,7 +71,7 @@ export async function executeAiAction(action, askedQuestion) {
     });
     if (error) throw error;
     if (severity === 'critical') {
-      pushToTeam({ kind: 'attention', title: `⚠ ${title}`, body: String(input?.detail ?? '').slice(0, 140), url: '/', tag: `ai-alert` });
+      pushToTeam({ kind: 'attention', category: 'hazard', severity: 'critical', title: `⚠ ${title}`, body: String(input?.detail ?? '').slice(0, 140), url: '/', tag: `ai-alert` });
     }
     logEvent('ai.action', { action: 'raise_alert', severity, title });
     return `Raised a ${severity} alert: "${title}"${severity === 'critical' ? ' — pushed to the team' : ''}.`;

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { setCachedOrgId } from '../lib/org';
 
 const AuthContext = createContext(null);
 
@@ -14,6 +15,8 @@ export const AuthProvider = ({ children }) => {
       .select('*')
       .eq('id', userId)
       .single();
+    // Cache the company before anything renders that queries it
+    if (data?.org_id) setCachedOrgId(data.org_id);
     setProfile(data ?? null);
   }, []);
 
@@ -62,6 +65,7 @@ export const AuthProvider = ({ children }) => {
         signInWithMagicLink,
         signUpWithInvite,
         signOut,
+        reloadProfile: () => (session ? loadProfile(session.user.id) : null),
       }}
     >
       {children}

@@ -34,6 +34,27 @@ const WX_CODES: Record<number, string> = {
 const DAY_WORD = (i: number, dateStr: string) =>
   i === 0 ? 'today' : i === 1 ? 'tomorrow' : new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-CA', { weekday: 'long' });
 
+// Mirrors src/lib/notifyPrefs.js — keep the two in step.
+const VIBRATE: Record<string, number[]> = {
+  standard: [200, 100, 200, 100, 400],
+  siren: [600, 150, 600, 150, 600],
+  chime: [150, 80, 150],
+  pulse: [80, 60, 80, 60, 80, 60, 80],
+  vibrate: [300, 120, 300],
+};
+const RANK: Record<string, number> = { info: 0, warning: 1, critical: 2 };
+const LEVEL_MIN: Record<string, number> = { all: 0, warnings: 1, critical: 2 };
+type Prefs = { categories?: Record<string, boolean>; level?: string; sound?: string };
+const shouldDeliver = (prefs: Prefs, category: string, severity: string) => {
+  if (category === 'checkin') return { deliver: true, silent: false };
+  const enabled = prefs?.categories?.[category] !== false;
+  if (severity === 'critical') return { deliver: true, silent: !enabled };
+  if (!enabled) return { deliver: false, silent: true };
+  if ((RANK[severity] ?? 0) < (LEVEL_MIN[prefs?.level ?? 'all'] ?? 0)) return { deliver: false, silent: true };
+  return { deliver: true, silent: false };
+};
+const ROLE_ORDER = ['viewer', 'field', 'operator', 'coordinator', 'admin'];
+
 const KM = 6371;
 const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -73,12 +94,23 @@ Deno.serve(async (req) => {
     const dayCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     const [orgs, profiles, positions, devices, existing, subs] = await Promise.all([
       q('organizations?select=id,name,settings'),
-      q('profiles?select=id,display_name,org_id'),
+      q('profiles?select=id,display_name,org_id,role,team_id,notification_prefs'),
       q(`positions?select=profile_id,org_id,lat,lng,at&at=gte.${dayCut}&order=at.desc&limit=2000`),
       q('devices?select=org_id,lat,lng,name'),
       q('attention_items?select=org_id,dedupe_key&status=neq.resolved'),
       q('push_subscriptions?select=org_id,profile_id,endpoint,p256dh,auth'),
     ]);
+    const [openCheckins, recentCheckins] = await Promise.all([
+      q('checkins?select=id,org_id,team_id,requested_by,created_at,message&status=eq.open'),
+      q(`checkins?select=id,org_id,created_at&created_at=gte.${new Date(Date.now() - 30 * 60e3).toISOString()}`),
+    ]);
+    const openIds = (openCheckins ?? []).map((c: { id: string }) => c.id);
+    const checkinResponses = openIds.length
+      ? await q(`checkin_responses?select=checkin_id,profile_id&checkin_id=in.(${openIds.join(',')})`)
+      : [];
+    const prefsOf: Record<string, Prefs> = Object.fromEntries(
+      (profiles ?? []).map((p: { id: string; notification_prefs: Prefs }) => [p.id, p.notification_prefs ?? {}])
+    );
     const nameOf = Object.fromEntries((profiles ?? []).map((p: { id: string; display_name: string }) => [p.id, p.display_name]));
     const liveKeys = new Set((existing ?? []).map((i: { org_id: string; dedupe_key: string }) => `${i.org_id}|${i.dedupe_key}`));
     const hourBucket = new Date().toISOString().slice(0, 13);
@@ -186,6 +218,47 @@ Deno.serve(async (req) => {
       })
       : null;
 
+    // One sender for every push the tower makes: honours each
+    // recipient's preferences, prunes dead subscriptions.
+    type Sub = { org_id: string; profile_id: string; endpoint: string; p256dh: string; auth: string };
+    const sendTo = async (
+      list: Sub[],
+      msg: { kind: string; title: string; body: string; url?: string; tag: string },
+      category: string,
+      severity: string,
+    ) => {
+      if (!appServer) return;
+      for (const sub of list) {
+        const prefs = prefsOf[sub.profile_id] ?? {};
+        const { deliver, silent } = shouldDeliver(prefs, category, severity);
+        if (!deliver) continue;
+        const sound = prefs.sound ?? 'standard';
+        const message = JSON.stringify({
+          url: '/', ...msg, category, severity, silent, sound, vibrate: VIBRATE[sound] ?? VIBRATE.standard,
+        });
+        try {
+          await appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }).pushTextMessage(message, {});
+          pushed++;
+        } catch (e) {
+          if (String(e).includes('410') || String(e).includes('404')) {
+            await fetch(`${supaUrl}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`, {
+              method: 'DELETE', headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+            });
+          }
+        }
+      }
+    };
+    const subsOfOrg = (orgId: string) => (subs ?? []).filter((x: Sub) => x.org_id === orgId);
+    const categoryOf = (c: Cand) =>
+      c.kind === 'weather' ? (c.dedupe_key.startsWith('brief:') ? 'briefs' : 'weather') : 'hazard';
+    // Who a check-in expects: operational members of its team (or the
+    // whole org), never the person who asked.
+    const expectedOf = (ck: { org_id: string; team_id: string | null; requested_by: string | null }) =>
+      (profiles ?? []).filter((p: { id: string; org_id: string; role: string; team_id: string | null }) =>
+        p.org_id === ck.org_id && p.role !== 'viewer' && p.id !== ck.requested_by
+        && (!ck.team_id || p.team_id === ck.team_id));
+    const recentCheckinOrgs = new Set((recentCheckins ?? []).map((c: { org_id: string }) => c.org_id));
+
     for (const org of orgs ?? []) {
       const anchors = (anchorsByOrg.get(org.id) ?? []).slice(0, 12);
       const people = (peopleByOrg.get(org.id) ?? []).slice(0, 12);
@@ -229,7 +302,7 @@ Deno.serve(async (req) => {
           if (!m?.time?.length) continue;
           let idx = 0;
           for (let k = 0; k < m.time.length; k++) {
-            if (new Date(m.time[k] + 'Z') <= Date.now()) idx = k; else break;
+            if (new Date(m.time[k] + 'Z').getTime() <= Date.now()) idx = k; else break;
           }
           if (idx > m.time.length - 5) idx = 0;
           const cur = m.precipitation[idx] ?? 0;
@@ -338,17 +411,11 @@ Deno.serve(async (req) => {
                     org_id: org.id, actor_kind: 'system', type: 'brief.sent',
                     subject: key, payload: { label: person.label, brief },
                   });
-                  if (appServer) {
-                    const mySubs = (subs ?? []).filter((x: { org_id: string; profile_id: string }) =>
-                      x.org_id === org.id && x.profile_id === person.profileId);
-                    const message = JSON.stringify({ kind: 'forecast', title: `☀ Your day — ${desc}`, body: brief, url: '/', tag: key });
-                    for (const sub of mySubs) {
-                      try {
-                        await appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }).pushTextMessage(message, {});
-                        pushed++;
-                      } catch { /* stale sub — pruned by the critical path */ }
-                    }
-                  }
+                  await sendTo(
+                    subsOfOrg(org.id).filter((x: Sub) => x.profile_id === person.profileId),
+                    { kind: 'forecast', title: `☀ Your day — ${desc}`, body: brief, tag: key },
+                    'briefs', 'info',
+                  );
                 }
               }
             }
@@ -367,22 +434,80 @@ Deno.serve(async (req) => {
           org_id: org.id, actor_kind: 'system', type: 'attention.raised',
           subject: c.dedupe_key, payload: { severity: c.severity, kind: c.kind, title: c.title, via: 'tower-sweep' },
         });
-        if (c.severity === 'critical' && appServer) {
-          const orgSubs = (subs ?? []).filter((x: { org_id: string }) => x.org_id === org.id);
-          const message = JSON.stringify({ kind: 'attention', title: `⚠ ${c.title}`, body: c.detail.slice(0, 140), url: '/', tag: c.dedupe_key });
-          for (const sub of orgSubs) {
-            try {
-              await appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }).pushTextMessage(message, {});
-              pushed++;
-            } catch (e) {
-              if (String(e).includes('410') || String(e).includes('404')) {
-                await fetch(`${supaUrl}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`, {
-                  method: 'DELETE', headers: { apikey: svc, Authorization: `Bearer ${svc}` },
-                });
-              }
+        if (c.severity === 'critical') {
+          await sendTo(
+            subsOfOrg(org.id),
+            { kind: 'attention', title: `⚠ ${c.title}`, body: c.detail.slice(0, 140), tag: c.dedupe_key },
+            categoryOf(c), 'critical',
+          );
+          // Opt-in: a critical hazard or weather hit asks everyone to
+          // check in (at most once per 30 min per company)
+          if (s.par_auto_on_critical === true && !recentCheckinOrgs.has(org.id)) {
+            const ckRes = await fetch(`${supaUrl}/rest/v1/checkins`, {
+              method: 'POST',
+              headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+              body: JSON.stringify({ org_id: org.id, source: 'auto', message: c.title.slice(0, 140) }),
+            });
+            const created = ckRes.ok ? (await ckRes.json())?.[0] : null;
+            if (created) {
+              recentCheckinOrgs.add(org.id);
+              await insert('events', {
+                org_id: org.id, actor_kind: 'system', type: 'checkin.requested',
+                subject: created.id, payload: { source: 'auto', trigger: c.title, via: 'tower-sweep' },
+              });
+              const expectedIds = new Set(expectedOf(created).map((p: { id: string }) => p.id));
+              await sendTo(
+                subsOfOrg(org.id).filter((x: Sub) => expectedIds.has(x.profile_id)),
+                { kind: 'checkin', title: '✋ Check-in requested — are you OK?', body: c.title.slice(0, 140), url: `/?checkin=${created.id}`, tag: `checkin:${created.id}` },
+                'checkin', 'critical',
+              );
             }
           }
         }
+      }
+    }
+
+    // ---------- check-in silence: re-alert at the red threshold ----------
+    for (const ck of openCheckins ?? []) {
+      const org = (orgs ?? []).find((o: { id: string }) => o.id === ck.org_id);
+      const s = org?.settings ?? {};
+      if (!org || s.par_auto_escalate === false) continue;
+      const redMin = +s.par_red_min > 0 ? +s.par_red_min : 10;
+      const elapsedMin = (Date.now() - new Date(ck.created_at).getTime()) / 60000;
+      if (elapsedMin < redMin || elapsedMin > 180) continue;
+      const answered = new Set((checkinResponses ?? [])
+        .filter((r: { checkin_id: string }) => r.checkin_id === ck.id)
+        .map((r: { profile_id: string }) => r.profile_id));
+      for (const p of expectedOf(ck)) {
+        if (answered.has(p.id)) continue;
+        const key = `par-silent:${ck.id}:${p.id}`;
+        if (liveKeys.has(`${ck.org_id}|${key}`)) continue;
+        const res = await insert('attention_items', {
+          org_id: ck.org_id, dedupe_key: key, severity: 'critical', kind: 'hazard',
+          title: `${p.display_name ?? 'A member'} has not answered the check-in (${Math.round(elapsedMin)} min)`,
+          detail: `No answer to the check-in sent ${Math.round(elapsedMin)} min ago${ck.message ? ` (“${ck.message}”)` : ''}. Try radio or phone; check their last position on the tactical map.`,
+        });
+        if (!res.ok) continue;
+        raised++;
+        liveKeys.add(`${ck.org_id}|${key}`);
+        await insert('events', {
+          org_id: ck.org_id, actor_kind: 'system', type: 'checkin.escalated',
+          subject: ck.id, payload: { name: p.display_name, minutes: Math.round(elapsedMin), via: 'tower-sweep' },
+        });
+        // Second ask to the silent member, then tell the coordinators
+        await sendTo(
+          subsOfOrg(ck.org_id).filter((x: Sub) => x.profile_id === p.id),
+          { kind: 'checkin', title: '✋ Second request — are you OK?', body: 'Your coordinator has not heard from you. Tap to answer.', url: `/?checkin=${ck.id}`, tag: `checkin:${ck.id}` },
+          'checkin', 'critical',
+        );
+        const coordIds = new Set((profiles ?? [])
+          .filter((x: { org_id: string; role: string }) => x.org_id === ck.org_id && ROLE_ORDER.indexOf(x.role) >= ROLE_ORDER.indexOf('coordinator'))
+          .map((x: { id: string }) => x.id));
+        await sendTo(
+          subsOfOrg(ck.org_id).filter((x: Sub) => coordIds.has(x.profile_id)),
+          { kind: 'attention', title: `⚠ ${p.display_name ?? 'A member'} — no check-in answer`, body: `${Math.round(elapsedMin)} min without an answer. Try radio or phone.`, tag: key },
+          'hazard', 'critical',
+        );
       }
     }
 

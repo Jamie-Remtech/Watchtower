@@ -3,6 +3,8 @@ import { Building2, Loader2, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
 import { logEvent } from '../lib/eventLog';
+import { parSettings } from '../hooks/useCheckins';
+import { ROLE_LABELS } from '../auth/roles';
 
 // Organization identity — name and (optional) region, editable by admins.
 // Leave region empty to avoid tying the org to any specific place.
@@ -15,13 +17,19 @@ export const OrgSettings = () => {
   const [fireKm, setFireKm] = useState('');
   const [hazardKm, setHazardKm] = useState('');
   const [autoProtocols, setAutoProtocols] = useState(false);
+  const [parAmber, setParAmber] = useState('5');
+  const [parRed, setParRed] = useState('10');
+  const [parMinRole, setParMinRole] = useState('coordinator');
+  const [parEscalate, setParEscalate] = useState(true);
+  const [parAuto, setParAuto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('organizations').select('*').limit(1).single();
+      if (!profile?.org_id) return;
+      const { data } = await supabase.from('organizations').select('*').eq('id', profile.org_id).single();
       if (data) {
         setOrg(data);
         setName(data.name ?? '');
@@ -29,9 +37,15 @@ export const OrgSettings = () => {
         setFireKm(data.settings?.wildfire_radius_km ?? '');
         setHazardKm(data.settings?.hazard_radius_km ?? '');
         setAutoProtocols(data.settings?.auto_run_protocols === true);
+        const p = parSettings(data);
+        setParAmber(String(p.amberMin));
+        setParRed(String(p.redMin));
+        setParMinRole(p.requestMinRole);
+        setParEscalate(p.autoEscalate);
+        setParAuto(p.autoOnCritical);
       }
     })();
-  }, []);
+  }, [profile?.org_id]);
 
   const save = async () => {
     if (!org) return;
@@ -42,6 +56,11 @@ export const OrgSettings = () => {
       wildfire_radius_km: +fireKm > 0 ? +fireKm : undefined,
       hazard_radius_km: +hazardKm > 0 ? +hazardKm : undefined,
       auto_run_protocols: autoProtocols,
+      par_amber_min: Math.max(1, +parAmber || 5),
+      par_red_min: Math.max((+parAmber || 5) + 1, +parRed || 10),
+      par_request_min_role: parMinRole,
+      par_auto_escalate: parEscalate,
+      par_auto_on_critical: parAuto,
     };
     const patch = { name: name.trim() || 'Watchtower', region: region.trim() || null, settings };
     const { error: err } = await supabase.from('organizations').update(patch).eq('id', org.id);
@@ -132,6 +151,38 @@ export const OrgSettings = () => {
           </span>
         </span>
       </label>
+      <div className="p-3 rounded-lg border border-slate-700 bg-slate-800/40 space-y-2">
+        <p className="text-xs font-medium text-white">Check-in (personnel accountability)</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <label className="text-[11px] text-slate-400">
+            Amber after (min)
+            <input type="number" min="1" value={parAmber} onChange={e => setParAmber(e.target.value)} disabled={!isAdmin}
+              className="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none disabled:opacity-60" />
+          </label>
+          <label className="text-[11px] text-slate-400">
+            Red after (min)
+            <input type="number" min="2" value={parRed} onChange={e => setParRed(e.target.value)} disabled={!isAdmin}
+              className="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none disabled:opacity-60" />
+          </label>
+          <label className="text-[11px] text-slate-400 col-span-2 sm:col-span-1">
+            Who can request
+            <select value={parMinRole} onChange={e => setParMinRole(e.target.value)} disabled={!isAdmin}
+              className="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none disabled:opacity-60">
+              {['field', 'operator', 'coordinator', 'admin'].map(r => (
+                <option key={r} value={r}>{ROLE_LABELS[r]} and up</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="flex items-start gap-2 text-[11px] text-slate-300">
+          <input type="checkbox" checked={parEscalate} onChange={e => setParEscalate(e.target.checked)} disabled={!isAdmin} className="mt-0.5 accent-orange-500" />
+          <span>At red, the tower re-alerts the silent member and raises an alert for coordinators</span>
+        </label>
+        <label className="flex items-start gap-2 text-[11px] text-slate-300">
+          <input type="checkbox" checked={parAuto} onChange={e => setParAuto(e.target.checked)} disabled={!isAdmin} className="mt-0.5 accent-orange-500" />
+          <span>Ask everyone automatically when a critical hazard or weather alert hits (at most once every 30 min)</span>
+        </label>
+      </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       {isAdmin && (
         <button

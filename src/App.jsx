@@ -15,6 +15,12 @@ import { supabase } from './lib/supabase';
 import { enableNotifications, ensureSubscribed, notificationPermission, localNotify } from './lib/push';
 import { findProtocolForItem, startProtocolRun } from './lib/protocols';
 import { AttentionPanel } from './components/AttentionPanel';
+import { CheckInPrompt } from './components/CheckInPrompt';
+import { NotificationSettings } from './components/NotificationSettings';
+import { playAlert } from './lib/alertSound';
+import { shouldDeliver, categoryOfItem, withDefaults } from './lib/notifyPrefs';
+import { cachedOrgId } from './lib/org';
+import { useCheckins, CheckinsContext } from './hooks/useCheckins';
 import { RequestAccess } from './components/RequestAccess';
 import { alertAnimationStyles } from './styles/alertAnimations';
 import { BillingTab } from './tabs/BillingTab';
@@ -43,6 +49,7 @@ const WatchtowerPortal = () => {
   const org = useOrg();
   const { devices } = useDevices();
   const attention = useAttention();
+  const checkins = useCheckins();
   usePresence(); // register this session as online for the whole team
 
   // Automatic position tracking for operational roles — no toggle needed.
@@ -55,6 +62,9 @@ const WatchtowerPortal = () => {
   }, [profile?.role]);
 
   const [attnOpen, setAttnOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const prefsRef = useRef(profile?.notification_prefs);
+  prefsRef.current = profile?.notification_prefs;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('world');
@@ -78,10 +88,29 @@ const WatchtowerPortal = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (payload.new.sender === user?.id) return;
+        if (payload.new.org_id && payload.new.org_id !== cachedOrgId()) return;
         if (activeTabRef.current !== 'comms') {
+          // Chat is never siren-loud: the siren must stay rare to stay heard
+          if (shouldDeliver(prefsRef.current, 'comms', 'info').deliver) {
+            playAlert(withDefaults(prefsRef.current).sound === 'vibrate' ? 'vibrate' : 'chime');
+          }
           setUnreadMsgs(n => n + 1);
           localNotify('Watchtower — new message', payload.new.text?.slice(0, 120) ?? '', '/');
         }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Live alerts while the app is open: play the member's own sound
+  useEffect(() => {
+    const channel = supabase
+      .channel('attention-shell')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attention_items' }, (payload) => {
+        const item = payload.new;
+        if (item.org_id !== cachedOrgId()) return;
+        const { deliver, silent } = shouldDeliver(prefsRef.current, categoryOfItem(item), item.severity);
+        if (deliver && !silent && item.severity !== 'info') playAlert(withDefaults(prefsRef.current).sound);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -167,6 +196,8 @@ const WatchtowerPortal = () => {
   };
 
   return (
+    <CheckinsContext.Provider value={checkins}>
+    <CheckInPrompt checkins={checkins.checkins} responses={checkins.responses} respond={checkins.respond} />
     <div className="h-screen bg-slate-950 text-slate-100 flex overflow-hidden">
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 bg-slate-900 border-b border-slate-800 px-4 py-3 z-40 flex items-center justify-between">
@@ -263,6 +294,9 @@ const WatchtowerPortal = () => {
               <Bell className="w-3.5 h-3.5" />Enable notifications
             </button>
           )}
+          <button onClick={() => setNotifOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 text-xs font-medium hover:text-white">
+            <Bell className="w-3.5 h-3.5" />My notifications
+          </button>
           <button onClick={() => setAiOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-400 text-xs font-medium">
             <Zap className="w-3.5 h-3.5" />AI Assistant
           </button>
@@ -342,6 +376,17 @@ const WatchtowerPortal = () => {
 
       <AIAssistant isOpen={aiOpen} onClose={() => setAiOpen(false)} />
 
+      {notifOpen && (
+        <div className="fixed inset-0 bg-black/70 z-[90] flex items-start sm:items-center justify-center p-3 overflow-y-auto" onClick={() => setNotifOpen(false)}>
+          <div className="w-full max-w-2xl my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-end mb-1">
+              <button onClick={() => setNotifOpen(false)} className="p-1.5 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <NotificationSettings />
+          </div>
+        </div>
+      )}
+
       <AttentionPanel
         open={attnOpen}
         onClose={() => setAttnOpen(false)}
@@ -372,6 +417,7 @@ const WatchtowerPortal = () => {
         </button>
       )}
     </div>
+    </CheckinsContext.Provider>
   );
 };
 

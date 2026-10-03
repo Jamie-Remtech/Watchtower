@@ -44,6 +44,11 @@ const TYPE_META = {
   'protocol.run_aborted': { icon: '⏹️', label: 'Protocol aborted' },
   'ai.action': { icon: '⚡', label: 'AI acted' },
   'brief.sent': { icon: '☀️', label: 'Daily brief' },
+  'checkin.requested': { icon: '✋', label: 'Check-in requested' },
+  'checkin.answered': { icon: '✋', label: 'Check-in answered' },
+  'checkin.escalated': { icon: '⏰', label: 'Check-in silence' },
+  'checkin.closed': { icon: '✋', label: 'Check-in closed' },
+  'member.notifications_updated': { icon: '🔔', label: 'Notification settings' },
   'team.created': { icon: '🧩', label: 'Team created' },
   'team.removed': { icon: '🧩', label: 'Team removed' },
   'member.team_changed': { icon: '🧩', label: 'Team assignment' },
@@ -93,6 +98,11 @@ const summarize = (e) => {
   if (e.type.startsWith('protocol.')) return p.name ?? '';
   if (e.type === 'ai.action') return `${p.action}: ${p.protocol ?? p.title ?? p.text ?? ''}`;
   if (e.type === 'brief.sent') return `${p.label}: ${p.brief}`;
+  if (e.type === 'checkin.requested') return p.source === 'auto' ? `auto — ${p.trigger}` : (p.message ?? `${p.expected ?? ''} members asked`);
+  if (e.type === 'checkin.answered') return p.status === 'help' ? `NEEDS HELP${p.note ? ` — ${p.note}` : ''}` : 'OK';
+  if (e.type === 'checkin.escalated') return `${p.name}: no answer after ${p.minutes} min`;
+  if (e.type === 'checkin.closed') return `${p.ok ?? 0} OK · ${p.help ?? 0} help · ${p.silent ?? 0} silent · ${p.minutes ?? 0} min`;
+  if (e.type === 'member.notifications_updated') return `level ${p.level}, sound ${p.sound}`;
   if (e.type.startsWith('team.')) return p.name ?? '';
   if (e.type === 'member.team_changed') return `${p.name ?? 'member'} → ${p.team}`;
   if (e.type === 'platform.member_moved') return `${p.name} → ${p.to} (${p.role})`;

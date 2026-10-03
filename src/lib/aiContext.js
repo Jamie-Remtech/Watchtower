@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
+import { getOrgId } from './org';
 
 // ============================================
 // AI CONTEXT SNAPSHOT
@@ -19,6 +20,8 @@ const quickPosition = () =>
 
 export async function gatherContext() {
   if (!isSupabaseConfigured) return null;
+  const orgId = await getOrgId();
+  if (!orgId) return null;
 
   const [me, org, devices, patients, positions, markers, attention, events, views, protocols, activeRuns] = await Promise.all([
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -26,11 +29,11 @@ export async function gatherContext() {
       const { data } = await supabase.from('profiles').select('display_name, role, callsign').eq('id', user.id).single();
       return data;
     }),
-    supabase.from('organizations').select('name, region').limit(1).single().then(r => r.data),
-    supabase.from('devices').select('name, kind, status, lat, lng').then(r => r.data ?? []),
+    supabase.from('organizations').select('name, region').eq('id', orgId).single().then(r => r.data),
+    supabase.from('devices').select('name, kind, status, lat, lng').eq('org_id', orgId).then(r => r.data ?? []),
     supabase.from('patients').select('num, tag, triage, status, lat, lng, created_at').then(r => r.data ?? []),
-    supabase.from('positions').select('profile_id, lat, lng, at').order('at', { ascending: false }).limit(100).then(r => r.data ?? []),
-    supabase.from('markers').select('kind, label, notes, lat, lng, created_at').then(r => r.data ?? []),
+    supabase.from('positions').select('profile_id, lat, lng, at').eq('org_id', orgId).order('at', { ascending: false }).limit(100).then(r => r.data ?? []),
+    supabase.from('markers').select('kind, label, notes, lat, lng, created_at').eq('org_id', orgId).then(r => r.data ?? []),
     supabase.from('attention_items').select('severity, kind, title, status').neq('status', 'resolved').then(r => r.data ?? []),
     supabase.from('events').select('type, subject, payload, at')
       .in('type', ['field.report', 'patient.entry']).order('at', { ascending: false }).limit(15).then(r => r.data ?? []),
@@ -40,7 +43,7 @@ export async function gatherContext() {
   ]);
 
   // Latest fresh position per person, with names
-  const { data: profiles } = await supabase.from('profiles').select('id, display_name');
+  const { data: profiles } = await supabase.from('profiles').select('id, display_name').eq('org_id', orgId);
   const nameOf = Object.fromEntries((profiles ?? []).map(p => [p.id, p.display_name]));
   const seen = new Set();
   const crew = [];

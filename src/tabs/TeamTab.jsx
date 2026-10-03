@@ -6,6 +6,8 @@ import {
 import { useTeam } from '../hooks/useTeam';
 import { usePresence } from '../hooks/usePresence';
 import { useAuth } from '../auth/AuthContext';
+import { CheckInBoard } from '../components/CheckInBoard';
+import { useCheckinsShared } from '../hooks/useCheckins';
 import { ROLES as ROLE_OPTIONS_ALL, ROLE_LABELS, ROLE_DESCRIPTIONS, invitableRoles } from '../auth/roles';
 
 
@@ -22,6 +24,7 @@ export const TeamTab = () => {
   // Live team only, with REAL presence: online = has Watchtower open now.
   const { isLive, liveMembers, invitations, teams, createInvitation, revokeInvitation, dropMember, setMemberRole, updateContact, createTeam, removeTeam, setMemberTeam } = useTeam();
   const onlineIds = usePresence();
+  const checkinsShared = useCheckinsShared();
   const { profile, session } = useAuth();
   const myId = session?.user?.id;
   const isAdmin = profile?.role === 'admin';
@@ -156,6 +159,18 @@ export const TeamTab = () => {
         </div>
       </div>
       
+      {/* CHECK-IN / PAR — personnel accountability */}
+      {checkinsShared && (
+        <CheckInBoard
+          members={teamMembers}
+          teams={teams}
+          checkins={checkinsShared.checkins}
+          responses={checkinsShared.responses}
+          requestCheckin={checkinsShared.requestCheckin}
+          closeCheckin={checkinsShared.closeCheckin}
+        />
+      )}
+
       {/* TEAMS — parallel operations inside the company */}
       {canManageTeams && (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">

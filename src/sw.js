@@ -25,9 +25,14 @@ self.addEventListener('push', (event) => {
       // the alpha channel only — an opaque icon becomes a black square.
       badge: '/badge-96.png',
       tag: data.tag ?? data.kind ?? 'watchtower',
-      renotify: true,
+      renotify: !data.silent,
+      silent: !!data.silent,
+      // Check-ins and criticals stay on screen until someone acts on them
+      requireInteraction: data.kind === 'checkin' || (data.severity === 'critical' && !data.silent),
       data: { url: data.url ?? '/' },
-      vibrate: data.kind === 'attention' ? [200, 100, 200, 100, 400] : [150, 80, 150],
+      vibrate: data.silent ? undefined
+        : Array.isArray(data.vibrate) ? data.vibrate
+        : data.kind === 'attention' ? [200, 100, 200, 100, 400] : [150, 80, 150],
     })
   );
 });
