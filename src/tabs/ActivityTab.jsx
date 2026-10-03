@@ -48,6 +48,12 @@ const TYPE_META = {
   'checkin.answered': { icon: '✋', label: 'Check-in answered' },
   'checkin.escalated': { icon: '⏰', label: 'Check-in silence' },
   'checkin.closed': { icon: '✋', label: 'Check-in closed' },
+  'log.entry_edited': { icon: '✏️', label: 'Log entry corrected' },
+  'log.entry_removed': { icon: '🗑️', label: 'Log entry removed' },
+  'log.entry_restored': { icon: '↩️', label: 'Log entry restored' },
+  'vehicle.help': { icon: '🆘', label: 'Help call from vehicle' },
+  'vehicle.unit_named': { icon: '🚒', label: 'Unit named' },
+  'app.error': { icon: '⚠️', label: 'Screen crashed' },
   'member.notifications_updated': { icon: '🔔', label: 'Notification settings' },
   'team.created': { icon: '🧩', label: 'Team created' },
   'team.removed': { icon: '🧩', label: 'Team removed' },
@@ -101,6 +107,10 @@ const summarize = (e) => {
   if (e.type === 'checkin.requested') return p.source === 'auto' ? `auto — ${p.trigger}` : (p.message ?? `${p.expected ?? ''} members asked`);
   if (e.type === 'checkin.answered') return p.status === 'help' ? `NEEDS HELP${p.note ? ` — ${p.note}` : ''}` : 'OK';
   if (e.type === 'checkin.escalated') return `${p.name}: no answer after ${p.minutes} min`;
+  if (e.type.startsWith('log.entry_')) return p.reason ? `reason: ${p.reason}` : '';
+  if (e.type === 'vehicle.help') return p.unit ?? '';
+  if (e.type === 'vehicle.unit_named') return p.unit ?? '';
+  if (e.type === 'app.error') return `${p.where}: ${p.message}`;
   if (e.type === 'checkin.closed') return `${p.ok ?? 0} OK · ${p.help ?? 0} help · ${p.silent ?? 0} silent · ${p.minutes ?? 0} min`;
   if (e.type === 'member.notifications_updated') return `level ${p.level}, sound ${p.sound}`;
   if (e.type.startsWith('team.')) return p.name ?? '';

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Mic, MicOff, Send, Loader2, MapPin, ClipboardList, Radio, Info,
-  UserPlus, X, FileText, Volume2, Copy, WifiOff
+  UserPlus, X, FileText, Volume2, Copy, WifiOff, Pencil, Trash2, RotateCcw, History, Check, UserMinus
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
@@ -12,6 +12,8 @@ import { startTracking, pauseTracking, isTrackingPaused } from '../lib/tracker';
 import { usePatients } from '../hooks/usePatients';
 import { parseCommand, TRIAGE_META } from '../lib/fieldCommands';
 import { beep, say } from '../lib/speechFeedback';
+import { useAuth } from '../auth/AuthContext';
+import { ROLES } from '../auth/roles';
 
 // ============================================
 // FIELD LOG v2 — multi-casualty, voice-commanded
@@ -60,11 +62,135 @@ const basicHandoff = (patient, entries) => {
   ].join('\n');
 };
 
+const NOTE_TYPES = ['field.report', 'patient.entry'];
+
+// One timeline entry. Notes can be corrected or removed by their author or a
+// coordinator+ — the original is kept in event_revisions, never lost.
+const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) => {
+  const [mode, setMode] = useState(null); // 'edit' | 'remove' | 'history'
+  const [draft, setDraft] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [revs, setRevs] = useState(null);
+  const isNote = NOTE_TYPES.includes(e.type);
+  const removed = !!e.deleted_at;
+
+  const run = async (fn, args) => {
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc(fn, args);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setMode(null); setReason('');
+    onChanged();
+  };
+  const openHistory = async () => {
+    if (mode === 'history') { setMode(null); return; }
+    setMode('history');
+    const { data } = await supabase.from('event_revisions').select('*').eq('event_id', e.id).order('at');
+    setRevs(data ?? []);
+  };
+  const input = 'w-full px-2.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500';
+
+  return (
+    <div className={`rounded-xl p-3 border ${removed ? 'bg-slate-900/30 border-red-500/20 opacity-70' : 'bg-slate-900/60 border-slate-800'}`}>
+      {mode === 'edit' ? (
+        <div className="space-y-2">
+          <textarea value={draft} onChange={ev => setDraft(ev.target.value)} rows={3} className={`${input} resize-none`} autoFocus />
+          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder="Why the change? (optional — kept with the record)" className={input} maxLength={500} />
+          <div className="flex gap-2">
+            <button disabled={busy || !draft.trim()} onClick={() => run('edit_log_entry', { p_id: e.id, p_text: draft, p_reason: reason || null })}
+              className="px-3 py-1.5 bg-orange-500 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-50">
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}Save correction
+            </button>
+            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <p className={`text-sm whitespace-pre-wrap ${removed ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
+          {e.type === 'patient.triage' ? `Triage → ${e.payload?.triage}` :
+           e.type === 'patient.status' ? `Status → ${e.payload?.status}` :
+           e.type === 'patient.created' ? 'Patient created' :
+           e.payload?.text}
+        </p>
+      )}
+      {mode === 'remove' && (
+        <div className="mt-2 space-y-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
+          <p className="text-xs text-red-200">Remove this entry from the log? It stays in the record's history and a coordinator can restore it.</p>
+          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder="Reason (optional) — e.g. wrong patient" className={input} maxLength={500} autoFocus />
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={() => run('remove_log_entry', { p_id: e.id, p_reason: reason || null })}
+              className="px-3 py-1.5 bg-red-600 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-50">
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}Remove
+            </button>
+            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Keep it</button>
+          </div>
+        </div>
+      )}
+      {mode === 'history' && (
+        <div className="mt-2 space-y-1.5 p-2.5 rounded-lg bg-slate-800/60 border border-slate-700">
+          {!revs && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+          {revs?.length === 0 && <p className="text-[11px] text-slate-500">No changes — this is the original entry.</p>}
+          {revs?.map(r => (
+            <div key={r.id} className="text-[11px] text-slate-300">
+              <span className="text-slate-500">{new Date(r.at).toLocaleString()} · {names[r.by_id] ?? 'Team'} · </span>
+              <span className="font-semibold">{r.action === 'edit' ? 'corrected' : r.action === 'remove' ? 'removed' : 'restored'}</span>
+              {r.reason && <span className="text-slate-400"> — “{r.reason}”</span>}
+              {r.action === 'edit' && <p className="text-slate-500 line-through whitespace-pre-wrap">{r.old_payload?.text}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+      {err && <p className="text-[11px] text-red-400 mt-1">{err}</p>}
+      <div className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
+        <span>{names[e.actor_id] ?? 'Team'}</span>
+        <span>·</span>
+        <span>{timeAgo(e.payload?.at_client ?? e.at)}</span>
+        {patientTag && (<><span>·</span><span className="text-orange-300">{patientTag}</span></>)}
+        {e.payload?.lat != null && (
+          <>
+            <span>·</span>
+            <span className="flex items-center gap-0.5">
+              <MapPin className="w-2.5 h-2.5" />
+              {Number(e.payload.lat).toFixed(4)}, {Number(e.payload.lng).toFixed(4)}
+            </span>
+          </>
+        )}
+        {e.edited_at && !removed && <span className="text-sky-300">· corrected</span>}
+        {removed && <span className="text-red-300">· removed</span>}
+        {isNote && (
+          <span className="ml-auto flex items-center gap-1">
+            {(e.edited_at || removed) && (
+              <button onClick={openHistory} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-200" title="History of changes"><History className="w-3.5 h-3.5" /></button>
+            )}
+            {canChange && !removed && mode !== 'edit' && (
+              <button onClick={() => { setDraft(e.payload?.text ?? ''); setReason(''); setMode('edit'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-orange-300" title="Correct this entry"><Pencil className="w-3.5 h-3.5" /></button>
+            )}
+            {canChange && !removed && (
+              <button onClick={() => { setReason(''); setMode(mode === 'remove' ? null : 'remove'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-red-300" title="Remove this entry"><Trash2 className="w-3.5 h-3.5" /></button>
+            )}
+            {canRestore && removed && (
+              <button disabled={busy} onClick={() => run('restore_log_entry', { p_id: e.id })} className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-1" title="Put this entry back"><RotateCcw className="w-3 h-3" />Restore</button>
+            )}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const FieldLogTab = () => {
   const isLive = isSupabaseConfigured;
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
-  const [entries, setEntries] = useState([]);
+  const [allEntries, setEntries] = useState([]);
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [confirmRemovePatient, setConfirmRemovePatient] = useState(false);
+  const { profile, session } = useAuth();
+  const myId = session?.user?.id;
+  const isCoord = ROLES.indexOf(profile?.role) >= ROLES.indexOf('coordinator');
+  const entries = allEntries.filter(e => !e.deleted_at);
+  const removedCount = allEntries.length - entries.length;
   const [names, setNames] = useState({});
   const [activePatientId, setActivePatientId] = useState(null);
   const [lastAck, setLastAck] = useState(null);
@@ -187,9 +313,10 @@ export const FieldLogTab = () => {
     setHandoffBusy(false);
   };
 
+  const pool = showRemoved ? allEntries : entries;
   const visibleEntries = activePatient
-    ? entries.filter(e => e.subject === activePatient.id)
-    : entries.filter(e => e.type === 'field.report' || e.type === 'patient.entry');
+    ? pool.filter(e => e.subject === activePatient.id)
+    : pool.filter(e => e.type === 'field.report' || e.type === 'patient.entry');
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
@@ -244,8 +371,23 @@ export const FieldLogTab = () => {
                 {TRIAGE_META[activePatient.triage]?.label} · since {timeAgo(activePatient.created_at)}
               </span>
             </p>
-            <button onClick={() => setActivePatientId(null)} className="p-1 text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+            <div className="flex items-center gap-1">
+              {(isCoord || activePatient.created_by === myId) && (
+                <button onClick={() => setConfirmRemovePatient(v => !v)} className="p-1 text-slate-500 hover:text-red-300" title="Remove this patient (created by mistake)">
+                  <UserMinus className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button onClick={() => setActivePatientId(null)} className="p-1 text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+            </div>
           </div>
+          {confirmRemovePatient && (
+            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-red-200 flex-1 min-w-[12rem]">Remove {patientLabel(activePatient)} from the board? Use this for a patient created by mistake — the record keeps the history.</p>
+              <button onClick={async () => { await updatePatient(activePatient.id, { status: 'removed' }, 'patient.status'); setConfirmRemovePatient(false); setActivePatientId(null); }}
+                className="px-3 py-1.5 bg-red-600 rounded-lg text-xs font-semibold text-white">Remove patient</button>
+              <button onClick={() => setConfirmRemovePatient(false)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Cancel</button>
+            </div>
+          )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {['red', 'yellow', 'green', 'gray', 'black'].map(c => (
               <button
@@ -357,43 +499,29 @@ export const FieldLogTab = () => {
 
       {/* Timeline */}
       <div className="space-y-2">
-        <h3 className="text-xs font-bold text-white">
-          {activePatient ? `${patientLabel(activePatient)} timeline` : 'Recent entries'}
-          {visibleEntries.length > 0 && <span className="text-slate-500 font-normal"> ({visibleEntries.length})</span>}
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs font-bold text-white">
+            {activePatient ? `${patientLabel(activePatient)} timeline` : 'Recent entries'}
+            {visibleEntries.length > 0 && <span className="text-slate-500 font-normal"> ({visibleEntries.length})</span>}
+          </h3>
+          {isCoord && removedCount > 0 && (
+            <button onClick={() => setShowRemoved(v => !v)} className="text-[11px] text-slate-400 hover:text-white">
+              {showRemoved ? 'Hide removed' : `Show removed (${removedCount})`}
+            </button>
+          )}
+        </div>
         {visibleEntries.length === 0 ? (
           <p className="text-xs text-slate-500">
             Nothing yet. Every spoken action becomes part of the record — timestamped, located, per patient.
           </p>
         ) : (
-          visibleEntries.map(e => (
-            <div key={e.id} className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
-              <p className="text-sm text-slate-100 whitespace-pre-wrap">
-                {e.type === 'patient.triage' ? `Triage → ${e.payload?.triage}` :
-                 e.type === 'patient.status' ? `Status → ${e.payload?.status}` :
-                 e.type === 'patient.created' ? `Patient created` :
-                 e.payload?.text}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
-                <span>{names[e.actor_id] ?? 'Team'}</span>
-                <span>·</span>
-                <span>{timeAgo(e.payload?.at_client ?? e.at)}</span>
-                {!activePatient && e.subject && (() => {
-                  const p = patients.find(x => x.id === e.subject);
-                  return p ? (<><span>·</span><span className="text-orange-300">{patientLabel(p)}</span></>) : null;
-                })()}
-                {e.payload?.lat != null && (
-                  <>
-                    <span>·</span>
-                    <span className="flex items-center gap-0.5">
-                      <MapPin className="w-2.5 h-2.5" />
-                      {Number(e.payload.lat).toFixed(4)}, {Number(e.payload.lng).toFixed(4)}
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-          ))
+          visibleEntries.map(e => {
+            const p = !activePatient && e.subject ? patients.find(x => x.id === e.subject) : null;
+            return (
+              <LogEntry key={e.id} e={e} names={names} patientTag={p ? patientLabel(p) : null}
+                canChange={e.actor_id === myId || isCoord} canRestore={isCoord} onChanged={refresh} />
+            );
+          })
         )}
       </div>
 

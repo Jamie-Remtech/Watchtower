@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   ClipboardList, Play, Plus, Sparkles, X, Check, Loader2, ChevronDown, ChevronRight,
   Flame, Activity, CloudRain, Stethoscope, Wrench, Square, CheckSquare, Trash2, Pencil, FileText,
@@ -168,19 +168,36 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
   );
 };
 
+// ---------- collapsing (remembered on this device) ----------
+const readOpen = (key, dflt) => { try { const v = localStorage.getItem(key); return v == null ? dflt : v === '1'; } catch { return dflt; } };
+const useOpen = (key, dflt = true) => {
+  const [open, setOpen] = useState(() => readOpen(key, dflt));
+  const toggle = useCallback(() => setOpen(o => { try { localStorage.setItem(key, o ? '0' : '1'); } catch { /* private mode */ } return !o; }), [key]);
+  return [open, toggle];
+};
+const SectionHeader = ({ open, onToggle, label, count }) => (
+  <button onClick={onToggle} className="w-full flex items-center gap-1.5 text-left py-1 group" aria-expanded={open}>
+    {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-500" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-500" />}
+    <span className="text-[11px] text-slate-500 uppercase tracking-wide group-hover:text-slate-300">{label}</span>
+    {count != null && <span className="text-[10px] text-slate-600">({count})</span>}
+  </button>
+);
+
 // ---------- a live run card ----------
 const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
   const done = run.steps.filter(s => s.done).length;
   const total = run.steps.length;
   const [confirmAbort, setConfirmAbort] = useState(false);
+  const [open, toggleOpen] = useOpen(`wt-proto-run-${run.id}`, true);
   return (
     <div className="bg-slate-900/70 border border-orange-500/40 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+        <button onClick={toggleOpen} className="flex items-center gap-2 text-left" aria-expanded={open}>
+          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse inline-block" />
           <h4 className="text-sm font-bold text-white">{run.name}</h4>
           <span className="text-[10px] text-slate-500">started {timeAgo(run.started_at)}</span>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           <span className="text-xs text-orange-300 font-mono">{done}/{total}</span>
           <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -189,6 +206,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
         </div>
       </div>
 
+      {open && (<>
       {run.context?.attention?.title && (
         <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
           Triggered by alert: {run.context.attention.title}
@@ -233,6 +251,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
           </button>
         </div>
       )}
+      </>)}
     </div>
   );
 };
@@ -247,7 +266,12 @@ export const ProtocolsTab = () => {
   const [starting, setStarting] = useState(null);    // protocol id being started
   const [seeding, setSeeding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [openHistory, setOpenHistory] = useState(null);
+  const [openHistory, setOpenHistory] = useState(() => new Set());
+  const [openSteps, setOpenSteps] = useState(() => new Set());
+  const flip = (setter, id) => setter(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [liveOpen, toggleLive] = useOpen('wt-proto-sec-live', true);
+  const [libOpen, toggleLib] = useOpen('wt-proto-sec-library', true);
+  const [pastOpen, togglePast] = useOpen('wt-proto-sec-history', true);
   const [actionError, setActionError] = useState(null);
 
   const activeRuns = runs.filter(r => r.status === 'active');
@@ -288,8 +312,9 @@ export const ProtocolsTab = () => {
 
       {/* ACTIVE RUNS — the live checklists, top priority */}
       {activeRuns.length > 0 && (
-        <div className="space-y-3">
-          {activeRuns.map(r => (
+        <div className="space-y-2">
+          <SectionHeader open={liveOpen} onToggle={toggleLive} label="Live runs" count={activeRuns.length} />
+          {liveOpen && activeRuns.map(r => (
             <RunCard key={r.id} run={r} onToggle={doToggle} onEnd={doEnd} canEnd={canRun} />
           ))}
         </div>
@@ -297,9 +322,9 @@ export const ProtocolsTab = () => {
 
       {/* LIBRARY */}
       <div className="space-y-2">
-        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Playbook library</p>
-        {loading && <p className="text-xs text-slate-500">Loading…</p>}
-        {!loading && protocols.length === 0 && (
+        <SectionHeader open={libOpen} onToggle={toggleLib} label="Playbook library" count={protocols.length} />
+        {libOpen && loading && <p className="text-xs text-slate-500">Loading…</p>}
+        {libOpen && !loading && protocols.length === 0 && (
           <div className="p-6 bg-slate-900/50 border border-slate-800 rounded-xl text-center space-y-3">
             <p className="text-sm text-slate-400">No protocols yet. This is where the organization's playbooks live — checklists the whole team executes together when something happens.</p>
             {canManage && (
@@ -314,13 +339,18 @@ export const ProtocolsTab = () => {
             )}
           </div>
         )}
-        {protocols.map(p => {
+        {libOpen && protocols.map(p => {
           const meta = kindMeta(p.trigger_kind);
           const Icon = meta.icon;
+          const stepsOpen = openSteps.has(p.id);
           return (
-            <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl">
+            <div key={p.id} className="bg-slate-900/50 border border-slate-800 rounded-xl">
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <button onClick={() => flip(setOpenSteps, p.id)} className="p-0.5 -ml-1 text-slate-500 hover:text-white" aria-expanded={stepsOpen} title={stepsOpen ? 'Hide steps' : 'Show steps'}>
+                {stepsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
               <Icon className={`w-4 h-4 flex-shrink-0 ${meta.color}`} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => flip(setOpenSteps, p.id)}>
                 <p className="text-sm text-white font-medium truncate">{p.name}</p>
                 <p className="text-[11px] text-slate-500 truncate">{p.description ?? meta.label} · {(p.steps ?? []).length} steps</p>
               </div>
@@ -352,6 +382,15 @@ export const ProtocolsTab = () => {
                 </button>
               )}
             </div>
+            {stepsOpen && (
+              <ol className="px-4 pb-3 pl-10 space-y-1 list-decimal list-outside marker:text-slate-600">
+                {(p.steps ?? []).map((st, i) => (
+                  <li key={st.id ?? i} className="text-xs text-slate-300 pl-1">{st.text}</li>
+                ))}
+                {(p.steps ?? []).length === 0 && <li className="text-xs text-slate-500 list-none -ml-4">No steps yet.</li>}
+              </ol>
+            )}
+            </div>
           );
         })}
       </div>
@@ -359,13 +398,13 @@ export const ProtocolsTab = () => {
       {/* HISTORY — recorded patterns */}
       {pastRuns.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[11px] text-slate-500 uppercase tracking-wide">Past runs — the record the org learns from</p>
-          {pastRuns.map(r => {
+          <SectionHeader open={pastOpen} onToggle={togglePast} label="Past runs — the record the org learns from" count={pastRuns.length} />
+          {pastOpen && pastRuns.map(r => {
             const done = r.steps.filter(s => s.done).length;
-            const open = openHistory === r.id;
+            const open = openHistory.has(r.id);
             return (
               <div key={r.id} className="bg-slate-900/40 border border-slate-800 rounded-xl">
-                <button onClick={() => setOpenHistory(open ? null : r.id)}
+                <button onClick={() => flip(setOpenHistory, r.id)} aria-expanded={open}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left">
                   {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-500" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-500" />}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
