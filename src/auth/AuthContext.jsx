@@ -40,17 +40,24 @@ export const AuthProvider = ({ children }) => {
   const signInWithPassword = (email, password) =>
     supabase.auth.signInWithPassword({ email, password });
 
+  // Existing members only: accounts are created by invitation, never by a link
   const signInWithMagicLink = (email) =>
-    supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
+    supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } });
 
-  // Invitation-code onboarding: the code travels in user metadata; a database
-  // trigger attaches the new user to the inviting org with the invited role.
-  const signUpWithInvite = (email, password, inviteCode, displayName) =>
-    supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { invite_code: inviteCode, display_name: displayName } },
+  // Invitation-code onboarding: the join function checks the code and creates
+  // the account (no confirmation email); the database trigger attaches the
+  // person to the inviting company with the invited role. Then we sign in.
+  const signUpWithInvite = async (email, password, inviteCode, displayName, language) => {
+    const { error } = await supabase.functions.invoke('join', {
+      body: { code: inviteCode, email, password, display_name: displayName, language },
     });
+    if (error) {
+      let code = 'join_failed';
+      try { code = (await error.context?.json())?.error ?? code; } catch { /* not JSON */ }
+      return { error: { code } };
+    }
+    return supabase.auth.signInWithPassword({ email, password });
+  };
 
   const signOut = () => (isSupabaseConfigured ? supabase.auth.signOut() : null);
 

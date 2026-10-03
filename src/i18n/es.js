@@ -171,4 +171,13 @@ export const es = {
   'ap.c.blue': "Azul",
   'ap.c.violet': "Violeta",
   'ap.c.pink': "Rosa",
+  'join.invalid_input': "Revisa el código y tu correo.",
+  'join.weak_password': "Elige una contraseña de al menos 8 caracteres.",
+  'join.code_not_valid': "Este código de invitación no es válido o ya se usó. Pide uno nuevo.",
+  'join.code_expired': "Esta invitación expiró. Pide una nueva.",
+  'join.code_other_email': "Esta invitación se hizo para otro correo.",
+  'join.email_exists': "Este correo ya tiene una cuenta de Watchtower — inicia sesión.",
+  'join.create_failed': "No se pudo crear la cuenta. Inténtalo de nuevo.",
+  'join.join_failed': "No se pudo unir ahora. Inténtalo de nuevo.",
+  'login.noAccount': "Ninguna cuenta de Watchtower usa este correo. Únete primero con tu código de invitación.",
 };

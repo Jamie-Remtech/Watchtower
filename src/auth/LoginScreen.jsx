@@ -43,12 +43,11 @@ export const LoginScreen = () => {
         if (error) throw error;
         setNotice(t('login.magicSent'));
       } else {
-        const { error } = await signUpWithInvite(email, password, inviteCode.trim(), displayName.trim());
-        if (error) throw error;
-        setNotice(t('login.created'));
+        const { error } = await signUpWithInvite(email.trim(), password, inviteCode.trim(), displayName.trim(), lang);
+        if (error) throw new Error(error.code ? t(`join.${error.code}`) : error.message);
       }
     } catch (err) {
-      setError(err.message ?? t('login.error'));
+      setError(/signups not allowed/i.test(err.message ?? '') ? t('login.noAccount') : (err.message ?? t('login.error')));
     } finally {
       setBusy(false);
     }

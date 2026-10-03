@@ -182,4 +182,13 @@ export const en = {
   'ap.c.blue': "Blue",
   'ap.c.violet': "Violet",
   'ap.c.pink': "Pink",
+  'join.invalid_input': "Check the code and your email address.",
+  'join.weak_password': "Choose a password of at least 8 characters.",
+  'join.code_not_valid': "This invitation code is not valid or has already been used. Ask for a new one.",
+  'join.code_expired': "This invitation has expired. Ask for a new one.",
+  'join.code_other_email': "This invitation was made for a different email address.",
+  'join.email_exists': "This email already has a Watchtower account — sign in instead.",
+  'join.create_failed': "Could not create the account. Please try again.",
+  'join.join_failed': "Could not join right now. Please try again.",
+  'login.noAccount': "No Watchtower account uses this email. Join with your invitation code first.",
 };
