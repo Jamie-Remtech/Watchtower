@@ -173,7 +173,7 @@ export const useProtocols = () => {
           .from('events').select('at, type, payload')
           .gte('at', run.started_at).order('at').limit(80);
         const { data } = await supabase.functions.invoke('field-assist', {
-          body: { mode: 'debrief', run: { name: run.name, started_at: run.started_at, steps: run.steps, context: run.context }, events: evs ?? [] },
+          body: { mode: 'debrief', run: { name: run.name, started_at: run.started_at, steps: run.steps, context: run.context }, events: evs ?? [], language: document.documentElement.lang || 'en' },
         });
         debrief = data?.debrief ?? null;
       } catch { /* debrief is best-effort — the run still closes */ }
@@ -190,7 +190,7 @@ export const useProtocols = () => {
   // AI drafts a playbook from a plain-language situation.
   const draftWithAI = useCallback(async (situation) => {
     const { data, error: err } = await supabase.functions.invoke('field-assist', {
-      body: { mode: 'protocol_draft', situation },
+      body: { mode: 'protocol_draft', situation, language: document.documentElement.lang || 'en' },
     });
     if (err) throw err;
     if (data?.error) throw new Error(data.error);

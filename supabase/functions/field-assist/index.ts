@@ -24,15 +24,27 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { mode, patient, entries, question, context, history, picture, situation, run, events } = await req.json();
+    const { mode, patient, entries, question, context, history, picture, situation, run, events, language, texts, target, format } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY secret is not set' }, 500);
 
+    // Everything a person reads comes back in THEIR language (cascade
+    // output is org-wide, translated on display, so it stays English).
+    const langName = (code: string) => {
+      try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code; } catch { return code; }
+    };
+    const langRule = language && language !== 'en' && mode !== 'cascade' && mode !== 'translate'
+      ? `Write all human-readable text in ${langName(language)}. Keep JSON keys, enum values and identifiers exactly as specified, in English.`
+      : '';
+
     const callClaude = async (body: Record<string, unknown>) => {
+      const withLang = langRule
+        ? { ...body, system: [body.system, langRule].filter(Boolean).join('\n\n') }
+        : body;
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-5', ...body }),
+        body: JSON.stringify({ model: 'claude-sonnet-5', ...withLang }),
       });
       const data = await r.json();
       return { ok: r.ok, data };
@@ -49,6 +61,25 @@ Deno.serve(async (req) => {
       }
       return null;
     };
+
+    // ---- mode: translate — batch translation for comms, alerts, notes ----
+    if (mode === 'translate') {
+      const list = (Array.isArray(texts) ? texts : []).map((t: unknown) => String(t ?? '').slice(0, 2000)).slice(0, 40);
+      if (!list.length || !target) return json({ translations: [] });
+      const prompt = `Translate each item of the JSON array below into ${langName(target)} (${target}).
+Context: operational messages between emergency responders. Keep it faithful and terse; keep numbers, units, times, coordinates, place names, call signs and proper names exactly as written. If an item is already in ${langName(target)}, return it unchanged.
+Respond with STRICT JSON only: {"translations":["…", …]} — same length and order as the input.
+
+${JSON.stringify(list)}`;
+      const { ok, data } = await callClaude({ max_tokens: 4000, messages: [{ role: 'user', content: prompt }] });
+      if (!ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      const parsed = parseJson(textOf(data));
+      const out = Array.isArray(parsed?.translations) && parsed.translations.length === list.length
+        ? parsed.translations.map((t: unknown) => String(t))
+        : null;
+      if (!out) return json({ error: 'unparseable translation', raw: textOf(data).slice(0, 200) }, 502);
+      return json({ translations: out });
+    }
 
     // ---- mode: protocol_draft — turn a situation into a playbook ----
     if (mode === 'protocol_draft') {

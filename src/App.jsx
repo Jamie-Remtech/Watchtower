@@ -5,7 +5,7 @@ import {
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
 import { useAuth } from './auth/AuthContext';
-import { ROLE_LABELS, allowedTabs } from './auth/roles';
+import { allowedTabs } from './auth/roles';
 import { useOrg } from './hooks/useOrg';
 import { useDevices } from './hooks/useDevices';
 import { useAttention } from './hooks/useAttention';
@@ -20,6 +20,7 @@ import { NotificationSettings } from './components/NotificationSettings';
 import { playAlert } from './lib/alertSound';
 import { shouldDeliver, categoryOfItem, withDefaults } from './lib/notifyPrefs';
 import { cachedOrgId } from './lib/org';
+import { useI18n } from './i18n/index.jsx';
 import { useCheckins, CheckinsContext } from './hooks/useCheckins';
 import { RequestAccess } from './components/RequestAccess';
 import { alertAnimationStyles } from './styles/alertAnimations';
@@ -46,7 +47,17 @@ import { ForecastsTab } from './tabs/ForecastsTab';
 // ============================================
 
 const WatchtowerPortal = () => {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, session, reloadProfile } = useAuth();
+  const { t, lang } = useI18n();
+
+  // First sign-in: remember this device's language on the profile so the
+  // tower can alert this member in their language too.
+  useEffect(() => {
+    if (profile && !profile.language && session?.user?.id) {
+      supabase.from('profiles').update({ language: lang }).eq('id', session.user.id).then(() => reloadProfile?.());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
   const org = useOrg();
   const { devices } = useDevices();
   const attention = useAttention();
@@ -160,18 +171,18 @@ const WatchtowerPortal = () => {
     ...(isPlatformStaff ? ['platform'] : []),
   ];
   const navItems = [
-    { id: 'streams', name: 'Live Streams', icon: Video },
-    { id: 'tactical', name: 'Tactical Map', icon: Map },
-    { id: 'world', name: 'World', icon: Globe },
-    { id: 'forecasts', name: 'Forecasts', icon: CloudSun },
-    { id: 'log', name: 'Field Log', icon: Mic },
-    { id: 'protocols', name: 'Protocols', icon: ClipboardList },
-    { id: 'comms', name: 'Comms & Tracking', icon: Radio },
-    { id: 'activity', name: 'Activity', icon: Activity },
-    { id: 'team', name: 'Team', icon: Users },
-    { id: 'billing', name: 'Billing', icon: CreditCard },
-    { id: 'settings', name: 'Settings', icon: Settings },
-    { id: 'platform', name: 'Platform', icon: Building2 },
+    { id: 'streams', name: t('nav.streams'), icon: Video },
+    { id: 'tactical', name: t('nav.tactical'), icon: Map },
+    { id: 'world', name: t('nav.world'), icon: Globe },
+    { id: 'forecasts', name: t('nav.forecasts'), icon: CloudSun },
+    { id: 'log', name: t('nav.log'), icon: Mic },
+    { id: 'protocols', name: t('nav.protocols'), icon: ClipboardList },
+    { id: 'comms', name: t('nav.comms'), icon: Radio },
+    { id: 'activity', name: t('nav.activity'), icon: Activity },
+    { id: 'team', name: t('nav.team'), icon: Users },
+    { id: 'billing', name: t('nav.billing'), icon: CreditCard },
+    { id: 'settings', name: t('nav.settings'), icon: Settings },
+    { id: 'platform', name: t('nav.platform'), icon: Building2 },
   ].filter(item => allowed.includes(item.id));
 
   // Never leave someone on a tab their role can't open
@@ -294,14 +305,14 @@ const WatchtowerPortal = () => {
               onClick={async () => { await enableNotifications(); setNotifPerm(notificationPermission()); }}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-medium"
             >
-              <Bell className="w-3.5 h-3.5" />Enable notifications
+              <Bell className="w-3.5 h-3.5" />{t('shell.enableNotifications')}
             </button>
           )}
           <button onClick={() => setNotifOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 text-slate-300 text-xs font-medium hover:text-white">
-            <Bell className="w-3.5 h-3.5" />My notifications
+            <Bell className="w-3.5 h-3.5" />{t('shell.mySettings')}
           </button>
           <button onClick={() => setAiOpen(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500/20 to-orange-600/20 border border-orange-500/30 text-orange-400 text-xs font-medium">
-            <Zap className="w-3.5 h-3.5" />AI Assistant
+            <Zap className="w-3.5 h-3.5" />{t('shell.aiAssistant')}
           </button>
         </div>
 
@@ -309,14 +320,14 @@ const WatchtowerPortal = () => {
         <div className="px-2 py-2 border-t border-slate-800">
           <div className="flex items-center justify-between px-2 py-1.5 bg-slate-800/50 rounded-lg">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-white truncate">{profile?.display_name ?? 'Signed in'}</p>
+              <p className="text-xs font-medium text-white truncate">{profile?.display_name ?? t('shell.signedIn')}</p>
               <p className="text-[10px] text-slate-500">
-                {ROLE_LABELS[profile?.role] ?? profile?.role}
+                {profile?.role ? t(`role.${profile.role}`) : ''}
               </p>
             </div>
             {(
               <button onClick={signOut} className="text-[10px] text-slate-400 hover:text-orange-400 font-medium ml-2 flex-shrink-0">
-                Sign out
+                {t('shell.signOut')}
               </button>
             )}
           </div>
@@ -332,7 +343,7 @@ const WatchtowerPortal = () => {
           </div>
           <div className="flex items-center gap-3">
             {(
-              <button onClick={() => setAttnOpen(true)} className="relative p-1.5 hover:bg-slate-800 rounded-lg" title="Attention queue">
+              <button onClick={() => setAttnOpen(true)} className="relative p-1.5 hover:bg-slate-800 rounded-lg" title={t('shell.attentionQueue')}>
                 <Bell className={`w-4 h-4 ${attention.hasCritical ? 'text-red-400' : attention.openItems.length ? 'text-orange-400' : 'text-slate-400'}`} />
                 {attention.openItems.length > 0 && (
                   <span className={`absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white ${attention.hasCritical ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
@@ -348,7 +359,7 @@ const WatchtowerPortal = () => {
                 className="flex items-center gap-2 px-3 py-1 bg-red-500 rounded-lg animate-pulse cursor-pointer hover:bg-red-600 transition-colors"
               >
                 <Flame className="w-4 h-4 text-white" />
-                <span className="text-white font-bold text-xs">{activeAlerts} ALERT{activeAlerts > 1 ? 'S' : ''}</span>
+                <span className="text-white font-bold text-xs">{t('shell.alerts', { n: activeAlerts })}</span>
               </button>
             ) : tendedAlerts > 0 ? (
               <button 
@@ -356,19 +367,19 @@ const WatchtowerPortal = () => {
                 className="flex items-center gap-2 px-3 py-1 bg-orange-500 rounded-lg cursor-pointer hover:bg-orange-600 transition-colors"
               >
                 <Flame className="w-4 h-4 text-white" />
-                <span className="text-white font-bold text-xs">{tendedAlerts} TENDED</span>
+                <span className="text-white font-bold text-xs">{t('shell.tended', { n: tendedAlerts })}</span>
               </button>
             ) : (
               <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-lg">
                 <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                <span className="text-green-400 text-xs font-medium">No active alerts</span>
+                <span className="text-green-400 text-xs font-medium">{t('shell.noActiveAlerts')}</span>
               </div>
             )}
             {/* Active devices */}
             <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 border border-green-500/30 rounded-lg">
               <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
               <span className="text-green-400 text-xs font-medium">
-                {devices.filter(d => d.status === "active").length} online
+                {t('shell.online', { n: devices.filter(d => d.status === "active").length })}
               </span>
             </div>
           </div>

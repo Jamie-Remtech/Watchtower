@@ -21,6 +21,8 @@ export const say = (text) => {
   try {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.15;
+    // Speak in the member's Watchtower language
+    u.lang = document.documentElement.lang || 'en';
     u.volume = 0.9;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);

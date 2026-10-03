@@ -177,7 +177,7 @@ export const FieldLogTab = () => {
     const timeline = entries.filter(e => e.subject === patient.id);
     try {
       const { data, error } = await supabase.functions.invoke('field-assist', {
-        body: { mode: 'handoff', patient, entries: timeline.slice().reverse() },
+        body: { mode: 'handoff', patient, entries: timeline.slice().reverse(), language: document.documentElement.lang || 'en' },
       });
       if (error || !data?.handoff) throw error ?? new Error('no result');
       setHandoff({ patient, text: data.handoff, ai: true });

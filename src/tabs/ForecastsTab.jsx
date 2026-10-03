@@ -6,6 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 import { useTeam } from '../hooks/useTeam';
 import { usePositions } from '../hooks/usePositions';
 import { pointForecast, multiDaily, seasonalOutlook, dayFlags, wxIcon, wxLabel } from '../lib/forecast';
+import { useI18n } from '../i18n/index.jsx';
+import { useTranslations } from '../lib/translate';
 
 // ============================================
 // FORECASTS — reading time, not just seeing it.
@@ -20,12 +22,12 @@ const SEV = {
   critical: 'bg-red-500/15 text-red-300 border-red-500/40',
   warning: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
 };
-const dayName = (iso, i) => (i === 0 ? 'Today' : i === 1 ? 'Tomorrow'
-  : new Date(`${iso}T12:00:00`).toLocaleDateString([], { weekday: 'short', day: 'numeric' }));
+const dayNameT = (t, lang, iso, i) => (i === 0 ? t('fc.today') : i === 1 ? t('fc.tomorrow')
+  : new Date(`${iso}T12:00:00`).toLocaleDateString(lang, { weekday: 'short', day: 'numeric' }));
 const hhmm = (iso) => iso?.slice(11, 16) ?? '';
-const ago = (iso) => {
+const agoT = (t, iso) => {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  return m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`;
+  return m < 60 ? t('time.minAgo', { m }) : m < 1440 ? t('time.hAgo', { h: Math.floor(m / 60) }) : t('time.dAgo', { d: Math.floor(m / 1440) });
 };
 
 const Card = ({ title, icon: Icon, right, children }) => (
@@ -40,6 +42,9 @@ const Card = ({ title, icon: Icon, right, children }) => (
 
 export const ForecastsTab = () => {
   const { profile } = useAuth();
+  const { t, lang } = useI18n();
+  const dayName = (iso, i) => dayNameT(t, lang, iso, i);
+  const ago = (iso) => agoT(t, iso);
   const isViewer = !profile?.role || profile.role === 'viewer';
   const { liveMembers } = useTeam();
   const { latest: positions } = usePositions();
@@ -57,7 +62,7 @@ export const ForecastsTab = () => {
   const [seasonErr, setSeasonErr] = useState(null);
 
   const locate = useCallback(() => {
-    if (!navigator.geolocation) { setMyErr('This device cannot share its location'); return; }
+    if (!navigator.geolocation) { setMyErr(t('fc.noLoc')); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (p) => {
@@ -66,7 +71,7 @@ export const ForecastsTab = () => {
         try { localStorage.setItem(MY_LOCATION_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
         setLocating(false);
       },
-      () => { setMyErr('Location permission needed — tap the button and allow it'); setLocating(false); },
+      () => { setMyErr(t('fc.locErr')); setLocating(false); },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
   }, []);
@@ -116,6 +121,16 @@ export const ForecastsTab = () => {
   }, [isViewer, liveMembers.length, positions.map(p => p.profile_id).sort().join(',')]);
 
   const cur = mine?.current;
+  // Weather words, hazard flags and NOAA text are English at the source
+  const wxTexts = lang === 'en' ? [] : [
+    ...(mine?.current ? [wxLabel(mine.current.weather_code)] : []),
+    ...(mine?.daily?.weather_code ?? []).map(wxLabel),
+    ...(mine?.daily ? mine.daily.time.flatMap((_, k) => dayFlags(mine.daily, k).map(f => f.text)) : []),
+    ...team.flatMap(m => (m.daily ? m.daily.time.flatMap((_, k) => dayFlags(m.daily, k).map(f => f.text)) : [])),
+    ...(enso?.status ? [enso.status] : []), ...(enso?.synopsis ? [enso.synopsis] : []),
+  ];
+  const wxTr = useTranslations([...new Set(wxTexts)], lang, wxTexts.length > 0);
+  const W = (x) => (x ? wxTr[x] ?? x : x);
   const d = mine?.daily;
   const hourly = (mine?.hourly?.time ?? []).map((t, i) => ({
     t: hhmm(t),
@@ -129,7 +144,7 @@ export const ForecastsTab = () => {
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <CloudSun className="w-6 h-6 text-orange-400" />Forecasts
+          <CloudSun className="w-6 h-6 text-orange-400" />{t('fc.title')}
         </h2>
         <button
           onClick={locate}
@@ -137,25 +152,25 @@ export const ForecastsTab = () => {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-xs font-medium disabled:opacity-50"
         >
           {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LocateFixed className="w-3.5 h-3.5" />}
-          My location
+          {t('fc.myLocation')}
         </button>
       </div>
 
       {/* ---------- MY FORECAST ---------- */}
-      <Card title={place ? `My forecast · ${place}` : 'My forecast'} icon={Thermometer}
-        right={cur && <span className="text-[11px] text-slate-500">updated {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · Open-Meteo</span>}>
+      <Card title={place ? t('fc.myAt', { place }) : t('fc.my')} icon={Thermometer}
+        right={cur && <span className="text-[11px] text-slate-500">{t('fc.updated', { time: new Date().toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' }) })}</span>}>
         {myErr && <p className="text-xs text-red-400">{myErr}</p>}
-        {!mine && !myErr && <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />Reading the sky at your position…</p>}
+        {!mine && !myErr && <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('fc.reading')}</p>}
         {cur && (
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-5xl leading-none">{wxIcon(cur.weather_code)}</span>
             <div>
               <p className="text-3xl font-bold text-white">{Math.round(cur.temperature_2m)}°C</p>
-              <p className="text-xs text-slate-400">{wxLabel(cur.weather_code)} · feels {Math.round(cur.apparent_temperature)}°</p>
+              <p className="text-xs text-slate-400">{W(wxLabel(cur.weather_code))} · {t('fc.feels', { t: Math.round(cur.apparent_temperature) })}</p>
             </div>
             <div className="flex gap-4 text-xs text-slate-300 flex-wrap">
               <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-sky-400" />{cur.relative_humidity_2m}%</span>
-              <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-slate-400" />{Math.round(cur.wind_speed_10m)} km/h, gusts {Math.round(cur.wind_gusts_10m)}</span>
+              <span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-slate-400" />{t('fc.gusts', { w: Math.round(cur.wind_speed_10m), g: Math.round(cur.wind_gusts_10m) })}</span>
               {d?.sunrise?.[0] && <span className="flex items-center gap-1"><Sunrise className="w-3.5 h-3.5 text-amber-300" />{hhmm(d.sunrise[0])}</span>}
               {d?.sunset?.[0] && <span className="flex items-center gap-1"><Sunset className="w-3.5 h-3.5 text-orange-300" />{hhmm(d.sunset[0])}</span>}
             </div>
@@ -166,7 +181,7 @@ export const ForecastsTab = () => {
           <div className="flex flex-wrap gap-1.5">
             {myFlags.map((f, i) => (
               <span key={i} className={`px-2 py-1 rounded-lg border text-[11px] flex items-center gap-1 ${SEV[f.sev]}`}>
-                <AlertTriangle className="w-3 h-3" />{f.day}: {f.text}
+                <AlertTriangle className="w-3 h-3" />{f.day}: {W(f.text)}
               </span>
             ))}
           </div>
@@ -174,7 +189,7 @@ export const ForecastsTab = () => {
 
         {hourly.length > 0 && (
           <div>
-            <p className="text-[11px] text-slate-500 mb-1">Next 48 hours — temperature (line, °C) and rain (bars, mm per hour)</p>
+            <p className="text-[11px] text-slate-500 mb-1">{t('fc.next48')}</p>
             <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={hourly} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
@@ -184,7 +199,7 @@ export const ForecastsTab = () => {
                   <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: '#64748b' }} width={28} />
                   <Tooltip
                     contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                    formatter={(v, n) => (n === 'temp' ? [`${v} °C`, 'Temperature'] : [`${v} mm`, 'Rain'])}
+                    formatter={(v, n) => (n === 'temp' ? [`${v} °C`, t('fc.temperature')] : [`${v} mm`, t('fc.rain')])}
                   />
                   <Bar yAxisId="r" dataKey="rain" fill="#38bdf8" opacity={0.7} />
                   <Line yAxisId="t" dataKey="temp" stroke="#fb923c" strokeWidth={2} dot={false} />
@@ -201,7 +216,7 @@ export const ForecastsTab = () => {
               const worst = flagged.some(f => f.sev === 'critical') ? 'critical' : flagged.length ? 'warning' : null;
               return (
                 <div key={day} className={`rounded-lg p-1.5 text-center border ${worst ? SEV[worst] : 'border-slate-800 bg-slate-800/40'}`}
-                  title={flagged.map(f => f.text).join(' · ') || wxLabel(d.weather_code[k])}>
+                  title={flagged.map(f => W(f.text)).join(' · ') || W(wxLabel(d.weather_code[k]))}>
                   <p className="text-[10px] text-slate-400">{dayName(day, k)}</p>
                   <p className="text-xl leading-tight">{wxIcon(d.weather_code[k])}</p>
                   <p className="text-xs text-white font-semibold">{Math.round(d.temperature_2m_max[k])}°</p>
@@ -216,8 +231,8 @@ export const ForecastsTab = () => {
 
       {/* ---------- TEAM OUTLOOK ---------- */}
       {!isViewer && (
-        <Card title="Team outlook · next 3 days at each member's last position" icon={Users}>
-          {team.length === 0 && <p className="text-xs text-slate-500">No team positions in the last 48 hours.</p>}
+        <Card title={t('fc.team')} icon={Users}>
+          {team.length === 0 && <p className="text-xs text-slate-500">{t('fc.noTeam')}</p>}
           <div className="space-y-1.5">
             {team.map(m => {
               const dd = m.daily;
@@ -226,7 +241,7 @@ export const ForecastsTab = () => {
                 <div key={m.profile_id} className="flex items-center gap-3 px-3 py-2 bg-slate-800/40 rounded-lg flex-wrap">
                   <div className="w-36 min-w-0">
                     <p className="text-xs text-white font-medium truncate">{m.name}</p>
-                    <p className="text-[10px] text-slate-500">position {ago(m.at)}</p>
+                    <p className="text-[10px] text-slate-500">{t('fc.position', { ago: ago(m.at) })}</p>
                   </div>
                   <div className="flex gap-2">
                     {dd?.time.map((day, k) => (
@@ -239,56 +254,56 @@ export const ForecastsTab = () => {
                   </div>
                   <div className="flex flex-wrap gap-1 flex-1 justify-end">
                     {flags.length === 0
-                      ? <span className="text-[10px] text-green-400">No hazards flagged</span>
+                      ? <span className="text-[10px] text-green-400">{t('fc.noHazards')}</span>
                       : flags.map((f, i) => (
-                        <span key={i} className={`px-1.5 py-0.5 rounded border text-[10px] ${SEV[f.sev]}`}>{f.day}: {f.text}</span>
+                        <span key={i} className={`px-1.5 py-0.5 rounded border text-[10px] ${SEV[f.sev]}`}>{f.day}: {W(f.text)}</span>
                       ))}
                   </div>
                 </div>
               );
             })}
           </div>
-          <p className="text-[10px] text-slate-600">Flags use the same thresholds the tower pushes on — anything red here reaches phones automatically.</p>
+          <p className="text-[10px] text-slate-600">{t('fc.sameThresholds')}</p>
         </Card>
       )}
 
       {/* ---------- SEASON AHEAD ---------- */}
-      <Card title="The season ahead" icon={Waves}
+      <Card title={t('fc.season')} icon={Waves}
         right={<span className="text-[11px] text-slate-500">NOAA CPC · ECMWF SEAS5 via Open-Meteo</span>}>
         {enso?.phase && (
           <div className={`p-3 rounded-lg border ${enso.phase === 'El Niño' ? 'border-orange-500/40 bg-orange-500/10' : enso.phase === 'La Niña' ? 'border-sky-500/40 bg-sky-500/10' : 'border-slate-700 bg-slate-800/40'}`}>
             <p className="text-sm text-white font-semibold">
               {enso.phase}{enso.strength ? ` · ${enso.strength}` : ''}
-              {enso.status && <span className="text-xs font-normal text-slate-300"> — NOAA status: {enso.status}</span>}
+              {enso.status && <span className="text-xs font-normal text-slate-300"> — {t('fc.noaaStatus', { s: W(enso.status) })}</span>}
             </p>
-            {enso.synopsis && <p className="text-xs text-slate-300 mt-1">{enso.synopsis}</p>}
+            {enso.synopsis && <p className="text-xs text-slate-300 mt-1">{W(enso.synopsis)}</p>}
             {enso.oni?.length > 0 && (
               <p className="text-[10px] text-slate-500 mt-1.5">
-                Oceanic Niño Index (3-month): {enso.oni.slice(-6).map(o => `${o.season} ${o.anomaly > 0 ? '+' : ''}${o.anomaly.toFixed(1)}`).join(' · ')}
-                {' · '}<a href={enso.discussion_url} target="_blank" rel="noreferrer" className="text-orange-300 underline">NOAA discussion</a>
+                {t('fc.oni')}: {enso.oni.slice(-6).map(o => `${o.season} ${o.anomaly > 0 ? '+' : ''}${o.anomaly.toFixed(1)}`).join(' · ')}
+                {' · '}<a href={enso.discussion_url} target="_blank" rel="noreferrer" className="text-orange-300 underline">{t('fc.noaaLink')}</a>
               </p>
             )}
           </div>
         )}
-        {seasonErr && <p className="text-xs text-red-400">Seasonal outlook unavailable: {seasonErr}</p>}
-        {!season && !seasonErr && pos && <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />Comparing the 51-member seasonal ensemble with 30 years of climate here…</p>}
+        {seasonErr && <p className="text-xs text-red-400">{t('fc.seasonUnavailable', { e: seasonErr })}</p>}
+        {!season && !seasonErr && pos && <p className="text-xs text-slate-500 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />{t('fc.comparing')}</p>}
         {season && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {season.map(m => {
               const ta = m.tempAnomaly;
               const pr = m.precipRatio;
-              const tWord = ta == null ? '—' : ta >= 1.5 ? 'much warmer' : ta >= 0.5 ? 'warmer' : ta <= -1.5 ? 'much colder' : ta <= -0.5 ? 'colder' : 'near normal';
-              const pWord = pr == null ? '—' : pr >= 1.3 ? 'much wetter' : pr >= 1.1 ? 'wetter' : pr <= 0.7 ? 'much drier' : pr <= 0.9 ? 'drier' : 'near normal';
+              const tWord = ta == null ? '—' : ta >= 1.5 ? t('fc.muchWarmer') : ta >= 0.5 ? t('fc.warmer') : ta <= -1.5 ? t('fc.muchColder') : ta <= -0.5 ? t('fc.colder') : t('fc.nearNormal');
+              const pWord = pr == null ? '—' : pr >= 1.3 ? t('fc.muchWetter') : pr >= 1.1 ? t('fc.wetter') : pr <= 0.7 ? t('fc.muchDrier') : pr <= 0.9 ? t('fc.drier') : t('fc.nearNormal');
               return (
                 <div key={m.month} className="p-3 rounded-lg bg-slate-800/40 border border-slate-700">
                   <p className="text-xs text-white font-semibold">{m.month}</p>
                   <p className="text-[11px] text-slate-300 mt-1">
                     <Thermometer className="inline w-3 h-3 text-orange-300" /> {tWord}
-                    {ta != null && <span className="text-slate-500"> ({ta > 0 ? '+' : ''}{ta.toFixed(1)}°C vs normal)</span>}
+                    {ta != null && <span className="text-slate-500"> ({t('fc.vsNormal', { d: `${ta > 0 ? '+' : ''}${ta.toFixed(1)}` })})</span>}
                   </p>
                   <p className="text-[11px] text-slate-300">
                     <Droplets className="inline w-3 h-3 text-sky-300" /> {pWord}
-                    {pr != null && <span className="text-slate-500"> ({Math.round(m.precip)} mm vs {Math.round(m.precipNormal)} normal)</span>}
+                    {pr != null && <span className="text-slate-500"> ({t('fc.mmVsNormal', { p: Math.round(m.precip), n: Math.round(m.precipNormal) })})</span>}
                   </p>
                 </div>
               );
@@ -296,7 +311,7 @@ export const ForecastsTab = () => {
           </div>
         )}
         <p className="text-[10px] text-slate-600">
-          Seasonal forecasts describe tendencies over weeks, not daily weather — they are for planning staffing and supplies, not for go/no-go calls.
+          {t('fc.seasonNote')}
         </p>
       </Card>
     </div>

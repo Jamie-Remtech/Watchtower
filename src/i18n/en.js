@@ -1,0 +1,77 @@
+// English — the reference dictionary. Every key must exist here.
+export const en = {
+  // navigation
+  'nav.streams': 'Live Streams', 'nav.tactical': 'Tactical Map', 'nav.world': 'World', 'nav.forecasts': 'Forecasts',
+  'nav.log': 'Field Log', 'nav.protocols': 'Protocols', 'nav.comms': 'Comms & Tracking', 'nav.activity': 'Activity',
+  'nav.team': 'Team', 'nav.billing': 'Billing', 'nav.settings': 'Settings', 'nav.platform': 'Platform',
+  // shell
+  'shell.enableNotifications': 'Enable notifications', 'shell.mySettings': 'My settings', 'shell.aiAssistant': 'AI Assistant',
+  'shell.signOut': 'Sign out', 'shell.signedIn': 'Signed in', 'shell.noActiveAlerts': 'No active alerts', 'shell.online': '{n} online',
+  'shell.alerts': '{n} ALERTS', 'shell.tended': '{n} TENDED', 'shell.ok': 'OK', 'shell.attentionQueue': 'Attention queue',
+  // roles
+  'role.viewer': 'Viewer', 'role.field': 'Field Collaborator', 'role.operator': 'Operator', 'role.coordinator': 'Coordinator', 'role.admin': 'Company Admin',
+  // time
+  'time.justNow': 'just now', 'time.minAgo': '{m} min ago', 'time.hAgo': '{h} h ago', 'time.hmAgo': '{h} h {m} min ago', 'time.dAgo': '{d} d ago',
+  // check-in prompt
+  'ci.requested': 'Check-in requested', 'ci.areYouOk': 'Are you OK?', 'ci.positionNote': 'Your answer and current position go to your coordinator.',
+  'ci.ok': "I'M OK", 'ci.help': 'NEED HELP', 'ci.addNote': 'Add a note to a help call (optional)', 'ci.notePh': "What's wrong? Then tap NEED HELP",
+  'ci.sendFail': 'Could not send — try again',
+  // check-in board
+  'cib.title': 'Check-in · personnel accountability', 'cib.request': 'Request check-in', 'cib.everyone': 'Everyone in the company',
+  'cib.team': 'Team: {name}', 'cib.msgPh': 'Optional message — e.g. Wind shift, confirm positions', 'cib.asks': 'Asks {n} members.',
+  'cib.silence': 'Silence turns amber at {a} min and red at {r} min', 'cib.reAlert': ', then the tower re-alerts them',
+  'cib.cancel': 'Cancel', 'cib.send': 'Send now', 'cib.wholeCompany': 'Whole company', 'cib.teamName': 'Team {name}',
+  'cib.asked': 'asked {ago}', 'cib.byTower': ' by the tower', 'cib.ok': '{n} OK', 'cib.help': '{n} HELP', 'cib.waiting': '{n} waiting',
+  'cib.close': 'Close', 'cib.needsHelp': 'NEEDS HELP', 'cib.answeredOk': 'OK', 'cib.noAnswer': 'no answer · {m} min',
+  'cib.none': 'No members to ask in this group.', 'cib.lastClosed': 'Last check-in closed {ago}.', 'cib.call': 'Call {phone}',
+  // notification center
+  'ns.title': 'My notifications', 'ns.enable': 'Enable notifications on this device', 'ns.enabled': 'This device receives alerts',
+  'ns.what': 'What reaches me', 'ns.always': 'Check-ins and life-safety criticals always reach you — switching their category off makes them arrive silently instead.',
+  'ns.how': 'How alert I want to be', 'ns.sound': 'My alert sound', 'ns.preview': 'Preview',
+  'ns.soundNote': 'Plays inside Watchtower and sets your vibration pattern. While the app is closed, phones use their own notification tone until the native Watchtower app ships.',
+  'ns.test': 'Send me a test alert', 'ns.sending': 'Sending…', 'ns.noDevice': 'No device registered for push yet — enable notifications on this device first.',
+  'ns.sent': 'Sent to {n} device(s).', 'ns.failed': 'Could not send: {e}',
+  'ns.language': 'My language', 'ns.languageNote': 'Watchtower shows its screens in your language and translates what your team writes — messages, alerts, notes — automatically.',
+  'ns.partialUi': '* Screens stay in English for now in these languages — everything your team writes is still translated into yours.',
+  'cat.hazard': 'Hazards', 'cat.hazard.d': 'Wildfires, earthquakes, cascade warnings',
+  'cat.weather': 'Weather', 'cat.weather.d': 'Radar, rain nowcast, forward outlook',
+  'cat.comms': 'Messages', 'cat.comms.d': 'Team chat in Comms',
+  'cat.protocols': 'Protocols', 'cat.protocols.d': 'Playbook runs started for the team',
+  'cat.briefs': 'Daily brief', 'cat.briefs.d': 'Your morning forecast at your position',
+  'lvl.all': 'Everything', 'lvl.all.d': 'Info, warnings and criticals',
+  'lvl.warnings': 'Warnings and up', 'lvl.warnings.d': 'Skip informational items',
+  'lvl.critical': 'Criticals only', 'lvl.critical.d': 'Only life-safety alerts',
+  'snd.standard': 'Standard', 'snd.standard.d': 'Two-tone alert', 'snd.siren': 'Watchtower siren', 'snd.siren.d': 'Rising sweep, impossible to miss',
+  'snd.chime': 'Chime', 'snd.chime.d': 'Soft three-note bell', 'snd.pulse': 'Pulse', 'snd.pulse.d': 'Short rapid beeps',
+  'snd.vibrate': 'Vibrate only', 'snd.vibrate.d': 'No sound in the app',
+  // attention panel
+  'ap.title': 'Attention', 'ap.counts': '{o} open · {a} acknowledged', 'ap.checked': ' · checked {ago}', 'ap.runChecks': 'Run checks now',
+  'ap.allQuiet': 'All quiet', 'ap.watching': 'Devices, nearby hazards, weather, and admin items are being watched.',
+  'ap.acknowledge': 'Acknowledge', 'ap.runProtocol': 'Run protocol', 'ap.acknowledged': 'Acknowledged', 'ap.ackAgo': 'acknowledged {ago}',
+  'ap.footer': 'Watching: device health · NASA EONET hazards · USGS seismic · radar · Open-Meteo weather · invitations',
+  'ap.translated': 'translated', 'sev.critical': 'CRITICAL', 'sev.warning': 'WARNING', 'sev.info': 'INFO',
+  // comms
+  'comms.title': 'Comms', 'comms.online': '· {n} online', 'comms.empty': 'The org channel is open. Say something — everyone field-and-up sees it instantly, on every device.',
+  'comms.placeholder': 'Message the team…', 'comms.listening': 'Listening…', 'comms.translatedFrom': 'translated from {lang}',
+  'comms.showOriginal': 'original', 'comms.showTranslation': 'translation',
+  // forecasts
+  'fc.title': 'Forecasts', 'fc.myLocation': 'My location', 'fc.my': 'My forecast', 'fc.myAt': 'My forecast · {place}', 'fc.updated': 'updated {time} · Open-Meteo',
+  'fc.reading': 'Reading the sky at your position…', 'fc.feels': 'feels {t}°', 'fc.gusts': '{w} km/h, gusts {g}',
+  'fc.next48': 'Next 48 hours — temperature (line, °C) and rain (bars, mm per hour)', 'fc.temperature': 'Temperature', 'fc.rain': 'Rain',
+  'fc.today': 'Today', 'fc.tomorrow': 'Tomorrow', 'fc.team': "Team outlook · next 3 days at each member's last position",
+  'fc.noTeam': 'No team positions in the last 48 hours.', 'fc.position': 'position {ago}', 'fc.noHazards': 'No hazards flagged',
+  'fc.sameThresholds': 'Flags use the same thresholds the tower pushes on — anything red here reaches phones automatically.',
+  'fc.season': 'The season ahead', 'fc.noaaStatus': 'NOAA status: {s}', 'fc.oni': 'Oceanic Niño Index (3-month)', 'fc.noaaLink': 'NOAA discussion',
+  'fc.seasonUnavailable': 'Seasonal outlook unavailable: {e}', 'fc.comparing': 'Comparing the 51-member seasonal ensemble with 30 years of climate here…',
+  'fc.vsNormal': '{d}°C vs normal', 'fc.mmVsNormal': '{p} mm vs {n} normal',
+  'fc.muchWarmer': 'much warmer', 'fc.warmer': 'warmer', 'fc.muchColder': 'much colder', 'fc.colder': 'colder', 'fc.nearNormal': 'near normal',
+  'fc.muchWetter': 'much wetter', 'fc.wetter': 'wetter', 'fc.muchDrier': 'much drier', 'fc.drier': 'drier',
+  'fc.seasonNote': 'Seasonal forecasts describe tendencies over weeks, not daily weather — they are for planning staffing and supplies, not for go/no-go calls.',
+  'fc.locErr': 'Location permission needed — tap the button and allow it', 'fc.noLoc': 'This device cannot share its location',
+  // login
+  'login.tagline': 'Tactical coordination hub', 'login.signIn': 'Sign in', 'login.magic': 'Magic link', 'login.invite': 'Join with invite',
+  'login.code': 'Invitation code', 'login.name': 'Your name', 'login.email': 'Email', 'login.password': 'Password',
+  'login.sendMagic': 'Send magic link', 'login.create': 'Create account', 'login.magicSent': 'Check your email — your sign-in link is on its way.',
+  'login.created': 'Account created. Check your email to confirm, then sign in.', 'login.provisioned': "Access is provisioned by your organization's administrator.",
+  'login.error': 'Something went wrong.',
+};

@@ -18,7 +18,10 @@ export const useSpeech = ({ onFinal }) => {
     const rec = new SR();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = navigator.language || 'en-US';
+    // Listen in the member's Watchtower language (set on <html lang>)
+    const ui = document.documentElement.lang || 'en';
+    const nav = navigator.language || 'en-US';
+    rec.lang = nav.toLowerCase().startsWith(ui) ? nav : ({ en: 'en-US', fr: 'fr-CA', es: 'es-MX', pt: 'pt-BR' }[ui] ?? ui);
     rec.onresult = (e) => {
       let interimText = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {

@@ -6,6 +6,8 @@ import { CATEGORIES, LEVELS, SOUNDS, withDefaults } from '../lib/notifyPrefs';
 import { playAlert } from '../lib/alertSound';
 import { enableNotifications, notificationPermission } from '../lib/push';
 import { logEvent } from '../lib/eventLog';
+import { useI18n, LANGUAGES, hasDictionary } from '../i18n/index.jsx';
+import { Languages } from 'lucide-react';
 
 // Each member's own notification center: what reaches them, from what
 // severity up, and how it sounds. Check-ins and life-safety criticals
@@ -18,6 +20,13 @@ export const NotificationSettings = () => {
   const [error, setError] = useState(null);
   const [testNote, setTestNote] = useState(null);
   const [perm, setPerm] = useState(notificationPermission());
+  const { t, lang, setDeviceLang } = useI18n();
+
+  const saveLanguage = async (code) => {
+    setDeviceLang(code);
+    const { error: err } = await supabase.from('profiles').update({ language: code }).eq('id', session?.user?.id);
+    if (err) setError(err.message); else { reloadProfile?.(); logEvent('member.language_changed', { language: code }); }
+  };
 
   useEffect(() => { setPrefs(withDefaults(profile?.notification_prefs)); }, [profile?.notification_prefs]);
 
@@ -37,7 +46,7 @@ export const NotificationSettings = () => {
   };
 
   const sendTest = async () => {
-    setTestNote('Sending…');
+    setTestNote(t('ns.sending'));
     const { data, error: err } = await supabase.functions.invoke('push-notify', {
       body: {
         kind: 'attention', category: 'hazard', severity: 'critical',
@@ -45,9 +54,9 @@ export const NotificationSettings = () => {
         url: '/', tag: 'self-test', profile_ids: [session?.user?.id],
       },
     });
-    if (err || data?.error) setTestNote(`Could not send: ${err?.message ?? data.error}`);
-    else if (!data?.sent) setTestNote('No device registered for push yet — enable notifications on this device first.');
-    else setTestNote(`Sent to ${data.sent} device${data.sent > 1 ? 's' : ''}.`);
+    if (err || data?.error) setTestNote(t('ns.failed', { e: err?.message ?? data.error }));
+    else if (!data?.sent) setTestNote(t('ns.noDevice'));
+    else setTestNote(t('ns.sent', { n: data.sent }));
   };
 
   const row = 'flex items-start gap-2.5 p-2.5 rounded-lg border';
@@ -56,7 +65,7 @@ export const NotificationSettings = () => {
     <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <Bell className="w-4 h-4 text-orange-400" />My notifications
+          <Bell className="w-4 h-4 text-orange-400" />{t('ns.title')}
           {busy && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
           {saved && <Check className="w-3.5 h-3.5 text-green-400" />}
         </h3>
@@ -64,14 +73,27 @@ export const NotificationSettings = () => {
           <button
             onClick={async () => { await enableNotifications(); setPerm(notificationPermission()); }}
             className="px-3 py-1.5 bg-sky-500/20 border border-sky-500/40 text-sky-300 rounded-lg text-xs font-medium"
-          >Enable notifications on this device</button>
+          >{t('ns.enable')}</button>
         ) : (
-          <span className="text-[11px] text-green-400">This device receives alerts</span>
+          <span className="text-[11px] text-green-400">{t('ns.enabled')}</span>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-[11px] text-slate-500 uppercase tracking-wide">What reaches me</p>
+        <p className="text-[11px] text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><Languages className="w-3.5 h-3.5" />{t('ns.language')}</p>
+        <select
+          value={lang}
+          onChange={e => saveLanguage(e.target.value)}
+          className="w-full sm:w-64 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-orange-500"
+        >
+          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}{hasDictionary(l.code) ? '' : ' *'}</option>)}
+        </select>
+        <p className="text-[10px] text-slate-500">{t('ns.languageNote')}</p>
+        <p className="text-[10px] text-slate-600">{t('ns.partialUi')}</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-[11px] text-slate-500 uppercase tracking-wide">{t('ns.what')}</p>
         {CATEGORIES.map(c => (
           <label key={c.id} className={`${row} cursor-pointer ${prefs.categories[c.id] ? 'border-slate-700 bg-slate-800/40' : 'border-slate-800 opacity-70'}`}>
             <input
@@ -81,18 +103,18 @@ export const NotificationSettings = () => {
               className="mt-0.5 accent-orange-500"
             />
             <span className="min-w-0">
-              <span className="block text-xs text-white font-medium">{c.label}</span>
-              <span className="block text-[10px] text-slate-500">{c.desc}</span>
+              <span className="block text-xs text-white font-medium">{t(`cat.${c.id}`)}</span>
+              <span className="block text-[10px] text-slate-500">{t(`cat.${c.id}.d`)}</span>
             </span>
           </label>
         ))}
         <p className="text-[10px] text-slate-500">
-          Check-ins and life-safety criticals always reach you — switching their category off makes them arrive silently instead.
+          {t('ns.always')}
         </p>
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-[11px] text-slate-500 uppercase tracking-wide">How alert I want to be</p>
+        <p className="text-[11px] text-slate-500 uppercase tracking-wide">{t('ns.how')}</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
           {LEVELS.map(l => (
             <button
@@ -100,36 +122,36 @@ export const NotificationSettings = () => {
               onClick={() => save({ ...prefs, level: l.id })}
               className={`text-left p-2.5 rounded-lg border ${prefs.level === l.id ? 'border-orange-500/50 bg-orange-500/10' : 'border-slate-700 bg-slate-800/40'}`}
             >
-              <span className="block text-xs text-white font-medium">{l.label}</span>
-              <span className="block text-[10px] text-slate-500">{l.desc}</span>
+              <span className="block text-xs text-white font-medium">{t(`lvl.${l.id}`)}</span>
+              <span className="block text-[10px] text-slate-500">{t(`lvl.${l.id}.d`)}</span>
             </button>
           ))}
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-[11px] text-slate-500 uppercase tracking-wide">My alert sound</p>
+        <p className="text-[11px] text-slate-500 uppercase tracking-wide">{t('ns.sound')}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           {SOUNDS.map(snd => (
             <div key={snd.id} className={`flex items-center gap-2 p-2.5 rounded-lg border ${prefs.sound === snd.id ? 'border-orange-500/50 bg-orange-500/10' : 'border-slate-700 bg-slate-800/40'}`}>
               <button onClick={() => save({ ...prefs, sound: snd.id })} className="flex-1 text-left min-w-0">
-                <span className="block text-xs text-white font-medium">{snd.label}</span>
-                <span className="block text-[10px] text-slate-500">{snd.desc}</span>
+                <span className="block text-xs text-white font-medium">{t(`snd.${snd.id}`)}</span>
+                <span className="block text-[10px] text-slate-500">{t(`snd.${snd.id}.d`)}</span>
               </button>
-              <button onClick={() => playAlert(snd.id)} className="p-1.5 text-slate-400 hover:text-orange-300" title="Preview">
+              <button onClick={() => playAlert(snd.id)} className="p-1.5 text-slate-400 hover:text-orange-300" title={t('ns.preview')}>
                 <Volume2 className="w-4 h-4" />
               </button>
             </div>
           ))}
         </div>
         <p className="text-[10px] text-slate-500">
-          Plays inside Watchtower and sets your vibration pattern. While the app is closed, phones use their own notification tone until the native Watchtower app ships.
+          {t('ns.soundNote')}
         </p>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={sendTest} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 flex items-center gap-1.5 hover:border-orange-500/40">
-          <Send className="w-3.5 h-3.5" />Send me a test alert
+          <Send className="w-3.5 h-3.5" />{t('ns.test')}
         </button>
         {testNote && <span className="text-[11px] text-slate-400">{testNote}</span>}
         {error && <span className="text-[11px] text-red-400">{error}</span>}

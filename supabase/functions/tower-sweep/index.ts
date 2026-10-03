@@ -64,6 +64,61 @@ const haversine = (a: { lat: number; lng: number }, b: { lat: number; lng: numbe
   return 2 * KM * Math.asin(Math.sqrt(s));
 };
 
+// Push texts in each recipient's language: per-company cache first
+// (same table the app uses), then one Claude call per language.
+const fnv = (s: string) => {
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < s.length; i++) { h ^= BigInt(s.charCodeAt(i)); h = (h * 0x100000001b3n) & 0xffffffffffffffffn; }
+  return h.toString(16);
+};
+const trCache = new Map<string, string>();
+async function translateTexts(texts: string[], lang: string, orgId: string, supaUrl: string, svc: string): Promise<string[]> {
+  if (!lang || lang === 'en') return texts;
+  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  const out = [...texts];
+  const todo: number[] = [];
+  texts.forEach((t, i) => { const k = `${orgId}|${lang}|${fnv(t)}`; if (trCache.has(k)) out[i] = trCache.get(k)!; else todo.push(i); });
+  if (!todo.length) return out;
+  const hashes = todo.map(i => fnv(texts[i]));
+  try {
+    const rows = await (await fetch(`${supaUrl}/rest/v1/translations?org_id=eq.${orgId}&lang=eq.${lang}&src_hash=in.(${hashes.join(',')})&select=src_hash,text`, {
+      headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+    })).json();
+    for (const r of Array.isArray(rows) ? rows : []) trCache.set(`${orgId}|${lang}|${r.src_hash}`, r.text);
+  } catch { /* cache unavailable */ }
+  const missing = todo.filter(i => !trCache.has(`${orgId}|${lang}|${fnv(texts[i])}`));
+  if (missing.length && key) {
+    try {
+      const list = missing.map(i => texts[i]);
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5', max_tokens: 1500,
+          messages: [{ role: 'user', content: `Translate each item of this JSON array into the language with code "${lang}". Emergency-responder alerts: be faithful and terse; keep numbers, units, times, place names and people's names exactly. Respond with STRICT JSON only: {"translations":[...]} same length and order.\n\n${JSON.stringify(list)}` }],
+        }),
+      });
+      const data = await r.json();
+      const txt = (data?.content ?? []).filter((c: { text?: string }) => typeof c.text === 'string').map((c: { text: string }) => c.text).join('');
+      const m = txt.replace(/```(?:json)?/gi, '').match(/\{[\s\S]*\}/);
+      const tr = m ? JSON.parse(m[0]).translations : null;
+      if (Array.isArray(tr) && tr.length === list.length) {
+        const rows = missing.map((i, j) => {
+          trCache.set(`${orgId}|${lang}|${fnv(texts[i])}`, String(tr[j]));
+          return { org_id: orgId, src_hash: fnv(texts[i]), lang, text: String(tr[j]) };
+        });
+        await fetch(`${supaUrl}/rest/v1/translations`, {
+          method: 'POST',
+          headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify(rows),
+        });
+      }
+    } catch { /* translation unavailable — originals go out */ }
+  }
+  todo.forEach(i => { out[i] = trCache.get(`${orgId}|${lang}|${fnv(texts[i])}`) ?? texts[i]; });
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
@@ -94,7 +149,7 @@ Deno.serve(async (req) => {
     const dayCut = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
     const [orgs, profiles, positions, devices, existing, subs] = await Promise.all([
       q('organizations?select=id,name,settings'),
-      q('profiles?select=id,display_name,org_id,role,team_id,notification_prefs'),
+      q('profiles?select=id,display_name,org_id,role,team_id,notification_prefs,language'),
       q(`positions?select=profile_id,org_id,lat,lng,at&at=gte.${dayCut}&order=at.desc&limit=2000`),
       q('devices?select=org_id,lat,lng,name'),
       q('attention_items?select=org_id,dedupe_key&status=neq.resolved'),
@@ -228,13 +283,22 @@ Deno.serve(async (req) => {
       severity: string,
     ) => {
       if (!appServer) return;
+      const langOf: Record<string, string> = Object.fromEntries(
+        (profiles ?? []).map((p: { id: string; language: string | null }) => [p.id, p.language ?? 'en']));
+      const byLang: Record<string, string[]> = {};
+      for (const sub of list) {
+        const lang = langOf[sub.profile_id] ?? 'en';
+        if (!byLang[lang]) byLang[lang] = await translateTexts([msg.title, msg.body], lang, sub.org_id, supaUrl, svc);
+      }
       for (const sub of list) {
         const prefs = prefsOf[sub.profile_id] ?? {};
+        const [tTitle, tBody] = byLang[langOf[sub.profile_id] ?? 'en'] ?? [msg.title, msg.body];
         const { deliver, silent } = shouldDeliver(prefs, category, severity);
         if (!deliver) continue;
         const sound = prefs.sound ?? 'standard';
         const message = JSON.stringify({
-          url: '/', ...msg, category, severity, silent, sound, vibrate: VIBRATE[sound] ?? VIBRATE.standard,
+          url: '/', ...msg, title: tTitle || msg.title, body: tBody || msg.body,
+          category, severity, silent, sound, vibrate: VIBRATE[sound] ?? VIBRATE.standard,
         });
         try {
           await appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }).pushTextMessage(message, {});

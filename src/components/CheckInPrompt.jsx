@@ -3,6 +3,8 @@ import { ShieldCheck, LifeBuoy, Loader2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { playAlert } from '../lib/alertSound';
 import { withDefaults } from '../lib/notifyPrefs';
+import { useI18n } from '../i18n/index.jsx';
+import { useTranslations } from '../lib/translate';
 
 const MAX_AGE_MS = 3 * 3600 * 1000; // a check-in older than 3 h no longer interrupts
 
@@ -17,6 +19,7 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
   const [note, setNote] = useState('');
   const [showNote, setShowNote] = useState(false);
   const played = useRef(new Set());
+  const { t, lang } = useI18n();
 
   // Arriving from a check-in push: /?checkin=<id> — tidy the URL
   useEffect(() => {
@@ -44,6 +47,8 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
     }
   }, [pending, profile?.notification_prefs]);
 
+  const msgTr = useTranslations(pending?.message ? [pending.message] : [], lang, Boolean(pending?.message));
+
   if (!pending) return null;
 
   const answer = async (status) => {
@@ -54,7 +59,7 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
       setNote('');
       setShowNote(false);
     } catch (e) {
-      setError(e.message ?? 'Could not send — try again');
+      setError(e.message ?? t('ci.sendFail'));
     }
     setBusy(null);
   };
@@ -62,10 +67,10 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950/95 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4 text-center">
-        <p className="text-xs uppercase tracking-widest text-orange-400 font-bold">Check-in requested</p>
-        <h2 className="text-2xl font-bold text-white">Are you OK?</h2>
-        {pending.message && <p className="text-sm text-slate-300">“{pending.message}”</p>}
-        <p className="text-[11px] text-slate-500">Your answer and current position go to your coordinator.</p>
+        <p className="text-xs uppercase tracking-widest text-orange-400 font-bold">{t('ci.requested')}</p>
+        <h2 className="text-2xl font-bold text-white">{t('ci.areYouOk')}</h2>
+        {pending.message && <p className="text-sm text-slate-300">“{msgTr[pending.message] ?? pending.message}”</p>}
+        <p className="text-[11px] text-slate-500">{t('ci.positionNote')}</p>
 
         <button
           onClick={() => answer('ok')}
@@ -73,7 +78,7 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
           className="w-full py-8 rounded-2xl bg-green-600 hover:bg-green-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
         >
           {busy === 'ok' ? <Loader2 className="w-8 h-8 animate-spin" /> : <ShieldCheck className="w-8 h-8" />}
-          I'M OK
+          {t('ci.ok')}
         </button>
 
         <button
@@ -82,19 +87,19 @@ export const CheckInPrompt = ({ checkins, responses, respond }) => {
           className="w-full py-8 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white text-2xl font-bold flex items-center justify-center gap-3 disabled:opacity-60"
         >
           {busy === 'help' ? <Loader2 className="w-8 h-8 animate-spin" /> : <LifeBuoy className="w-8 h-8" />}
-          NEED HELP
+          {t('ci.help')}
         </button>
         {showNote ? (
           <input
             autoFocus
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder="What's wrong? Then tap NEED HELP"
+            placeholder={t('ci.notePh')}
             className="w-full px-4 py-3 bg-slate-800 border border-red-500/40 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none"
           />
         ) : (
           <button onClick={() => setShowNote(true)} className="text-xs text-slate-400 underline">
-            Add a note to a help call (optional)
+            {t('ci.addNote')}
           </button>
         )}
         {error && <p className="text-sm text-red-400">{error}</p>}

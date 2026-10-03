@@ -47,7 +47,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
       const context = await gatherContext();
       const history = messages.slice(-6);
       const { data, error } = await supabase.functions.invoke('field-assist', {
-        body: { mode: 'ask', question: q, context, history },
+        body: { mode: 'ask', question: q, context, history, language: document.documentElement.lang || 'en' },
       });
       if (error || (!data?.answer && !data?.actions?.length)) throw error ?? new Error(data?.error ?? 'no answer');
       if (data.answer) {

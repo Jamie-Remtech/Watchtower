@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Mail, KeyRound, Ticket, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { LogoMark } from '../components/common';
+import { useI18n, LANGUAGES } from '../i18n/index.jsx';
 
 // Three onboarding paths: password sign-in, magic link, invitation-code signup.
 const MODES = [
-  { id: 'password', label: 'Sign in' },
-  { id: 'magic', label: 'Magic link' },
-  { id: 'invite', label: 'Join with invite' },
+  { id: 'password', label: 'login.signIn' },
+  { id: 'magic', label: 'login.magic' },
+  { id: 'invite', label: 'login.invite' },
 ];
 
 // A ?join=CODE link (from the invite QR) opens sign-up with the code filled in
@@ -17,6 +18,7 @@ const joinParam = typeof window !== 'undefined'
 
 export const LoginScreen = () => {
   const { signInWithPassword, signInWithMagicLink, signUpWithInvite } = useAuth();
+  const { t, lang, setDeviceLang } = useI18n();
   const [mode, setMode] = useState(joinParam ? 'invite' : 'password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,14 +40,14 @@ export const LoginScreen = () => {
       } else if (mode === 'magic') {
         const { error } = await signInWithMagicLink(email);
         if (error) throw error;
-        setNotice('Check your email — your sign-in link is on its way.');
+        setNotice(t('login.magicSent'));
       } else {
         const { error } = await signUpWithInvite(email, password, inviteCode.trim(), displayName.trim());
         if (error) throw error;
-        setNotice('Account created. Check your email to confirm, then sign in.');
+        setNotice(t('login.created'));
       }
     } catch (err) {
-      setError(err.message ?? 'Something went wrong.');
+      setError(err.message ?? t('login.error'));
     } finally {
       setBusy(false);
     }
@@ -63,7 +65,7 @@ export const LoginScreen = () => {
             <span className="text-slate-100">tower</span>
           </span>
         </div>
-        <p className="text-center text-slate-500 text-xs mb-6">Tactical coordination hub</p>
+        <p className="text-center text-slate-500 text-xs mb-6">{t('login.tagline')}</p>
 
         <div className="flex gap-1 mb-4 bg-slate-900 border border-slate-800 rounded-lg p-1">
           {MODES.map((m) => (
@@ -74,7 +76,7 @@ export const LoginScreen = () => {
                 mode === m.id ? 'bg-orange-500/20 text-orange-400' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              {m.label}
+              {t(m.label)}
             </button>
           ))}
         </div>
@@ -84,21 +86,21 @@ export const LoginScreen = () => {
             <>
               <div className="relative">
                 <Ticket className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                <input className={`${input} pl-9`} placeholder="Invitation code" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required />
+                <input className={`${input} pl-9`} placeholder={t('login.code')} value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required />
               </div>
-              <input className={input} placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+              <input className={input} placeholder={t('login.name')} value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
             </>
           )}
 
           <div className="relative">
             <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-            <input className={`${input} pl-9`} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className={`${input} pl-9`} type="email" placeholder={t('login.email')} value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
 
           {mode !== 'magic' && (
             <div className="relative">
               <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              <input className={`${input} pl-9`} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+              <input className={`${input} pl-9`} type="password" placeholder={t('login.password')} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             </div>
           )}
 
@@ -111,13 +113,23 @@ export const LoginScreen = () => {
             className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === 'password' ? 'Sign in' : mode === 'magic' ? 'Send magic link' : 'Create account'}
+            {mode === 'password' ? t('login.signIn') : mode === 'magic' ? t('login.sendMagic') : t('login.create')}
           </button>
         </form>
 
         <p className="text-center text-slate-600 text-xs mt-4">
-          Access is provisioned by your organization&apos;s administrator.
+          {t('login.provisioned')}
         </p>
+        <div className="flex justify-center mt-3">
+          <select
+            value={lang}
+            onChange={e => setDeviceLang(e.target.value)}
+            className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-400 focus:outline-none"
+            aria-label="Language"
+          >
+            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+          </select>
+        </div>
       </div>
     </div>
   );

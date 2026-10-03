@@ -10,6 +10,8 @@ import { pushToTeam } from '../lib/push';
 import { allowedTabs } from '../auth/roles';
 import { CheckInBoard } from '../components/CheckInBoard';
 import { useCheckinsShared } from '../hooks/useCheckins';
+import { useI18n, langName } from '../i18n/index.jsx';
+import { useTranslations } from '../lib/translate';
 
 // ============================================
 // COMMS — the org channel
@@ -24,6 +26,8 @@ export const CommsTab = () => {
   const { liveMembers, teams } = useTeam();
   const onlineIds = usePresence();
   const checkinsShared = useCheckinsShared();
+  const { t, lang } = useI18n();
+  const [showOriginal, setShowOriginal] = useState(() => new Set());
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -75,7 +79,7 @@ export const CommsTab = () => {
       org = prof?.org_id;
       if (org) localStorage.setItem('watchtower-org-id', org);
     }
-    const { error: err } = await supabase.from('messages').insert({ org_id: org, sender: myId, text: body });
+    const { error: err } = await supabase.from('messages').insert({ org_id: org, sender: myId, text: body, lang });
     if (err) {
       setError(/does not exist/i.test(err.message)
         ? 'Messages table missing — run migration 0010 in the Supabase SQL Editor.'
@@ -102,12 +106,16 @@ export const CommsTab = () => {
 
   const onlineCount = liveMembers.filter(m => onlineIds.has(m.id)).length;
 
+  // Others' messages written in another language are shown in mine
+  const foreign = messages.filter(m => m.sender !== myId && (m.lang ?? 'en') !== lang).map(m => m.text);
+  const tr = useTranslations(foreign, lang, foreign.length > 0);
+
   return (
     <div className="max-w-2xl mx-auto h-full flex flex-col gap-3">
       <div className="flex items-center justify-between flex-shrink-0">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Radio className="w-6 h-6 text-orange-400" />
-          Comms
+          {t('comms.title')}
         </h2>
         <div className="flex items-center gap-2">
           {liveMembers.map(m => (
@@ -116,7 +124,7 @@ export const CommsTab = () => {
               {m.name.split(' ')[0]}
             </span>
           ))}
-          <span className="text-[10px] text-slate-600">· {onlineCount} online</span>
+          <span className="text-[10px] text-slate-600">{t('comms.online', { n: onlineCount })}</span>
         </div>
       </div>
 
@@ -138,7 +146,7 @@ export const CommsTab = () => {
       <div ref={scrollRef} className="flex-1 min-h-[300px] overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-xl p-3 space-y-2">
         {messages.length === 0 && !error && (
           <p className="text-xs text-slate-500 text-center py-8">
-            The org channel is open. Say something — everyone field-and-up sees it instantly, on every device.
+            {t('comms.empty')}
           </p>
         )}
         {error && <p className="text-xs text-red-400 text-center py-4">{error}</p>}
@@ -152,8 +160,28 @@ export const CommsTab = () => {
                 {!mine && (
                   <p className="text-[10px] font-semibold text-orange-300">{nameOf[m.sender] ?? 'Team'}</p>
                 )}
-                <p className="text-sm text-slate-100 whitespace-pre-wrap break-words">{m.text}</p>
-                <p className="text-[9px] text-slate-500 mt-0.5 text-right">{timeStr(m.at)}</p>
+                {(() => {
+                  const isForeign = !mine && (m.lang ?? 'en') !== lang;
+                  const translated = isForeign ? tr[m.text] : null;
+                  const original = showOriginal.has(m.id);
+                  const shown = translated && translated !== m.text && !original ? translated : m.text;
+                  return (
+                    <>
+                      <p className="text-sm text-slate-100 whitespace-pre-wrap break-words">{shown}</p>
+                      <p className="text-[9px] text-slate-500 mt-0.5 text-right">
+                        {translated && translated !== m.text && (
+                          <button
+                            onClick={() => setShowOriginal(prev => { const n = new Set(prev); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })}
+                            className="mr-2 underline text-sky-400/80"
+                          >
+                            {original ? t('comms.showTranslation') : `${t('comms.translatedFrom', { lang: langName(m.lang ?? 'en') })} · ${t('comms.showOriginal')}`}
+                          </button>
+                        )}
+                        {timeStr(m.at)}
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -176,7 +204,7 @@ export const CommsTab = () => {
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send(); }}
-          placeholder={listening ? 'Listening — speak your message…' : `Message the team${profile?.display_name ? ` as ${profile.display_name}` : ''}…`}
+          placeholder={listening ? t('comms.listening') : t('comms.placeholder')}
           className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
         />
         <button

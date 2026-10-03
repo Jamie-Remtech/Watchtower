@@ -44,6 +44,61 @@ const shouldDeliver = (prefs: Prefs, category: string, severity: string) => {
   return { deliver: true, silent: false };
 };
 
+// Push texts in each recipient's language: per-company cache first
+// (same table the app uses), then one Claude call per language.
+const fnv = (s: string) => {
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < s.length; i++) { h ^= BigInt(s.charCodeAt(i)); h = (h * 0x100000001b3n) & 0xffffffffffffffffn; }
+  return h.toString(16);
+};
+const trCache = new Map<string, string>();
+async function translateTexts(texts: string[], lang: string, orgId: string, supaUrl: string, svc: string): Promise<string[]> {
+  if (!lang || lang === 'en') return texts;
+  const key = Deno.env.get('ANTHROPIC_API_KEY');
+  const out = [...texts];
+  const todo: number[] = [];
+  texts.forEach((t, i) => { const k = `${orgId}|${lang}|${fnv(t)}`; if (trCache.has(k)) out[i] = trCache.get(k)!; else todo.push(i); });
+  if (!todo.length) return out;
+  const hashes = todo.map(i => fnv(texts[i]));
+  try {
+    const rows = await (await fetch(`${supaUrl}/rest/v1/translations?org_id=eq.${orgId}&lang=eq.${lang}&src_hash=in.(${hashes.join(',')})&select=src_hash,text`, {
+      headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+    })).json();
+    for (const r of Array.isArray(rows) ? rows : []) trCache.set(`${orgId}|${lang}|${r.src_hash}`, r.text);
+  } catch { /* cache unavailable */ }
+  const missing = todo.filter(i => !trCache.has(`${orgId}|${lang}|${fnv(texts[i])}`));
+  if (missing.length && key) {
+    try {
+      const list = missing.map(i => texts[i]);
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5', max_tokens: 1500,
+          messages: [{ role: 'user', content: `Translate each item of this JSON array into the language with code "${lang}". Emergency-responder alerts: be faithful and terse; keep numbers, units, times, place names and people's names exactly. Respond with STRICT JSON only: {"translations":[...]} same length and order.\n\n${JSON.stringify(list)}` }],
+        }),
+      });
+      const data = await r.json();
+      const txt = (data?.content ?? []).filter((c: { text?: string }) => typeof c.text === 'string').map((c: { text: string }) => c.text).join('');
+      const m = txt.replace(/```(?:json)?/gi, '').match(/\{[\s\S]*\}/);
+      const tr = m ? JSON.parse(m[0]).translations : null;
+      if (Array.isArray(tr) && tr.length === list.length) {
+        const rows = missing.map((i, j) => {
+          trCache.set(`${orgId}|${lang}|${fnv(texts[i])}`, String(tr[j]));
+          return { org_id: orgId, src_hash: fnv(texts[i]), lang, text: String(tr[j]) };
+        });
+        await fetch(`${supaUrl}/rest/v1/translations`, {
+          method: 'POST',
+          headers: { apikey: svc, Authorization: `Bearer ${svc}`, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify(rows),
+        });
+      }
+    } catch { /* translation unavailable — originals go out */ }
+  }
+  todo.forEach(i => { out[i] = trCache.get(`${orgId}|${lang}|${fnv(texts[i])}`) ?? texts[i]; });
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -90,11 +145,19 @@ Deno.serve(async (req) => {
     if (subs.length === 0) return json({ sent: 0, failed: 0, note: 'no subscribed devices' });
 
     const prefRows = await q(
-      `profiles?org_id=eq.${orgId}&select=id,notification_prefs`
+      `profiles?org_id=eq.${orgId}&select=id,notification_prefs,language`
     );
     const prefsOf: Record<string, Prefs> = Object.fromEntries(
       (Array.isArray(prefRows) ? prefRows : []).map((p: { id: string; notification_prefs: Prefs }) => [p.id, p.notification_prefs ?? {}])
     );
+    const langOf: Record<string, string> = Object.fromEntries(
+      (Array.isArray(prefRows) ? prefRows : []).map((p: { id: string; language: string | null }) => [p.id, p.language ?? 'en'])
+    );
+    // Translate title + body once per recipient language
+    const textsByLang: Record<string, string[]> = {};
+    for (const lang of new Set(subs.map((s: { profile_id: string }) => langOf[s.profile_id] ?? 'en'))) {
+      textsByLang[lang] = await translateTexts([String(title ?? ''), String(body ?? '')], lang, orgId, supaUrl, svc);
+    }
 
     const vapidKeys = await webpush.importVapidKeys(JSON.parse(vapidJson), { extractable: false });
     const appServer = await webpush.ApplicationServer.new({
@@ -108,7 +171,8 @@ Deno.serve(async (req) => {
       const { deliver, silent } = shouldDeliver(prefs, category, severity);
       if (!deliver) { filtered++; continue; }
       const sound = prefs.sound ?? 'standard';
-      const message = JSON.stringify({ title, body, url, kind, tag, category, severity, silent, sound, vibrate: VIBRATE[sound] ?? VIBRATE.standard });
+      const [tTitle, tBody] = textsByLang[langOf[s.profile_id] ?? 'en'] ?? [title, body];
+      const message = JSON.stringify({ title: tTitle || title, body: tBody || body, url, kind, tag, category, severity, silent, sound, vibrate: VIBRATE[sound] ?? VIBRATE.standard });
       try {
         const subscriber = appServer.subscribe({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } });
         await subscriber.pushTextMessage(message, {});
