@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList
+  Video, Users, CreditCard, Settings, Flame, Building2, CheckCircle, Zap, Menu, X, MessageSquare, Radio, Map, Globe, Bell, Mic, Activity, ClipboardList, CloudSun
 } from 'lucide-react';
 import { AIAssistant } from './components/AIAssistant';
 import { Logo } from './components/common';
@@ -34,6 +34,7 @@ import { FieldLogTab } from './tabs/FieldLogTab';
 import { ActivityTab } from './tabs/ActivityTab';
 import { ProtocolsTab } from './tabs/ProtocolsTab';
 import { PlatformTab } from './tabs/PlatformTab';
+import { ForecastsTab } from './tabs/ForecastsTab';
 
 
 
@@ -162,6 +163,7 @@ const WatchtowerPortal = () => {
     { id: 'streams', name: 'Live Streams', icon: Video },
     { id: 'tactical', name: 'Tactical Map', icon: Map },
     { id: 'world', name: 'World', icon: Globe },
+    { id: 'forecasts', name: 'Forecasts', icon: CloudSun },
     { id: 'log', name: 'Field Log', icon: Mic },
     { id: 'protocols', name: 'Protocols', icon: ClipboardList },
     { id: 'comms', name: 'Comms & Tracking', icon: Radio },
@@ -183,6 +185,7 @@ const WatchtowerPortal = () => {
       case 'streams': return <StreamsTab />;
       case 'tactical': return <TacticalMapTab />;
       case 'world': return <WorldTab />;
+      case 'forecasts': return <ForecastsTab />;
       case 'log': return <FieldLogTab />;
       case 'protocols': return <ProtocolsTab />;
       case 'comms': return <CommsTab />;
