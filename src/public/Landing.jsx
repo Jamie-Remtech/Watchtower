@@ -99,7 +99,7 @@ export const Landing = ({ signedIn }) => {
       {/* FEATURES */}
       <div className="bg-slate-900/40 border-y border-slate-800">
         <Section title={c.features.title}>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4">
             {c.features.items.map(([icon, h, p]) => (
               <div key={h} className="bg-slate-950/70 border border-slate-800 rounded-xl p-5">
                 <div className="text-2xl" aria-hidden="true">{icon}</div>

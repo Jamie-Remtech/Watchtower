@@ -8,6 +8,8 @@ import { usePositions } from '../hooks/usePositions';
 import { pointForecast, multiDaily, seasonalOutlook, dayFlags, wxIcon, wxLabel } from '../lib/forecast';
 import { useI18n } from '../i18n/index.jsx';
 import { useTranslations } from '../lib/translate';
+import { AreaHistory } from '../components/AreaHistory';
+import { TrackRecord } from '../components/TrackRecord';
 
 // ============================================
 // FORECASTS — reading time, not just seeing it.
@@ -314,6 +316,10 @@ export const ForecastsTab = () => {
           {t('fc.seasonNote')}
         </p>
       </Card>
+
+      {/* ---------- REGIONAL MEMORY + PREDICTION LEDGER ---------- */}
+      {pos && <AreaHistory pos={pos} heavyRainSoon={myFlags.some(f => f.tag === 'rain')} />}
+      {!isViewer && <TrackRecord />}
     </div>
   );
 };

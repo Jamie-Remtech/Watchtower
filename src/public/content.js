@@ -29,6 +29,8 @@ const en = {
       ['🩺', 'Field medical log', 'Voice-driven patient records with triage, offline queueing and an AI-composed handover for the receiving hospital.'],
       ['☀️', 'Forecasts and the season ahead', 'Your day at your position, your team\'s three-day outlook, and the El Niño / La Niña context for the months ahead.'],
       ['🏢', 'Companies and mutual aid', 'Each organization runs its own private Watchtower; linked companies share their tactical picture during joint operations.'],
+      ["📈","Proof, not promises","Every prediction Watchtower makes is recorded with its variables, frozen, and checked against what really happened — alongside the region's memory of fires, floods and quakes, and a live log of every action in the operation."],
+      ["🛰️","Devices and live feeds","Drones, cameras and sensors registered in one place with their live status. Video ingest is the next step on the roadmap."],
     ],
   },
   how: {
@@ -68,7 +70,7 @@ const en = {
       ['👋', 'Welcome', 'Watchtower is your team\'s shared picture of the situation. This tour shows the main screens in about three minutes. You can open it again any time from the homepage.', ['World map with live weather', 'Your team on a tactical map', 'Alerts that come to you']],
       ['📲', 'Install it and turn on alerts', 'On your phone, open Watchtower in the browser and choose "Add to Home Screen" (or "Install app"). Then tap "Enable notifications" in the menu — alerts reach you even when the app is closed.', ['Menu → Enable notifications', 'My settings → choose your sound', 'Send yourself a test alert']],
       ['🗣️', 'Your language', 'Open My settings and pick your language. Screens follow it, and everything your team writes — messages, alerts, notes — is translated for you, with the original one tap away.', ['My settings → My language', 'Comms: "translated from…" · original']],
-      ['🌍', 'World and Forecasts', 'World is the live globe: radar, satellite clouds, wildfires, earthquakes, terrain. Forecasts gives your day and week at your position, your team\'s outlook and the season ahead.', ['Toggle layers on the globe', 'Play the radar and cloud loop', 'Forecasts → the season ahead']],
+      ['🌍', 'World and Forecasts', 'World is the live globe: radar, satellite clouds, wildfires, earthquakes, terrain. Forecasts gives your day and week at your position, your team\'s outlook and the season ahead.', ['Toggle layers on the globe', 'Play the radar and cloud loop', 'Forecasts → the season ahead', 'Forecasts → Area history and Track record']],
       ['📡', 'The extra sense', 'You do not have to watch the sky. Every five minutes the tower checks radar, rain, wind, heat, cold, earthquakes and fires around your position and pushes what matters. Each morning you get a short brief for your day.', ['Bell icon = everything waiting for you', 'Red = act now · amber = be aware']],
       ['✋', 'Check-in', 'When a coordinator asks for a check-in, a full screen appears: tap I\'M OK or NEED HELP. Your position goes with it. If you stay silent, the tower asks again and tells your coordinator.', ['One tap — works with gloves', 'NEED HELP alerts the whole team']],
       ['🗺️', 'Tactical map and Comms', 'The tactical map shows your team live, plus markers anyone can drag into place. Comms is the team channel — type or dictate.', ['Drag a marker from the palette', 'Tap the mic to dictate a message']],
@@ -107,6 +109,8 @@ const fr = {
       ['🩺', 'Journal médical terrain', 'Dossiers patients à la voix avec triage, file hors ligne et transfert à l’hôpital rédigé par l’IA.'],
       ['☀️', 'Prévisions et saison à venir', 'Ta journée à ta position, les trois prochains jours de ton équipe, et le contexte El Niño / La Niña pour les mois qui viennent.'],
       ['🏢', 'Organisations et entraide', 'Chaque organisation a son propre Watchtower privé; les organisations liées partagent leur image tactique lors d’opérations conjointes.'],
+      ["📈","Des preuves, pas des promesses","Chaque prévision de Watchtower est consignée avec ses variables, figée, puis vérifiée contre ce qui est vraiment arrivé — avec la mémoire du secteur (feux, inondations, séismes) et un journal en direct de chaque action de l’opération."],
+      ["🛰️","Appareils et flux en direct","Drones, caméras et capteurs regroupés au même endroit avec leur état en direct. La réception vidéo est la prochaine étape prévue."],
     ],
   },
   how: {
@@ -146,7 +150,7 @@ const fr = {
       ['👋', 'Bienvenue', 'Watchtower est l’image partagée de la situation pour ton équipe. Ce tour présente les écrans principaux en trois minutes environ. Tu peux le rouvrir en tout temps depuis la page d’accueil.', ['Carte du monde avec la météo en direct', 'Ton équipe sur une carte tactique', 'Des alertes qui viennent à toi']],
       ['📲', 'Installer l’appli et activer les alertes', 'Sur ton téléphone, ouvre Watchtower dans le navigateur et choisis « Ajouter à l’écran d’accueil » (ou « Installer l’application »). Ensuite, touche « Activer les notifications » dans le menu — les alertes te parviennent même appli fermée.', ['Menu → Activer les notifications', 'Mes réglages → choisis ton son', 'Envoie-toi une alerte test']],
       ['🗣️', 'Ta langue', 'Ouvre Mes réglages et choisis ta langue. Les écrans la suivent, et tout ce que ton équipe écrit — messages, alertes, notes — est traduit pour toi, avec l’original à un geste.', ['Mes réglages → Ma langue', 'Comms : « traduit de… » · original']],
-      ['🌍', 'Monde et Prévisions', 'Monde, c’est le globe en direct : radar, nuages satellites, feux, séismes, relief. Prévisions te donne ta journée et ta semaine à ta position, les perspectives de ton équipe et la saison à venir.', ['Active les couches sur le globe', 'Fais jouer la boucle radar et nuages', 'Prévisions → la saison qui vient']],
+      ['🌍', 'Monde et Prévisions', 'Monde, c’est le globe en direct : radar, nuages satellites, feux, séismes, relief. Prévisions te donne ta journée et ta semaine à ta position, les perspectives de ton équipe et la saison à venir.', ['Active les couches sur le globe', 'Fais jouer la boucle radar et nuages', 'Prévisions → la saison qui vient', 'Prévisions → Historique du secteur et Bilan']],
       ['📡', 'Le sens de plus', 'Pas besoin de surveiller le ciel. Toutes les cinq minutes, la tour vérifie radar, pluie, vent, chaleur, froid, séismes et feux autour de ta position et t’envoie ce qui compte. Chaque matin, tu reçois un court bulletin pour ta journée.', ['La cloche = tout ce qui t’attend', 'Rouge = agir maintenant · orange = rester attentif']],
       ['✋', 'L’appel de présence', 'Quand un coordonnateur demande un appel, un écran plein apparaît : touche ÇA VA ou J’AI BESOIN D’AIDE. Ta position suit. Si tu ne réponds pas, la tour redemande et avise ton coordonnateur.', ['Un seul geste — fonctionne avec des gants', 'AIDE alerte toute l’équipe']],
       ['🗺️', 'Carte tactique et Comms', 'La carte tactique montre ton équipe en direct, plus des repères que tous peuvent glisser en place. Comms est le canal de l’équipe — écris ou dicte.', ['Glisse un repère depuis la palette', 'Touche le micro pour dicter']],
@@ -185,6 +189,8 @@ const es = {
       ['🩺', 'Bitácora médica de campo', 'Registros de pacientes por voz con triaje, cola sin conexión y entrega al hospital redactada por IA.'],
       ['☀️', 'Pronósticos y la temporada', 'Tu día en tu posición, el panorama de tres días de tu equipo y el contexto de El Niño / La Niña para los próximos meses.'],
       ['🏢', 'Organizaciones y ayuda mutua', 'Cada organización tiene su propio Watchtower privado; las organizaciones vinculadas comparten su imagen táctica en operaciones conjuntas.'],
+      ["📈","Pruebas, no promesas","Cada pronóstico de Watchtower se registra con sus variables, se congela y se compara con lo que realmente pasó — junto con la memoria de la zona (incendios, inundaciones, sismos) y un registro en vivo de cada acción de la operación."],
+      ["🛰️","Dispositivos y transmisiones","Drones, cámaras y sensores registrados en un solo lugar con su estado en vivo. La recepción de video es el siguiente paso del plan."],
     ],
   },
   how: {
@@ -224,7 +230,7 @@ const es = {
       ['👋', 'Bienvenida', 'Watchtower es la imagen compartida de la situación para tu equipo. Este recorrido muestra las pantallas principales en unos tres minutos. Puedes volver a abrirlo cuando quieras desde la página de inicio.', ['Mapa del mundo con clima en vivo', 'Tu equipo en un mapa táctico', 'Alertas que llegan a ti']],
       ['📲', 'Instálala y activa las alertas', 'En tu teléfono, abre Watchtower en el navegador y elige "Agregar a la pantalla de inicio" (o "Instalar app"). Luego toca "Activar notificaciones" en el menú — las alertas te llegan incluso con la app cerrada.', ['Menú → Activar notificaciones', 'Mis ajustes → elige tu sonido', 'Envíate una alerta de prueba']],
       ['🗣️', 'Tu idioma', 'Abre Mis ajustes y elige tu idioma. Las pantallas lo siguen, y todo lo que escribe tu equipo — mensajes, alertas, notas — se traduce para ti, con el original a un toque.', ['Mis ajustes → Mi idioma', 'Comunicaciones: "traducido de…" · original']],
-      ['🌍', 'Mundo y Pronósticos', 'Mundo es el globo en vivo: radar, nubes satelitales, incendios, sismos, relieve. Pronósticos te da tu día y tu semana en tu posición, el panorama de tu equipo y la temporada que viene.', ['Activa capas en el globo', 'Reproduce el radar y las nubes', 'Pronósticos → la temporada que viene']],
+      ['🌍', 'Mundo y Pronósticos', 'Mundo es el globo en vivo: radar, nubes satelitales, incendios, sismos, relieve. Pronósticos te da tu día y tu semana en tu posición, el panorama de tu equipo y la temporada que viene.', ['Activa capas en el globo', 'Reproduce el radar y las nubes', 'Pronósticos → la temporada que viene', 'Pronósticos → Historia de la zona e Historial']],
       ['📡', 'El sentido extra', 'No tienes que vigilar el cielo. Cada cinco minutos la torre revisa radar, lluvia, viento, calor, frío, sismos e incendios alrededor de tu posición y te envía lo que importa. Cada mañana recibes un breve boletín de tu día.', ['La campana = todo lo pendiente', 'Rojo = actuar ya · ámbar = estar atento']],
       ['✋', 'Pase de lista', 'Cuando un coordinador pide un pase de lista, aparece una pantalla completa: toca ESTOY BIEN o NECESITO AYUDA. Tu posición va incluida. Si no respondes, la torre vuelve a preguntar y avisa a tu coordinador.', ['Un toque — funciona con guantes', 'AYUDA alerta a todo el equipo']],
       ['🗺️', 'Mapa táctico y Comunicaciones', 'El mapa táctico muestra a tu equipo en vivo, más marcadores que todos pueden arrastrar. Comunicaciones es el canal del equipo — escribe o dicta.', ['Arrastra un marcador desde la paleta', 'Toca el micrófono para dictar']],
@@ -236,4 +242,14 @@ const es = {
 };
 
 export const CONTENT = { en, fr, es };
+
+// Language-independent ids for features.items, in order. Every app tab
+// must be covered here (scripts/check-homepage.mjs runs before each
+// build): add a feature or a tutorial step when a feature ships.
+export const FEATURE_IDS = ['world', 'sense', 'checkin', 'protocols', 'tactical', 'medical', 'forecasts', 'companies', 'record', 'devices'];
+export const TAB_COVERAGE = {
+  world: 'feature:world', forecasts: 'feature:forecasts', tactical: 'feature:tactical', comms: 'feature:tactical',
+  log: 'feature:medical', protocols: 'feature:protocols', streams: 'feature:devices', activity: 'feature:record',
+  team: 'tour:9', settings: 'tour:9', billing: 'pricing',
+};
 export const contentFor = (lang) => CONTENT[lang] ?? en;
