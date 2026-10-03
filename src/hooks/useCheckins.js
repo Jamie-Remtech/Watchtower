@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
 import { pushToTeam } from '../lib/push';
 import { getOrgId } from '../lib/org';
+import { getLastCoords } from '../lib/tracker';
 
 // ============================================
 // CHECK-IN / PAR — "everyone, are you OK?"
@@ -24,12 +25,16 @@ export const parSettings = (org) => {
   };
 };
 
-const quickFix = () => new Promise((resolve) => {
+// A fresh fix, bounded by our OWN timer: the browser's timeout only
+// starts after location permission is granted, so without this an
+// unanswered permission prompt would hang forever.
+const freshFix = (ms = 8000) => new Promise((resolve) => {
   if (!navigator.geolocation) return resolve(null);
+  const timer = setTimeout(() => resolve(null), ms);
   navigator.geolocation.getCurrentPosition(
-    (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-    () => resolve(null),
-    { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+    (p) => { clearTimeout(timer); resolve({ lat: p.coords.latitude, lng: p.coords.longitude }); },
+    () => { clearTimeout(timer); resolve(null); },
+    { enableHighAccuracy: true, timeout: ms, maximumAge: 60000 }
   );
 });
 
@@ -100,7 +105,16 @@ export const useCheckins = () => {
   const respond = useCallback(async (checkinId, status, note = '') => {
     const { data: { user } } = await supabase.auth.getUser();
     const orgId = await getOrgId();
-    const fix = await quickFix();
+    // The answer never waits for GPS: last known position now, a
+    // fresh fix attached afterwards if one arrives.
+    let fix = getLastCoords();
+    if (!fix) {
+      const { data: last } = await supabase.from('positions')
+        .select('lat, lng, at').eq('profile_id', user?.id)
+        .gte('at', new Date(Date.now() - 2 * 3600e3).toISOString())
+        .order('at', { ascending: false }).limit(1);
+      if (last?.[0]) fix = { lat: last[0].lat, lng: last[0].lng };
+    }
     const { error } = await supabase.from('checkin_responses').upsert({
       checkin_id: checkinId, profile_id: user?.id, org_id: orgId, status,
       note: note.trim() || null, lat: fix?.lat ?? null, lng: fix?.lng ?? null,
@@ -108,6 +122,14 @@ export const useCheckins = () => {
     }, { onConflict: 'checkin_id,profile_id' });
     if (error) throw error;
     logEvent('checkin.answered', { status, note: note.trim() || null }, checkinId);
+    freshFix().then(f => {
+      if (f) {
+        supabase.from('checkin_responses')
+          .update({ lat: f.lat, lng: f.lng })
+          .eq('checkin_id', checkinId).eq('profile_id', user?.id)
+          .then(() => {});
+      }
+    });
     if (status === 'help') {
       const { data: prof } = await supabase.from('profiles').select('display_name').eq('id', user?.id).single();
       const who = prof?.display_name ?? 'A crew member';

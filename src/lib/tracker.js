@@ -14,7 +14,12 @@ const SEND_MIN_MS = 15 * 1000;
 
 let watchId = null;
 let lastSentAt = 0;
+let lastCoords = null; // { lat, lng, at } — the newest fix this device saw
 let state = { active: false, lastFix: null, error: null };
+
+// Newest position this device knows, if not older than maxAgeMs.
+export const getLastCoords = (maxAgeMs = 15 * 60 * 1000) =>
+  lastCoords && Date.now() - lastCoords.at < maxAgeMs ? lastCoords : null;
 const listeners = new Set();
 const emit = () => listeners.forEach(fn => fn({ ...state }));
 
@@ -48,6 +53,7 @@ export async function startTracking() {
   watchId = navigator.geolocation.watchPosition(
     async (pos) => {
       const now = Date.now();
+      lastCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, at: now };
       if (now - lastSentAt < SEND_MIN_MS) return;
       lastSentAt = now;
       const { error } = await supabase.from('positions').insert({
