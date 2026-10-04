@@ -173,6 +173,9 @@ export const AirspacePanel = ({ getMap, ready }) => {
       if (!m) {
         const el = document.createElement('button');
         el.type = 'button';
+        // style once, before MapLibre takes the element: it positions markers
+        // through the inline transform, so the style must never be rewritten later
+        el.style.cssText = 'display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap;font:11px system-ui;color:#fff;background:transparent;border:0;padding:0';
         el.addEventListener('click', (e) => { e.stopPropagation(); setSelected(a.id); });
         m = new maplibregl.Marker({ element: el, anchor: 'left', offset: [-9, 0] }).setLngLat([a.lng, a.lat]).addTo(map);
         markers.set(a.id, m);
@@ -186,7 +189,6 @@ export const AirspacePanel = ({ getMap, ready }) => {
         [alt, a.speed_kmh != null && `${Math.round(a.speed_kmh)} km/h`, a.heading != null && `${Math.round(a.heading)}°`].filter(Boolean).join(' · '),
         t('air.kind.' + a.kind),
       ].filter(Boolean).join('\n');
-      el.style.cssText = 'display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap;font:11px system-ui;color:#fff;background:transparent;border:0;padding:0';
       // aircraft and helicopters: a small plane pointing where it flies; drones and others: a dot
       const icon = ['aircraft', 'helicopter'].includes(a.kind)
         ? `<svg viewBox="0 0 24 24" width="18" height="18" style="flex:none;transform:rotate(${Math.round(a.heading ?? 0)}deg);filter:drop-shadow(0 0 1px #020617)${danger ? ' drop-shadow(0 0 4px #ef4444)' : ''}"><path d="M12 1.5c.8 0 1.4.9 1.4 2.2v5.6l8.1 4.6v2.2l-8.1-2.4v4.6l2.3 1.7v1.8L12 20.6l-3.7 1.2V20l2.3-1.7v-4.6l-8.1 2.4v-2.2l8.1-4.6V3.7c0-1.3.6-2.2 1.4-2.2z" fill="${color}" stroke="#020617" stroke-width="0.8"/></svg>`
