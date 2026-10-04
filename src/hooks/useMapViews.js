@@ -19,7 +19,7 @@ export const useMapViews = () => {
     refresh();
     const t = setInterval(refresh, 60 * 1000); // safety net
     const channel = supabase
-      .channel('map-views-live')
+      .channel(`map-views-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'map_views' }, refresh)
       .subscribe();
     return () => { clearInterval(t); supabase.removeChannel(channel); };

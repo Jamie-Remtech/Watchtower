@@ -137,7 +137,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
       if (!orgId || cancelled) return;
       const { data } = await supabase.from('messages').select('*').eq('org_id', orgId).order('at', { ascending: false }).limit(25);
       if (!cancelled) setMessages(data ?? []);
-      channel = supabase.channel('messages-vehicle')
+      channel = supabase.channel(`messages-vehicle-${Math.random().toString(36).slice(2, 10)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `org_id=eq.${orgId}` }, async (payload) => {
           const m = payload.new;
           setMessages(prev => [m, ...prev.filter(x => x.id !== m.id)].slice(0, 25));

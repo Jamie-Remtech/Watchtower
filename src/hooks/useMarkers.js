@@ -40,7 +40,7 @@ export const useMarkers = () => {
     refresh();
     const t = setInterval(refresh, POLL_MS);
     const channel = supabase
-      .channel('markers-live')
+      .channel(`markers-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'markers' }, refresh)
       .subscribe();
     return () => { clearInterval(t); supabase.removeChannel(channel); };

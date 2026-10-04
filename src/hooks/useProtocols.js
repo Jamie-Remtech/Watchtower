@@ -93,7 +93,7 @@ export const useProtocols = () => {
     if (!isLive) return;
     refresh();
     const channel = supabase
-      .channel('protocol-runs-live')
+      .channel(`protocol-runs-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'protocol_runs' }, refresh)
       .subscribe();
     const t = setInterval(refresh, 60 * 1000);

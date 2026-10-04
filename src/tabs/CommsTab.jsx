@@ -54,7 +54,7 @@ export const CommsTab = () => {
   useEffect(() => {
     refresh();
     const channel = supabase
-      .channel('messages-live')
+      .channel(`messages-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         setMessages(prev => [...prev, payload.new]);
         if (payload.new.sender !== myId) beep(true);

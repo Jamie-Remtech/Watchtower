@@ -123,7 +123,7 @@ const WatchtowerPortal = () => {
 
   useEffect(() => {
     const channel = supabase
-      .channel('messages-shell')
+      .channel(`messages-shell-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (payload.new.sender === user?.id) return;
@@ -144,7 +144,7 @@ const WatchtowerPortal = () => {
   // Live alerts while the app is open: play the member's own sound
   useEffect(() => {
     const channel = supabase
-      .channel('attention-shell')
+      .channel(`attention-shell-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'attention_items' }, (payload) => {
         const item = payload.new;
         if (item.org_id !== cachedOrgId()) return;
@@ -168,7 +168,7 @@ const WatchtowerPortal = () => {
       .then(({ count: n }) => setNewRequests(n ?? 0));
     count();
     const channel = supabase
-      .channel('contact-requests-shell')
+      .channel(`contact-requests-shell-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, (payload) => {
         if (payload.eventType === 'INSERT') playAlert('chime');
         count();

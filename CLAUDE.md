@@ -1,6 +1,7 @@
 # Watchtower — working rules
 
 - **The public homepage and tutorial ship with every feature.** When a user-facing feature lands, update `src/public/content.js` in the same commit: a homepage feature card and/or a tutorial step, in every language (en, fr, es). Only claim what the app does today. `npm run build` runs `scripts/check-homepage.mjs` first and fails if a tab has no homepage coverage (`TAB_COVERAGE`) or a language falls out of step with English.
+- **Load the built app before every push.** A module-initialization error (e.g. a `const` used before its definition at module top level) throws at bundle load — before any ErrorBoundary exists — and black-screens every user. After `npm run build`, start the preview, open the app and check the console for errors. If production breaks: Netlify → Deploys → last good deploy → Publish deploy (instant rollback), then fix forward.
 - New UI text goes into `src/i18n/en.js`, `fr.js` (Québec French, "tu"), `es.js`. Other languages fall back to English UI plus machine translation of written content.
 - "My company" queries filter by org explicitly (`getOrgId()` / `profile.org_id`): platform staff can read several companies.
 - Database changes are numbered files in `supabase/migrations/`; edge functions live in `supabase/functions/<name>/index.ts` (type-check with `npx --yes deno check --no-lock --node-modules-dir=none supabase/functions/<name>/index.ts`).

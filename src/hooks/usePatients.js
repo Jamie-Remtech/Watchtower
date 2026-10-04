@@ -18,7 +18,7 @@ export const usePatients = () => {
     refresh();
     const t = setInterval(refresh, 60 * 1000);
     const channel = supabase
-      .channel('patients-live')
+      .channel(`patients-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, refresh)
       .subscribe();
     return () => { clearInterval(t); supabase.removeChannel(channel); };

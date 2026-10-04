@@ -27,7 +27,7 @@ export const usePositions = () => {
     refresh();
     const t = setInterval(refresh, POLL_MS);
     const channel = supabase
-      .channel('positions-live')
+      .channel(`positions-live-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'positions' }, refresh)
       .subscribe();
     return () => { clearInterval(t); supabase.removeChannel(channel); };
