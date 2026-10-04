@@ -2,6 +2,7 @@ import { DeviceManager } from '../components/DeviceManager';
 import { OrgSettings } from '../components/OrgSettings';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { useDevices } from '../hooks/useDevices';
+import { AirLinks } from '../components/AirLinks';
 
 // Settings = my notifications + organization identity + real device &
 // channel management.
@@ -18,6 +19,7 @@ export const SettingsTab = () => {
         updateDevice={updateDevice}
         removeDevice={removeDevice}
       />
+      <AirLinks />
     </div>
   );
 };

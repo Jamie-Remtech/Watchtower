@@ -1,3 +1,4 @@
+import { AirspacePanel } from '../components/AirspacePanel';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -219,6 +220,7 @@ export const WorldTab = () => {
   const layerName = (id) => t(`world.layer.${id}.name`);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const getMap = useCallback(() => mapRef.current, []);
   const [ready, setReady] = useState(false);
   const [enabled, setEnabled] = useState(
     Object.fromEntries(OVERLAYS.map(o => [o.id, o.defaultOn]))
@@ -1125,6 +1127,9 @@ export const WorldTab = () => {
             </p>
           </div>
         </Section>
+
+        {/* Airspace — aircraft and drones at their height */}
+        <AirspacePanel getMap={getMap} ready={ready} />
 
         {/* Layers */}
         <Section
