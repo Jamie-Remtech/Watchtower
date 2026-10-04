@@ -59,7 +59,7 @@ export default {
     [
      "🗺️",
      "Mapa tático e comunicação",
-     "Posições das equipes ao vivo, marcadores que todos podem mover, chat da equipe com ditado por voz — traduzido para o idioma de cada leitor. O modo veículo transforma um tablet de cabine em uma tela de consulta rápida."
+     "Posições da equipe ao vivo, marcadores, zonas que alertam quando alguém entra, rotas de evacuação e acesso, suas próprias camadas de mapa e importação de KML/GeoJSON. Canais, um diretório de contatos externos, transmissões de emergência com confirmação — e os próprios sistemas da sua empresa conectados: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, gateways de rádio e despacho, um feed CAP."
     ],
     [
      "🩺",
@@ -223,11 +223,14 @@ export default {
     [
      "🗺️",
      "Mapa tático e Comunicação",
-     "O mapa tático mostra sua equipe ao vivo, além de marcadores que qualquer um pode arrastar para o lugar. Comunicação é o canal da equipe — digite ou dite.",
+     "O mapa tático mostra sua equipe ao vivo, além de marcadores, zonas e rotas que qualquer um pode desenhar. Comunicações reúne os canais da equipe, seus contatos externos e transmissões de emergência.",
      [
       "Arraste um marcador da paleta",
-      "Toque no microfone para ditar uma mensagem",
-      "No veículo: menu → Modo veículo — uma tela grande, lida em voz alta"
+      "Desenhar → zona, círculo ou rota; uma zona de exclusão alerta quando alguém entra",
+      "Camadas → mostrar ou ocultar equipe, zonas, as camadas de mapa da sua empresa · Importar / Exportar KML e GeoJSON",
+      "Comunicações → canais (Todos, Comando, TAC-1…) · Contatos: ligar, SMS, WhatsApp em um toque",
+      "Transmissão: todos precisam confirmar; grupos de contato recebem por SMS / e-mail",
+      "Em um veículo: menu → Modo veículo — uma tela grande, com leitura em voz alta"
      ]
     ],
     [
@@ -260,7 +263,9 @@ export default {
       "Convidar com código QR",
       "Criar times",
       "Configurações → limites de check-in",
-      "Equipe → Qualidade de comunicação: link de cada membro, ao vivo · Mapa tático → Sinal: histórico de cobertura"
+      "Equipe → Qualidade de comunicação: link de cada membro, ao vivo · Mapa tático → Sinal: histórico de cobertura",
+      "Configurações → Integrações: conecte seu SMS, e-mail, Teams, Slack, Telegram, PagerDuty, gateway de rádio / despacho ou qualquer webhook — e escolha o que cada um envia",
+      "Configurações → Mapa: seus tipos de marcador, categorias de zona e camadas de mapa (WMS / tiles)"
      ]
     ]
    ]
@@ -325,7 +330,7 @@ export default {
     [
      "🗺️",
      "Taktische Karte und Kommunikation",
-     "Live-Teampositionen, von allen verschiebbare Markierungen, Team-Chat mit Spracheingabe — übersetzt in die Sprache jedes Lesers. Der Fahrzeugmodus macht aus einem Tablet im Führerhaus einen Bildschirm für den schnellen Blick."
+     "Live-Positionen des Teams, Markierungen, Zonen mit Alarm bei Zutritt, Evakuierungs- und Zufahrtsrouten, eigene Kartenebenen und KML-/GeoJSON-Import. Kanäle, ein Verzeichnis externer Kontakte, Notfall-Rundrufe mit Bestätigung – und die Systeme deines Unternehmens angebunden: SMS, WhatsApp, E-Mail, Teams, Slack, Telegram, PagerDuty, Funk- und Leitstellen-Gateways, ein CAP-Feed."
     ],
     [
      "🩺",
@@ -489,11 +494,14 @@ export default {
     [
      "🗺️",
      "Taktische Karte und Kommunikation",
-     "Die taktische Karte zeigt dein Team live, plus Markierungen, die jeder platzieren kann. Kommunikation ist der Teamkanal — tippe oder diktiere.",
+     "Die taktische Karte zeigt dein Team live, dazu Markierungen, Zonen und Routen, die jeder einzeichnen kann. Kommunikation enthält die Teamkanäle, deine externen Kontakte und Notfall-Rundrufe.",
      [
       "Eine Markierung aus der Palette ziehen",
-      "Auf das Mikrofon tippen, um eine Nachricht zu diktieren",
-      "Im Fahrzeug: Menü → Fahrzeugmodus — ein großer Bildschirm, laut vorgelesen"
+      "Zeichnen → Zone, Kreis oder Route; eine Sperrzone alarmiert, wenn jemand sie betritt",
+      "Ebenen → Team, Zonen, Kartenebenen deines Unternehmens ein-/ausblenden · KML und GeoJSON importieren/exportieren",
+      "Kommunikation → Kanäle (Alle, Einsatzleitung, TAC-1…) · Kontakte: Anruf, SMS, WhatsApp mit einem Tipp",
+      "Rundruf: alle müssen bestätigen; Kontaktgruppen erhalten ihn per SMS/E-Mail",
+      "Im Fahrzeug: Menü → Fahrzeugmodus – ein großer Bildschirm, Vorlesefunktion"
      ]
     ],
     [
@@ -526,7 +534,9 @@ export default {
       "Mit QR-Code einladen",
       "Teams erstellen",
       "Einstellungen → Check-in-Schwellenwerte",
-      "Team → Funkqualität: Verbindung jedes Mitglieds, live · Taktische Karte → Signal: Abdeckungsverlauf"
+      "Team → Funkqualität: Verbindung jedes Mitglieds, live · Taktische Karte → Signal: Abdeckungsverlauf",
+      "Einstellungen → Integrationen: verbinde SMS, E-Mail, Teams, Slack, Telegram, PagerDuty, Funk-/Leitstellen-Gateway oder einen beliebigen Webhook – und lege fest, was jeder davon sendet",
+      "Einstellungen → Karte: deine Markierungstypen, Zonenkategorien und Kartenebenen (WMS/Kacheln)"
      ]
     ]
    ]
@@ -591,7 +601,7 @@ export default {
     [
      "🗺️",
      "Mappa tattica e comunicazioni",
-     "Posizioni delle squadre in tempo reale, indicatori che chiunque può spostare, chat di team con dettatura vocale — tradotta nella lingua di ogni destinatario. La modalità veicolo trasforma il tablet di un mezzo in uno schermo leggibile a colpo d'occhio."
+     "Posizioni della squadra in tempo reale, marcatori, zone che avvisano quando qualcuno vi entra, percorsi di evacuazione e di accesso, i tuoi livelli mappa personalizzati e l'importazione KML/GeoJSON. Canali, una rubrica di contatti esterni, comunicazioni di emergenza con conferma di lettura — e i sistemi della tua azienda collegati: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, gateway radio e di centrale, un feed CAP."
     ],
     [
      "🩺",
@@ -755,11 +765,14 @@ export default {
     [
      "🗺️",
      "Mappa tattica e Comunicazioni",
-     "La mappa tattica mostra la tua squadra in tempo reale, oltre a marcatori che chiunque può trascinare in posizione. Comunicazioni è il canale di squadra — scrivi o detta.",
+     "La mappa tattica mostra la tua squadra in tempo reale, oltre a marcatori, zone e percorsi che chiunque può disegnare. Comunicazioni contiene i canali della squadra, i tuoi contatti esterni e le comunicazioni di emergenza.",
      [
       "Trascina un marcatore dalla tavolozza",
-      "Tocca il microfono per dettare un messaggio",
-      "In veicolo: menu → Modalità veicolo — uno schermo grande, letto ad alta voce"
+      "Disegna → zona, cerchio o percorso; una zona di esclusione avvisa quando qualcuno vi entra",
+      "Livelli → mostra o nascondi squadra, zone, i livelli mappa della tua azienda · Importa / Esporta KML e GeoJSON",
+      "Comunicazioni → canali (Tutti, Comando, TAC-1…) · Contatti: chiama, SMS, WhatsApp con un tocco",
+      "Comunicazione di emergenza: tutti devono confermare la lettura; i gruppi di contatto la ricevono via SMS / email",
+      "In veicolo: menu → Modalità veicolo — uno schermo grande, con lettura ad alta voce"
      ]
     ],
     [
@@ -792,7 +805,9 @@ export default {
       "Invita con un codice QR",
       "Crea squadre",
       "Impostazioni → soglie di check-in",
-      "Team → Qualità comunicazioni: collegamento di ogni membro, in tempo reale · Mappa tattica → Segnale: cronologia copertura"
+      "Team → Qualità comunicazioni: collegamento di ogni membro, in tempo reale · Mappa tattica → Segnale: cronologia copertura",
+      "Impostazioni → Integrazioni: collega i tuoi SMS, email, Teams, Slack, Telegram, PagerDuty, gateway radio / centrale o qualsiasi webhook — e scegli cosa invia ciascuno",
+      "Impostazioni → Mappa: i tuoi tipi di marcatore, categorie di zona e livelli mappa (WMS / tile)"
      ]
     ]
    ]
@@ -857,7 +872,7 @@ export default {
     [
      "🗺️",
      "Тактична карта та зв'язок",
-     "Живі позиції команд, мітки, які може рухати будь-хто, командний чат із голосовим диктуванням — перекладений мовою кожного читача. Режим для авто перетворює планшет у кабіні на один зручний для швидкого погляду екран."
+     "Позиції команди в реальному часі, маркери, зони з сповіщенням при вході, маршрути евакуації та під'їзду, власні шари карти й імпорт KML/GeoJSON. Канали, довідник зовнішніх контактів, екстрені розсилки з підтвердженням — і підключені системи твоєї компанії: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, радіо- та диспетчерські шлюзи, канал CAP."
     ],
     [
      "🩺",
@@ -1021,11 +1036,14 @@ export default {
     [
      "🗺️",
      "Тактична карта та Зв'язок",
-     "Тактична карта показує твою команду в реальному часі, а також позначки, які будь-хто може перетягнути на місце. Зв'язок — це канал команди: друкуй або диктуй.",
+     "Тактична карта показує твою команду в реальному часі, а також маркери, зони й маршрути, які можна малювати. Зв'язок містить канали команди, зовнішні контакти та екстрені розсилки.",
      [
       "Перетягни позначку з палітри",
-      "Торкнись мікрофона, щоб продиктувати повідомлення",
-      "У транспорті: меню → Режим транспорту — один великий екран, читання вголос"
+      "Малювати → зона, коло або маршрут; зона виключення сповіщає, коли хтось заходить",
+      "Шари → показати або сховати команду, зони, шари карти компанії · Імпорт / Експорт KML та GeoJSON",
+      "Зв'язок → канали (Усі, Командування, TAC-1…) · Контакти: дзвінок, SMS, WhatsApp в один дотик",
+      "Розсилка: кожен має підтвердити; групи контактів отримують через SMS / email",
+      "У транспорті: меню → Режим водія — один великий екран, голосове озвучення"
      ]
     ],
     [
@@ -1058,7 +1076,9 @@ export default {
       "Запросити за QR-кодом",
       "Створити групи",
       "Налаштування → пороги відміток",
-      "Команда → Якість зв'язку: лінк кожного учасника, наживо · Тактична карта → Сигнал: історія покриття"
+      "Команда → Якість зв'язку: лінк кожного учасника, наживо · Тактична карта → Сигнал: історія покриття",
+      "Налаштування → Інтеграції: підключи SMS, email, Teams, Slack, Telegram, PagerDuty, радіо- чи диспетчерський шлюз або будь-який webhook — і вибери, що надсилати через кожен",
+      "Налаштування → Карта: твої типи маркерів, категорії зон і шари карти (WMS / тайли)"
      ]
     ]
    ]
@@ -1123,7 +1143,7 @@ export default {
     [
      "🗺️",
      "Mapa taktyczna i łączność",
-     "Pozycje zespołów na żywo, znaczniki, które może przesuwać każdy, czat zespołowy z dyktowaniem głosowym — tłumaczony na język każdego odbiorcy. Tryb pojazdowy zamienia tablet w kabinie w jeden przejrzysty ekran."
+     "Pozycje ekip na żywo, znaczniki, strefy alarmujące przy wejściu, trasy ewakuacji i dojazdu, własne warstwy mapy oraz import KML/GeoJSON. Kanały, katalog kontaktów zewnętrznych, komunikaty alarmowe z potwierdzeniem odbioru — oraz podłączone systemy Twojej firmy: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, bramki radiowe i dyspozytorskie, kanał CAP."
     ],
     [
      "🩺",
@@ -1287,11 +1307,14 @@ export default {
     [
      "🗺️",
      "Mapa taktyczna i Komunikacja",
-     "Mapa taktyczna pokazuje twój zespół na żywo oraz znaczniki, które każdy może przeciągnąć na miejsce. Komunikacja to kanał zespołu — pisz lub dyktuj.",
+     "Mapa taktyczna pokazuje Twój zespół na żywo oraz znaczniki, strefy i trasy, które może narysować każdy. Komunikacja zawiera kanały zespołu, kontakty zewnętrzne i komunikaty alarmowe.",
      [
       "Przeciągnij znacznik z palety",
-      "Dotknij mikrofonu, by podyktować wiadomość",
-      "W pojeździe: menu → Tryb pojazdu — jeden duży ekran, odczytywany na głos"
+      "Rysuj → strefę, okrąg lub trasę; strefa zakazana alarmuje, gdy ktoś do niej wejdzie",
+      "Warstwy → pokaż lub ukryj ekipy, strefy, warstwy mapy Twojej firmy · Importuj / eksportuj KML i GeoJSON",
+      "Komunikacja → kanały (Wszyscy, Dowództwo, TAC-1…) · Kontakty: połączenie, SMS, WhatsApp jednym dotknięciem",
+      "Komunikat alarmowy: każdy musi potwierdzić odbiór; grupy kontaktów otrzymują go przez SMS / e-mail",
+      "W pojeździe: menu → Tryb pojazdu — jeden duży ekran, odczyt na głos"
      ]
     ],
     [
@@ -1324,7 +1347,9 @@ export default {
       "Zaproś kodem QR",
       "Utwórz zespoły",
       "Ustawienia → progi zgłoszeń",
-      "Zespół → Jakość łączności: połączenie każdego członka, na żywo · Mapa taktyczna → Sygnał: historia zasięgu"
+      "Zespół → Jakość łączności: połączenie każdego członka, na żywo · Mapa taktyczna → Sygnał: historia zasięgu",
+      "Ustawienia → Integracje: połącz SMS, e-mail, Teams, Slack, Telegram, PagerDuty, bramkę radiową / dyspozytorską lub dowolny webhook — i wybierz, co każda z nich wysyła",
+      "Ustawienia → Mapa: typy znaczników, kategorie stref i warstwy mapy (WMS / kafelki)"
      ]
     ]
    ]
@@ -1389,7 +1414,7 @@ export default {
     [
      "🗺️",
      "Taktik harita ve iletişim",
-     "Canlı ekip konumları, herkesin taşıyabildiği işaretler, sesli yazdırmalı ekip sohbeti — her okuyucunun diline çevrilir. Araç modu, kabindeki tableti tek bakışta okunabilen bir ekrana dönüştürür."
+     "Canlı ekip konumları, işaretler, birisi girdiğinde uyaran bölgeler, tahliye ve erişim rotaları, kendi harita katmanların ve KML/GeoJSON içe aktarma. Kanallar, bir dış kişiler rehberi, onaylı acil durum yayınları — ve şirketinin kendi sistemleri entegre: SMS, WhatsApp, e-posta, Teams, Slack, Telegram, PagerDuty, telsiz ve sevk ağ geçitleri, bir CAP akışı."
     ],
     [
      "🩺",
@@ -1553,10 +1578,13 @@ export default {
     [
      "🗺️",
      "Taktik harita ve İletişim",
-     "Taktik harita, ekibini canlı olarak gösterir; ayrıca herkesin sürükleyip yerleştirebileceği işaretler bulunur. İletişim ekip kanalıdır — yazabilir veya sesli söyleyebilirsin.",
+     "Taktik harita ekibini canlı gösterir, ayrıca herkesin çizebileceği işaretler, bölgeler ve rotalar. İletişim, ekip kanallarını, dış kişilerini ve acil durum yayınlarını barındırır.",
      [
       "Paletten bir işaret sürükle",
-      "Mesajı sesli iletmek için mikrofona dokun",
+      "Çiz → bölge, çember veya rota; bir dışlama bölgesi birisi içeri girdiğinde uyarır",
+      "Katmanlar → ekibi, bölgeleri, şirketinin harita katmanlarını göster veya gizle · KML ve GeoJSON içe/dışa aktar",
+      "İletişim → kanallar (Tüm Ekip, Komuta, TAC-1…) · Kişiler: tek dokunuşla ara, SMS, WhatsApp",
+      "Yayın: herkes onaylamalı; kişi grupları SMS / e-posta ile alır",
       "Araçtayken: menü → Araç modu — tek büyük ekran, sesli okuma"
      ]
     ],
@@ -1590,7 +1618,9 @@ export default {
       "QR kodla davet et",
       "Takım oluştur",
       "Ayarlar → check-in eşikleri",
-      "Ekip → İletişim kalitesi: her üyenin bağlantısı, canlı · Taktik harita → Sinyal: kapsama geçmişi"
+      "Ekip → İletişim kalitesi: her üyenin bağlantısı, canlı · Taktik harita → Sinyal: kapsama geçmişi",
+      "Ayarlar → Entegrasyonlar: SMS, e-posta, Teams, Slack, Telegram, PagerDuty, telsiz / sevk ağ geçidini veya herhangi bir webhook'u bağla — ve her birinin neyi göndereceğini seç",
+      "Ayarlar → Harita: işaret türlerin, bölge kategorilerin ve harita katmanların (WMS / karo)"
      ]
     ]
    ]
@@ -1655,7 +1685,7 @@ export default {
     [
      "🗺️",
      "خريطة تكتيكية واتصالات",
-     "مواقع الطواقم الحيّة، علامات يمكن لأي شخص تحريكها، ودردشة فريق مع إملاء صوتي — تُترجم إلى لغة كل قارئ. يحوّل وضع المركبة جهاز لوحي في المقصورة إلى شاشة واحدة سهلة القراءة."
+     "مواقع الفرق المباشرة، العلامات، والمناطق التي تنبّه عند دخول أحد إليها، مسارات الإخلاء والوصول، طبقات الخرائط الخاصة بك واستيراد KML/GeoJSON. القنوات، دليل جهات الاتصال الخارجية، البث الطارئ مع تأكيد الاستلام — وأنظمة شركتك المتصلة: SMS، واتساب، البريد الإلكتروني، Teams، Slack، Telegram، PagerDuty، بوابات اللاسلكي والإرسال، وتغذية CAP."
     ],
     [
      "🩺",
@@ -1819,11 +1849,14 @@ export default {
     [
      "🗺️",
      "الخريطة التكتيكية والاتصالات",
-     "تُظهر الخريطة التكتيكية فريقك مباشرة، بالإضافة إلى علامات يمكن لأي شخص سحبها إلى مكانها. الاتصالات هي قناة الفريق — اكتب أو أملِ.",
+     "تعرض الخريطة التكتيكية فريقك مباشرة، إضافة إلى العلامات والمناطق والمسارات التي يمكن لأي شخص رسمها. يضم قسم الاتصالات قنوات الفريق وجهات اتصالك الخارجية والبث الطارئ.",
      [
       "اسحب علامة من اللوحة",
-      "اضغط على الميكروفون لإملاء رسالة",
-      "في المركبة: القائمة → وضع المركبة — شاشة كبيرة واحدة، تُقرأ بصوت عالٍ"
+      "ارسم ← منطقة أو دائرة أو مسارًا؛ منطقة محظورة تنبّه عند دخول أحد إليها",
+      "الطبقات ← أظهر أو أخفِ الفرق، المناطق، طبقات خرائط شركتك · استيراد/تصدير KML وGeoJSON",
+      "الاتصالات ← القنوات (الجميع، القيادة، TAC-1...) · جهات الاتصال: اتصال وSMS وواتساب بلمسة واحدة",
+      "البث: يجب على الجميع تأكيد الاستلام؛ تصل مجموعات الاتصال عبر SMS أو البريد الإلكتروني",
+      "في المركبة: القائمة ← وضع المركبة — شاشة كبيرة واحدة، مع القراءة الصوتية"
      ]
     ],
     [
@@ -1856,7 +1889,9 @@ export default {
       "الدعوة برمز QR",
       "إنشاء فرق",
       "الإعدادات → حدود تسجيل الحضور",
-      "الفريق → جودة الاتصال: رابط كل عضو، مباشر · الخريطة التكتيكية → الإشارة: سجل التغطية"
+      "الفريق → جودة الاتصال: رابط كل عضو، مباشر · الخريطة التكتيكية → الإشارة: سجل التغطية",
+      "الإعدادات ← التكاملات: اربط SMS، البريد الإلكتروني، Teams، Slack، Telegram، PagerDuty، بوابة اللاسلكي/الإرسال أو أي webhook — واختر ما يرسله كل منها",
+      "الإعدادات ← الخريطة: أنواع العلامات، فئات المناطق، وطبقات الخرائط الخاصة بك (WMS / tiles)"
      ]
     ]
    ]
@@ -1921,7 +1956,7 @@ export default {
     [
      "🗺️",
      "सामरिक मानचित्र और संचार",
-     "क्रू की लाइव स्थिति, मार्कर जिन्हें कोई भी हिला सकता है, टीम चैट वॉइस डिक्टेशन के साथ — हर पाठक की भाषा में अनुवादित। वाहन मोड कैब के टैबलेट को एक नज़र में समझ आने वाली स्क्रीन बना देता है।"
+     "लाइव क्रू पोज़िशन, मार्कर, ऐसे ज़ोन जो किसी के घुसने पर अलर्ट करें, निकासी और पहुँच मार्ग, तेरी अपनी मैप लेयर और KML/GeoJSON इम्पोर्ट। चैनल, बाहरी संपर्कों की डायरेक्टरी, पावती सहित इमरजेंसी ब्रॉडकास्ट — और तेरी कंपनी के अपने सिस्टम जुड़े हुए: SMS, WhatsApp, ईमेल, Teams, Slack, Telegram, PagerDuty, रेडियो और डिस्पैच गेटवे, एक CAP फ़ीड।"
     ],
     [
      "🩺",
@@ -2085,11 +2120,14 @@ export default {
     [
      "🗺️",
      "टैक्टिकल मैप और कम्यूनिकेशन",
-     "टैक्टिकल मैप तेरी टीम को लाइव दिखाता है, साथ ही मार्कर जिन्हें कोई भी खींचकर लगा सकता है। कम्यूनिकेशन टीम चैनल है — टाइप कर या बोलकर डिक्टेट कर।",
+     "टैक्टिकल मैप तेरी टीम को लाइव दिखाता है, साथ ही मार्कर, ज़ोन और रूट जो कोई भी बना सकता है। कम्युनिकेशन में टीम चैनल, तेरे बाहरी संपर्क और इमरजेंसी ब्रॉडकास्ट होते हैं।",
      [
       "पैलेट से एक मार्कर खींचें",
-      "संदेश डिक्टेट करने के लिए माइक टैप करें",
-      "वाहन में: मेनू → व्हीकल मोड — एक बड़ी स्क्रीन, ज़ोर से पढ़ी जाती है"
+      "ड्रॉ → ज़ोन, सर्कल या रूट बनाएँ; एक्सक्लूज़न ज़ोन में कोई घुसे तो अलर्ट मिलेगा",
+      "लेयर → क्रू, ज़ोन, तेरी कंपनी की मैप लेयर दिखाएँ या छुपाएँ · KML और GeoJSON इम्पोर्ट / एक्सपोर्ट करें",
+      "कम्युनिकेशन → चैनल (All hands, Command, TAC-1…) · संपर्क: एक टैप में कॉल, SMS, WhatsApp करें",
+      "ब्रॉडकास्ट: सबको पावती देनी होगी; कॉन्टैक्ट ग्रुप को यह SMS / ईमेल से मिलेगा",
+      "वाहन में: मेनू → व्हीकल मोड — एक बड़ी स्क्रीन, ज़ोर से पढ़कर सुनाए"
      ]
     ],
     [
@@ -2122,7 +2160,9 @@ export default {
       "QR कोड से आमंत्रित करें",
       "टीमें बनाएँ",
       "सेटिंग्स → चेक-इन सीमाएँ",
-      "टीम → संचार गुणवत्ता: हर सदस्य का लिंक, लाइव · टैक्टिकल मैप → सिग्नल: कवरेज इतिहास"
+      "टीम → संचार गुणवत्ता: हर सदस्य का लिंक, लाइव · टैक्टिकल मैप → सिग्नल: कवरेज इतिहास",
+      "सेटिंग्स → इंटीग्रेशन: अपना SMS, ईमेल, Teams, Slack, Telegram, PagerDuty, रेडियो / डिस्पैच गेटवे या कोई भी वेबहुक जोड़ें — और चुन कि हर एक क्या भेजे",
+      "सेटिंग्स → मैप: तेरे मार्कर प्रकार, ज़ोन श्रेणियाँ और मैप लेयर (WMS / टाइल्स)"
      ]
     ]
    ]
@@ -2187,7 +2227,7 @@ export default {
     [
      "🗺️",
      "战术地图与通讯",
-     "实时队伍位置、人人可移动的标记点、支持语音输入的团队聊天——自动翻译成每位读者的语言。车载模式可将驾驶室平板变成一目了然的信息屏。"
+     "实时队员位置、标记点、有人进入即报警的区域、疏散与进入路线、你自己的地图图层以及 KML/GeoJSON 导入。频道、外部联系人通讯录、需确认的紧急广播——还能接入你公司自己的系统：SMS、WhatsApp、邮件、Teams、Slack、Telegram、PagerDuty、无线电与调度网关、CAP 信息源。"
     ],
     [
      "🩺",
@@ -2351,11 +2391,14 @@ export default {
     [
      "🗺️",
      "战术地图与通讯",
-     "战术地图实时显示团队位置，以及任何人都可拖动放置的标记。通讯是团队频道——可输入或口述消息。",
+     "战术地图实时显示你的团队，还有任何人都可以绘制的标记点、区域和路线。通讯里保存着团队频道、你的外部联系人和紧急广播。",
      [
       "从标记面板拖出一个标记",
-      "点击麦克风口述消息",
-      "车载使用：菜单 → 车辆模式 — 单一大屏，朗读播报"
+      "绘制 → 区域、圆形或路线；禁入区域在有人进入时会报警",
+      "图层 → 显示或隐藏队员、区域、你公司的地图图层 · 导入/导出 KML 和 GeoJSON",
+      "通讯 → 频道（全员、指挥、TAC-1…）· 联系人：一键拨打电话、SMS、WhatsApp",
+      "广播：所有人都必须确认；联系人群组通过 SMS/邮件接收",
+      "在车辆中：菜单 → 车载模式——单屏大字显示，语音朗读"
      ]
     ],
     [
@@ -2388,7 +2431,9 @@ export default {
       "使用二维码邀请",
       "创建分组",
       "设置 → 签到阈值",
-      "团队 → 通讯质量：每位成员的连接状态，实时 · 战术地图 → 信号：覆盖历史"
+      "团队 → 通讯质量：每位成员的连接状态，实时 · 战术地图 → 信号：覆盖历史",
+      "设置 → 集成：连接你的 SMS、邮件、Teams、Slack、Telegram、PagerDuty、无线电/调度网关或任意 webhook——并选择每项发送的内容",
+      "设置 → 地图：你的标记类型、区域分类和地图图层（WMS/瓦片）"
      ]
     ]
    ]
@@ -2453,7 +2498,7 @@ export default {
     [
      "🗺️",
      "戦術マップと通信",
-     "クルーのリアルタイム位置、全員が動かせるマーカー、音声入力対応のチームチャット ― 読み手の言語に自動翻訳されます。車両モードでは、運転席のタブレットが一目で分かる画面になります。"
+     "隊員のリアルタイム位置、マーカー、進入時に警告するゾーン、避難・進入ルート、独自の地図レイヤー、KML/GeoJSONインポート。チャンネル、外部連絡先ディレクトリ、確認応答付き緊急一斉通報 — さらに自社システムとの連携:SMS、WhatsApp、メール、Teams、Slack、Telegram、PagerDuty、無線・指令ゲートウェイ、CAPフィード。"
     ],
     [
      "🩺",
@@ -2617,11 +2662,14 @@ export default {
     [
      "🗺️",
      "戦術マップと連絡",
-     "戦術マップにはチームの位置がリアルタイムで表示され、誰でもマーカーをドラッグして配置できる。「連絡」はチームのチャンネルで、入力または音声で送信できる。",
+     "戦術マップでは、チームの位置をリアルタイムで確認できるほか、誰でも描けるマーカー、ゾーン、ルートを表示します。通信には、チームチャンネル、外部連絡先、緊急一斉通報がまとめられています。",
      [
       "パレットからマーカーをドラッグ",
-      "マイクをタップしてメッセージを音声入力",
-      "車両内: メニュー → 車両モード — 大画面表示・音声読み上げ"
+      "描画 → ゾーン、円、ルートを作成。立入禁止ゾーンは誰かが入ると警告します",
+      "レイヤー → 隊員、ゾーン、自社の地図レイヤーの表示/非表示 · KML・GeoJSONのインポート/エクスポート",
+      "通信 → チャンネル(全員、指令本部、TAC-1など) · 連絡先:ワンタップで通話・SMS・WhatsApp",
+      "一斉通報:全員の確認応答が必要 · 連絡先グループにはSMS/メールで送信",
+      "車両内では:メニュー → 車両モード — 大画面1つで読み上げ"
      ]
     ],
     [
@@ -2654,7 +2702,9 @@ export default {
       "QRコードで招待",
       "チームを作成",
       "設定 → チェックイン基準",
-      "チーム → 通信品質：全メンバーのリンク状況（ライブ）・戦術マップ → 電波状況：カバレッジ履歴"
+      "チーム → 通信品質：全メンバーのリンク状況（ライブ）・戦術マップ → 電波状況：カバレッジ履歴",
+      "設定 → 連携:SMS、メール、Teams、Slack、Telegram、PagerDuty、無線・指令ゲートウェイ、または任意のWebhookを接続 — それぞれの送信内容を選択",
+      "設定 → マップ:マーカーの種類、ゾーンのカテゴリ、地図レイヤー(WMS/タイル)"
      ]
     ]
    ]
@@ -2719,7 +2769,7 @@ export default {
     [
      "🗺️",
      "Tactical Map at Komunikasyon",
-     "Live na posisyon ng mga crew, mga marker na kayang ilipat ng lahat, team chat na may voice dictation — isinasalin sa wika ng bawat mambabasa. Binabago ng vehicle mode ang tablet sa sasakyan tungo sa isang madaling-tingnang screen."
+     "Live na posisyon ng mga crew, markers, mga zone na nag-aalerto kapag may pumasok, mga ruta ng evacuation at access, ang sarili mong mga map layer at KML/GeoJSON import. Mga channel, isang directory ng mga outside contact, mga emergency broadcast na may acknowledgement — at mga sariling sistema ng kumpanya mo na naka-plug in: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, radio at dispatch gateway, isang CAP feed."
     ],
     [
      "🩺",
@@ -2883,11 +2933,14 @@ export default {
     [
      "🗺️",
      "Tactical map at Comms",
-     "Ipinapakita ng tactical map ang team mo nang live, kasama ang mga marker na maaaring i-drag ng kahit sino. Ang Comms ay ang channel ng team — mag-type o mag-dikta.",
+     "Ipinapakita ng tactical map ang team mo nang live, kasama ang mga marker, zone at ruta na kahit sino ay maaaring iguhit. Hawak ng Comms ang mga channel ng team, ang mga outside contact mo at ang mga emergency broadcast.",
      [
       "I-drag ang marker mula sa palette",
-      "I-tap ang mic para mag-dikta ng mensahe",
-      "Sa sasakyan: menu → Vehicle mode — isang malaking screen, binabasa nang malakas"
+      "Gumuhit → zone, circle, o ruta; isang exclusion zone ay nag-aalerto kapag may pumasok",
+      "Mga Layer → ipakita o itago ang crew, mga zone, mga map layer ng kumpanya mo · Mag-import / Mag-export ng KML at GeoJSON",
+      "Comms → mga channel (All hands, Command, TAC-1…) · Mga Contact: tumawag, mag-SMS, WhatsApp sa isang tap lang",
+      "Broadcast: kailangang kilalanin ito ng lahat; matatanggap ito ng mga contact group sa pamamagitan ng SMS / email",
+      "Kapag nasa sasakyan: menu → Vehicle mode — isang malaking screen, binabasa nang malakas"
      ]
     ],
     [
@@ -2920,7 +2973,9 @@ export default {
       "Mag-imbita gamit ang QR code",
       "Gumawa ng mga team",
       "Settings → mga threshold ng check-in",
-      "Team → Kalidad ng Comms: live na link ng bawat miyembro · Tactical map → Signal: history ng coverage"
+      "Team → Kalidad ng Comms: live na link ng bawat miyembro · Tactical map → Signal: history ng coverage",
+      "Settings → Mga Integration: ikonekta ang iyong SMS, email, Teams, Slack, Telegram, PagerDuty, radio / dispatch gateway o anumang webhook — at piliin kung ano ang ipapadala ng bawat isa",
+      "Settings → Mapa: ang iyong mga uri ng marker, mga kategorya ng zone at mga map layer (WMS / tiles)"
      ]
     ]
    ]
@@ -2985,7 +3040,7 @@ export default {
     [
      "🗺️",
      "Ramani ya kiufundi na mawasiliano",
-     "Nafasi hai za timu, alama ambazo kila mtu anaweza kusogeza, gumzo la timu lenye uandishi wa sauti — linatafsiriwa kwa lugha ya kila msomaji. Hali ya gari hubadilisha kompyuta kibao ya gari kuwa skrini moja rahisi kuangalia."
+     "Mahali pa wafanyakazi papo hapo, alama, kanda zinazotoa tahadhari mtu anapoingia, njia za uhamishaji na ufikiaji, tabaka zako za ramani na uingizaji wa KML/GeoJSON. Chaneli, orodha ya mawasiliano ya nje, matangazo ya dharura yenye uthibitisho — na mifumo ya kampuni yako yenyewe ikiunganishwa: SMS, WhatsApp, barua pepe, Teams, Slack, Telegram, PagerDuty, njia za redio na ulandanishaji, mkondo wa CAP."
     ],
     [
      "🩺",
@@ -3149,11 +3204,14 @@ export default {
     [
      "🗺️",
      "Ramani ya mbinu na Mawasiliano",
-     "Ramani ya mbinu inaonyesha timu yako moja kwa moja, pamoja na alama ambazo yeyote anaweza kuburuta mahali pake. Mawasiliano ni kituo cha timu — andika au tamka.",
+     "Ramani ya kiutendaji inaonyesha timu yako papo hapo, pamoja na alama, kanda na njia ambazo yeyote anaweza kuchora. Mawasiliano yana chaneli za timu, mawasiliano yako ya nje na matangazo ya dharura.",
      [
       "Buruta alama kutoka kwenye palette",
-      "Gusa kipaza sauti kutamka ujumbe",
-      "Ukiwa kwenye gari: menyu → Hali ya gari — skrini kubwa moja, inasomwa kwa sauti"
+      "Chora → kanda, duara au njia; kanda ya kuzuiwa hutoa tahadhari mtu anapoingia",
+      "Tabaka → onyesha au ficha wafanyakazi, kanda, tabaka za ramani za kampuni yako · Ingiza / Hamisha KML na GeoJSON",
+      "Mawasiliano → chaneli (All hands, Command, TAC-1…) · Mawasiliano: piga simu, SMS, WhatsApp kwa mguso mmoja",
+      "Tangazo: kila mtu lazima athibitishe; vikundi vya mawasiliano hupokea kwa SMS / barua pepe",
+      "Ukiwa kwenye gari: menyu → Hali ya Gari — skrini moja kubwa, inasomwa kwa sauti"
      ]
     ],
     [
@@ -3186,7 +3244,9 @@ export default {
       "Alika kwa msimbo wa QR",
       "Unda timu",
       "Mipangilio → vizingiti vya kujiandikisha",
-      "Timu → Ubora wa mawasiliano: muunganisho wa kila mwanachama, moja kwa moja · Ramani ya mbinu → Ishara: historia ya mawasiliano"
+      "Timu → Ubora wa mawasiliano: muunganisho wa kila mwanachama, moja kwa moja · Ramani ya mbinu → Ishara: historia ya mawasiliano",
+      "Mipangilio → Uunganishaji: unganisha SMS yako, barua pepe, Teams, Slack, Telegram, PagerDuty, njia ya redio / ulandanishaji au webhook yoyote — na chagua kila moja inatuma nini",
+      "Mipangilio → Ramani: aina zako za alama, makundi ya kanda na tabaka za ramani (WMS / tiles)"
      ]
     ]
    ]

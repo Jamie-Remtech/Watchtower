@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { Flame, Camera, Radio, Wind, Video } from 'lucide-react';
 import DeviceFeedViewer from './DeviceFeedViewer';
 import { useI18n } from '../i18n/index.jsx';
+import { overlayTileUrl, shapeAnchor, pathLengthM, polygonAreaM2, isLatLng } from '../lib/geo';
 
 // Translate a key built from data; show the raw value when no text exists for it.
 const tOr = (t, key, fallback) => { const v = t(key); return v === key ? fallback : v; };
@@ -85,6 +86,256 @@ const RadarOverlay = ({ visible }) => {
   return null;
 };
 
+// ---------- drawn shapes (zones, circles, routes) ----------
+// Core Maps API objects only (the Drawing Library is gone). Objects are
+// kept per shape id and updated in place, so an edit in progress is never
+// torn down by a realtime refresh.
+function round7(n) { return Math.round(n * 1e7) / 1e7; }
+function shapeStyle(s, editing) {
+  const g = window.google.maps;
+  const color = s.color || '#38bdf8';
+  const on = s.active !== false;
+  if (s.kind === 'route') {
+    const arrows = s.category !== 'fire_line'
+      ? [{ icon: { path: g.SymbolPath.FORWARD_OPEN_ARROW, scale: 2.5, strokeColor: color, strokeOpacity: on ? 1 : 0.4 }, offset: '60px', repeat: '160px' }]
+      : [];
+    return { strokeColor: color, strokeOpacity: on ? 0.95 : 0.35, strokeWeight: editing ? 6 : 4, icons: arrows };
+  }
+  return {
+    strokeColor: color, strokeOpacity: on ? 0.95 : 0.4, strokeWeight: editing ? 3 : 2,
+    fillColor: color, fillOpacity: on ? (s.alert && s.alert !== 'none' ? 0.22 : 0.15) : 0.05,
+  };
+}
+function readGeometry(rec) {
+  if (rec.kind === 'circle') {
+    const c = rec.obj.getCenter();
+    return { center: { lat: round7(c.lat()), lng: round7(c.lng()) }, radius: Math.max(1, Math.round(rec.obj.getRadius())) };
+  }
+  return { path: rec.obj.getPath().getArray().map(ll => ({ lat: round7(ll.lat()), lng: round7(ll.lng()) })) };
+}
+function applyGeometry(rec, s) {
+  const geo = s.geometry ?? {};
+  if (rec.kind === 'circle') {
+    if (isLatLng(geo.center)) rec.obj.setCenter(geo.center);
+    rec.obj.setRadius(Number(geo.radius) || 1);
+  } else {
+    rec.obj.setPath((geo.path ?? []).filter(isLatLng));
+  }
+}
+function makeShapeObject(s, map) {
+  const g = window.google.maps;
+  const geo = s.geometry ?? {};
+  if (s.kind === 'circle') {
+    return new g.Circle({ map, center: isLatLng(geo.center) ? geo.center : { lat: 0, lng: 0 }, radius: Number(geo.radius) || 1, ...shapeStyle(s) });
+  }
+  const path = (geo.path ?? []).filter(isLatLng);
+  if (s.kind === 'route') return new g.Polyline({ map, path, ...shapeStyle(s) });
+  return new g.Polygon({ map, paths: path, ...shapeStyle(s) });
+}
+
+const ShapesLayer = ({ shapes, interactive, editingId, onSelect, onGeometryChange }) => {
+  const map = useMap();
+  const recs = useRef(new globalThis.Map()); // id → { obj, kind, sig, click }
+  const cbs = useRef({});
+  cbs.current = { onSelect, onGeometryChange };
+
+  useEffect(() => () => {
+    for (const r of recs.current.values()) { r.click?.remove(); r.obj.setMap(null); }
+    recs.current.clear();
+  }, []);
+
+  useEffect(() => {
+    if (!map || !window.google?.maps) return;
+    const seen = new Set();
+    for (const s of shapes) {
+      seen.add(s.id);
+      const sig = JSON.stringify([s.geometry, s.color, s.active, s.alert, s.category]);
+      let rec = recs.current.get(s.id);
+      if (rec && rec.kind !== s.kind) { rec.click?.remove(); rec.obj.setMap(null); rec = null; }
+      if (!rec) {
+        const obj = makeShapeObject(s, map);
+        rec = { obj, kind: s.kind, sig };
+        rec.click = obj.addListener('click', (e) => {
+          const ll = e?.latLng;
+          cbs.current.onSelect?.(s.id, ll ? { lat: ll.lat(), lng: ll.lng() } : null);
+        });
+        recs.current.set(s.id, rec);
+      } else if (rec.sig !== sig && s.id !== editingId) {
+        applyGeometry(rec, s);
+        rec.sig = sig;
+      }
+      rec.obj.setOptions({ ...shapeStyle(s, s.id === editingId), clickable: interactive, editable: s.id === editingId });
+    }
+    for (const [id, r] of recs.current) {
+      if (!seen.has(id)) { r.click?.remove(); r.obj.setMap(null); recs.current.delete(id); }
+    }
+  }, [map, shapes, interactive, editingId]);
+
+  // While a shape is editable, save its geometry shortly after each change.
+  useEffect(() => {
+    if (!editingId || !map) return;
+    const rec = recs.current.get(editingId);
+    if (!rec) return;
+    const listeners = [];
+    let timer = null;
+    const flush = () => { timer = null; cbs.current.onGeometryChange?.(editingId, readGeometry(rec)); };
+    const changed = () => { clearTimeout(timer); timer = setTimeout(flush, 700); };
+    if (rec.kind === 'circle') {
+      listeners.push(rec.obj.addListener('radius_changed', changed), rec.obj.addListener('center_changed', changed));
+    } else {
+      const path = rec.obj.getPath();
+      for (const ev of ['set_at', 'insert_at', 'remove_at']) listeners.push(path.addListener(ev, changed));
+    }
+    return () => {
+      listeners.forEach(l => l.remove());
+      if (timer) { clearTimeout(timer); flush(); } // never lose the last drag
+    };
+  }, [editingId, map]);
+
+  return null;
+};
+
+// Preview of the shape being drawn.
+const DraftLayer = ({ draft }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !draft || !window.google?.maps) return;
+    const g = window.google.maps;
+    const color = draft.color || '#f97316';
+    const objs = [];
+    const pts = draft.points ?? [];
+    if (draft.kind === 'circle') {
+      if (draft.center && draft.radius > 0) {
+        objs.push(new g.Circle({ map, center: draft.center, radius: draft.radius, strokeColor: color, strokeWeight: 2, fillColor: color, fillOpacity: 0.2, clickable: false }));
+      }
+    } else if (draft.kind === 'zone' && pts.length >= 3) {
+      objs.push(new g.Polygon({ map, paths: pts, strokeColor: color, strokeWeight: 2, fillColor: color, fillOpacity: 0.2, clickable: false }));
+    } else if (pts.length >= 2) {
+      objs.push(new g.Polyline({ map, path: pts, strokeColor: color, strokeWeight: draft.kind === 'route' ? 4 : 2, strokeOpacity: 0.9, clickable: false }));
+    }
+    return () => objs.forEach(o => o.setMap(null));
+  }, [map, draft]);
+  if (!draft) return null;
+  const dots = draft.kind === 'circle' ? (draft.center ? [draft.center] : []) : (draft.points ?? []);
+  return dots.map((p, i) => (
+    <AdvancedMarker key={`d${i}`} position={p} zIndex={1000} clickable={false}>
+      <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', border: `3px solid ${draft.color || '#f97316'}`, transform: 'translateY(6px)', pointerEvents: 'none' }} />
+    </AdvancedMarker>
+  ));
+};
+
+// Company map overlays (XYZ tile templates or WMS), as Google ImageMapTypes.
+const OverlaysLayer = ({ overlays }) => {
+  const map = useMap();
+  const sig = JSON.stringify(overlays ?? []);
+  useEffect(() => {
+    const list = JSON.parse(sig);
+    if (!map || !list.length || !window.google?.maps) return;
+    const g = window.google.maps;
+    const types = list.map(o => new g.ImageMapType({
+      name: o.name, opacity: o.opacity ?? 0.7, tileSize: new g.Size(256, 256), maxZoom: 22,
+      getTileUrl: (coord, zoom) => overlayTileUrl(o, coord.x, coord.y, zoom),
+    }));
+    types.forEach(tp => map.overlayMapTypes.push(tp));
+    return () => {
+      const arr = map.overlayMapTypes;
+      for (let i = arr.getLength() - 1; i >= 0; i--) if (types.includes(arr.getAt(i))) arr.removeAt(i);
+    };
+  }, [map, sig]);
+  return null;
+};
+
+const SWATCHES = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#38bdf8', '#a855f7', '#ffffff'];
+function fmtDistance(m) { return m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`; }
+function fmtArea(m2) { return m2 >= 1e6 ? `${(m2 / 1e6).toFixed(2)} km²` : `${(m2 / 1e4).toFixed(2)} ha`; }
+
+// Popup editor for a drawn shape. Read-only for people without rights.
+const ShapeEditor = ({ shape, categories, categoryLabel, meta, canEdit, editingGeometry, onSave, onDelete, onToggleGeometry }) => {
+  const { t } = useI18n();
+  const [form, setForm] = useState(() => ({
+    label: shape.label ?? '', notes: shape.notes ?? '', category: shape.category ?? '',
+    alert: shape.alert ?? 'none', color: shape.color ?? '#38bdf8', active: shape.active !== false,
+  }));
+  const [confirmDel, setConfirmDel] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const options = useMemo(() => {
+    const fits = categories.filter(c => (shape.kind === 'route' ? c.kind === 'route' : c.kind !== 'route'));
+    return fits.some(c => c.id === form.category) || !form.category ? fits : [...fits, { id: form.category, kind: shape.kind }];
+  }, [categories, shape.kind, form.category]);
+  const geo = shape.geometry ?? {};
+  const size = shape.kind === 'circle'
+    ? t('map.ed.radius', { v: fmtDistance(Number(geo.radius) || 0) })
+    : shape.kind === 'route'
+      ? t('map.ed.length', { v: fmtDistance(pathLengthM(geo.path ?? [])) })
+      : t('map.ed.area', { v: fmtArea(polygonAreaM2(geo.path ?? [])) });
+  const field = 'w-full border border-slate-300 rounded px-2 py-1 text-xs text-slate-900';
+  const pickCategory = (id) => {
+    const c = categories.find(x => x.id === id);
+    setForm(f => ({ ...f, category: id, ...(c ? { color: c.color, alert: shape.kind === 'route' ? 'none' : c.alert } : {}) }));
+  };
+
+  if (!canEdit) {
+    return (
+      <div style={{ minWidth: 200, maxWidth: 260 }}>
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="w-3 h-3 rounded-sm inline-block" style={{ background: shape.color }} />
+          <span className="text-xs font-semibold text-slate-900">{shape.label || categoryLabel(shape.category)}</span>
+        </div>
+        <p className="text-[11px] text-slate-600">{categoryLabel(shape.category)} · {t(`map.kind.${shape.kind}`)} · {size}</p>
+        {shape.kind !== 'route' && shape.alert !== 'none' && <p className="text-[11px] text-slate-600">{t(`map.alert.${shape.alert}`)}</p>}
+        {shape.active === false && <p className="text-[11px] text-slate-500">{t('map.ed.inactive')}</p>}
+        {shape.notes && <p className="text-xs text-slate-700 mt-1 whitespace-pre-wrap">{shape.notes}</p>}
+        {meta && <p className="text-[10px] text-slate-500 mt-1">{meta}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minWidth: 220, maxWidth: 270 }} className="space-y-1.5">
+      <p className="text-[11px] font-semibold text-slate-900">{t(`map.kind.${shape.kind}`)} · <span className="font-normal text-slate-500">{size}</span></p>
+      <input value={form.label} onChange={e => set('label', e.target.value)} placeholder={t('map.ed.labelPh')} maxLength={200} className={field} />
+      <textarea value={form.notes} onChange={e => set('notes', e.target.value)} placeholder={t('map.ed.notesPh')} rows={2} className={field} />
+      <label className="block text-[10px] text-slate-500">{t('map.ed.category')}
+        <select value={form.category} onChange={e => pickCategory(e.target.value)} className={field}>
+          {!form.category && <option value="">—</option>}
+          {options.map(c => <option key={c.id} value={c.id}>{categoryLabel(c.id)}</option>)}
+        </select>
+      </label>
+      {shape.kind !== 'route' && (
+        <label className="block text-[10px] text-slate-500">{t('map.ed.alert')}
+          <select value={form.alert} onChange={e => set('alert', e.target.value)} className={field}>
+            {['none', 'enter', 'exit', 'both'].map(a => <option key={a} value={a}>{t(`map.alert.${a}`)}</option>)}
+          </select>
+        </label>
+      )}
+      <div className="flex items-center gap-1">
+        {SWATCHES.map(c => (
+          <button key={c} type="button" onClick={() => set('color', c)} title={c}
+            style={{ background: c, width: 18, height: 18, borderRadius: 4, border: form.color === c ? '2px solid #0f172a' : '1px solid #cbd5e1' }} />
+        ))}
+        <input type="color" value={form.color} onChange={e => set('color', e.target.value)} style={{ width: 24, height: 20, padding: 0, border: 0 }} title={t('map.ed.color')} />
+      </div>
+      <label className="flex items-center gap-1.5 text-xs text-slate-700">
+        <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
+        {t('map.ed.active')}
+      </label>
+      {meta && <p className="text-[10px] text-slate-500">{meta}</p>}
+      <div className="flex flex-wrap gap-1.5 pt-1">
+        <button onClick={() => onSave({
+          label: form.label.trim(), notes: form.notes.trim() || null, category: form.category,
+          alert: shape.kind === 'route' ? 'none' : form.alert, color: form.color, active: form.active,
+        })} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded">{t('veh.save')}</button>
+        <button onClick={onToggleGeometry} className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs rounded">
+          {editingGeometry ? t('map.ed.reshapeDone') : t('map.ed.reshape')}
+        </button>
+        {confirmDel
+          ? <button onClick={onDelete} className="px-3 py-1 bg-red-600 text-white text-xs rounded font-bold">{t('map.ed.confirmDelete')}</button>
+          : <button onClick={() => setConfirmDel(true)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded">{t('tac.remove')}</button>}
+      </div>
+    </div>
+  );
+};
+
 // Inline editor shown in a tactical marker's popup: label + notes,
 // saved for the whole team. Position changes by dragging the marker.
 const MarkerEditor = ({ marker, onSave, onDelete }) => {
@@ -152,7 +403,6 @@ const TacticalMap = ({
   zoom = 14,
   onMapInteraction,
   devices = [],
-  geofences = [],
   alerts = [],
   markers = [],
   onMapClick,        // (pos {lat,lng}) => void — placement mode
@@ -161,10 +411,37 @@ const TacticalMap = ({
   onMarkerEdit,      // (id, {label, notes}) => void — editable popup
   onCameraChanged,   // (center {lat,lng}) => void — track current view
   coverage = null,   // [{lat, lng, quality}] — comms coverage samples
+  // drawn shapes (map_shapes rows) and their editing
+  shapes = [],
+  shapeCategories = [],          // offered categories [{id, kind, color, alert}] (built-in + custom)
+  categoryLabel = (id) => id,    // (categoryId) => display text
+  describeShape,                 // (shape) => "who · when" line
+  canEditShape = () => false,    // (shape) => boolean
+  onShapeSave,                   // (id, patch) => void
+  onShapeDelete,                 // (id) => void
+  editingShapeId = null,         // id of the shape whose geometry is editable
+  onShapeEditToggle,             // (id | null) => void
+  onShapeGeometry,               // (id, geometry) => void — debounced while editing
+  openShape = null,              // { id, n } — open this shape's popup (e.g. right after drawing it)
+  draft = null,                  // shape being drawn: { kind, color, points, center, radius }
+  overlays = [],                 // company overlays to show [{id, type, url, layers, opacity}]
 }) => {
   const { t } = useI18n();
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const [selectedShape, setSelectedShape] = useState(null); // { id, position }
   const [activeFeed, setActiveFeed] = useState(null);
+  const shapeById = useMemo(() => Object.fromEntries((shapes ?? []).map(s => [s.id, s])), [shapes]);
+  const openedRef = useRef(null);
+  useEffect(() => {
+    if (!openShape?.id || openedRef.current === openShape.n) return;
+    const s = shapeById[openShape.id];
+    if (!s) return; // not loaded yet — try again when shapes arrive
+    openedRef.current = openShape.n;
+    setSelectedMarker(null);
+    setSelectedShape({ id: s.id, position: shapeAnchor(s) });
+  }, [openShape, shapeById]);
+  const shownShape = selectedShape ? shapeById[selectedShape.id] : null;
+  const drawing = Boolean(draft);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const mapTypeId = {
@@ -218,6 +495,7 @@ const TacticalMap = ({
         defaultZoom={zoom}
         mapTypeId={mapTypeId}
         gestureHandling="greedy"
+        clickableIcons={!onMapClick}
         disableDefaultUI={false}
         style={{ width: '100%', height: '100%', cursor: onMapClick ? 'crosshair' : undefined }}
         onClick={(e) => {
@@ -225,12 +503,37 @@ const TacticalMap = ({
             onMapClick({ lat: e.detail.latLng.lat, lng: e.detail.latLng.lng });
           } else {
             setSelectedMarker(null);
+            setSelectedShape(null);
           }
         }}
         onCameraChanged={(e) => onCameraChanged?.({ center: e.detail?.center, zoom: e.detail?.zoom })}
       >
+        <OverlaysLayer overlays={overlays} />
         <RadarOverlay visible={showWeather} />
         {coverage && <CoverageOverlay samples={coverage} />}
+        {showGeofences && (
+          <ShapesLayer
+            shapes={shapes}
+            interactive={!drawing}
+            editingId={editingShapeId}
+            onSelect={(id, pos) => { setSelectedMarker(null); setSelectedShape({ id, position: pos }); }}
+            onGeometryChange={onShapeGeometry}
+          />
+        )}
+        {/* shape names on the map; also an easy tap target for thin routes */}
+        {showGeofences && !drawing && (shapes ?? []).filter(s => s.label).map(s => {
+          const pos = shapeAnchor(s);
+          return pos ? (
+            <AdvancedMarker key={`lbl-${s.id}`} position={pos} zIndex={1} onClick={() => { setSelectedMarker(null); setSelectedShape({ id: s.id, position: pos }); }}>
+              <div style={{
+                padding: '1px 6px', borderRadius: 6, background: '#0f172acc', border: `1px solid ${s.color || '#38bdf8'}`,
+                color: '#fff', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', opacity: s.active === false ? 0.55 : 1,
+                transform: s.kind === 'route' ? undefined : 'translateY(50%)', cursor: 'pointer',
+              }}>{s.label}</div>
+            </AdvancedMarker>
+          ) : null;
+        })}
+        <DraftLayer draft={draft} />
         {showDevices && activeDevices.map((device) => (
           <AdvancedMarker
             key={device.id}
@@ -239,6 +542,7 @@ const TacticalMap = ({
               if (device.type === 'drone' || device.type === 'camera') {
                 setActiveFeed(device);
               } else {
+                setSelectedShape(null);
                 setSelectedMarker(device);
               }
             }}
@@ -265,11 +569,6 @@ const TacticalMap = ({
           </AdvancedMarker>
         ))}
 
-        {showGeofences && geofences.map((geofence) => (
-          <React.Fragment key={geofence.id}>
-          </React.Fragment>
-        ))}
-
         {/* Tactical markers / points of interest — draggable to reposition */}
         {showMarkers && markers.map((m) => (
           <AdvancedMarker
@@ -280,7 +579,7 @@ const TacticalMap = ({
               const ll = e.latLng;
               if (ll && onMarkerMove) onMarkerMove(m.id, { lat: ll.lat(), lng: ll.lng() });
             }}
-            onClick={() => setSelectedMarker({ ...m, isTacticalMarker: true })}
+            onClick={() => { setSelectedShape(null); setSelectedMarker({ ...m, isTacticalMarker: true }); }}
           >
             <div
               className="cursor-pointer"
@@ -353,6 +652,32 @@ const TacticalMap = ({
                   {t('tac.viewFeed')}
                 </button>
               )}
+            </div>
+          </InfoWindow>
+        )}
+
+        {shownShape && !drawing && (selectedShape.position || shapeAnchor(shownShape)) && (
+          <InfoWindow
+            key={shownShape.id}
+            position={selectedShape.position || shapeAnchor(shownShape)}
+            onCloseClick={() => setSelectedShape(null)}
+          >
+            <div className="p-1">
+              <ShapeEditor
+                key={shownShape.id}
+                shape={shownShape}
+                categories={shapeCategories}
+                categoryLabel={categoryLabel}
+                meta={describeShape?.(shownShape)}
+                canEdit={Boolean(onShapeSave) && canEditShape(shownShape)}
+                editingGeometry={editingShapeId === shownShape.id}
+                onSave={(patch) => { onShapeSave?.(shownShape.id, patch); setSelectedShape(null); }}
+                onDelete={() => { onShapeDelete?.(shownShape.id); setSelectedShape(null); }}
+                onToggleGeometry={() => {
+                  onShapeEditToggle?.(editingShapeId === shownShape.id ? null : shownShape.id);
+                  setSelectedShape(null);
+                }}
+              />
             </div>
           </InfoWindow>
         )}

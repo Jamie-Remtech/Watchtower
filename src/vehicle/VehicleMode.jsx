@@ -10,7 +10,8 @@ import { useI18n } from '../i18n/index.jsx';
 import { useCheckinsShared } from '../hooks/useCheckins';
 import { usePositions } from '../hooks/usePositions';
 import { useTeam } from '../hooks/useTeam';
-import { useMarkers, markerMeta } from '../hooks/useMarkers';
+import { useMarkers, markerMeta, markerKindLabel } from '../hooks/useMarkers';
+import { useMapConfig } from '../hooks/useMapConfig';
 import { useSpeech } from '../hooks/useSpeech';
 import { getLastCoords, subscribeTracker } from '../lib/tracker';
 import { getOrgId } from '../lib/org';
@@ -65,7 +66,8 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
   const { latest: positions } = usePositions();
   const { liveMembers } = useTeam();
   const { markers, createMarker } = useMarkers();
-  const kindLabel = (k) => t(`marker.${markerMeta(k).id}`);
+  useMapConfig(); // registers the company's custom marker kinds for markerMeta
+  const kindLabel = (k) => markerKindLabel(t, k);
 
   // ---------- my position ----------
   const [me, setMe] = useState(() => validPos(getLastCoords()));

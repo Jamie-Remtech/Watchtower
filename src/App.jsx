@@ -20,6 +20,7 @@ import { enableNotifications, ensureSubscribed, notificationPermission, localNot
 import { findProtocolForItem, startProtocolRun } from './lib/protocols';
 import { AttentionPanel } from './components/AttentionPanel';
 import { CheckInPrompt } from './components/CheckInPrompt';
+import { BroadcastBanner } from './components/Broadcasts';
 import { NotificationSettings } from './components/NotificationSettings';
 import { AppearanceSettings } from './components/AppearanceSettings';
 import { saveAppearance, hasLocalAppearance, DEFAULT_APPEARANCE } from './theme/theme';
@@ -269,6 +270,7 @@ const WatchtowerPortal = () => {
   return (
     <CheckinsContext.Provider value={checkins}>
     <CheckInPrompt checkins={checkins.checkins} responses={checkins.responses} respond={checkins.respond} />
+    <ErrorBoundary name="broadcast" fallback={() => null}><BroadcastBanner /></ErrorBoundary>
     {vehicleOpen && canVehicle && (
       <ErrorBoundary name="vehicle" fallback={({ reset }) => (
         <div className="fixed inset-0 z-[130] bg-slate-950 text-slate-100 flex items-center justify-center p-6">

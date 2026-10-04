@@ -3,6 +3,8 @@ import { OrgSettings } from '../components/OrgSettings';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { useDevices } from '../hooks/useDevices';
 import { AirLinks } from '../components/AirLinks';
+import { Integrations } from '../components/Integrations';
+import { MapSettings } from '../components/MapSettings';
 
 // Settings = my notifications + organization identity + real device &
 // channel management.
@@ -13,6 +15,8 @@ export const SettingsTab = () => {
     <div className="space-y-4">
       <NotificationSettings />
       <OrgSettings />
+      <Integrations />
+      <MapSettings />
       <DeviceManager
         devices={devices}
         createDevice={createDevice}

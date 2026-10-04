@@ -1,16 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { Map, Crosshair, Plus, Star, RefreshCw, X, Check, ExternalLink, CloudRain } from 'lucide-react';
+import { Map, Crosshair, Plus, Star, RefreshCw, X, Check, ExternalLink, CloudRain, PenTool, Layers, Upload, Download, Undo2, Hexagon, Circle, Spline } from 'lucide-react';
 import TacticalMap from '../components/TacticalMap';
 import { useDevices } from '../hooks/useDevices';
 import { usePositions } from '../hooks/usePositions';
 import { useTeam } from '../hooks/useTeam';
-import { useMarkers, MARKER_KINDS, markerMeta } from '../hooks/useMarkers';
+import { useMarkers, markerMeta, markerKindLabel } from '../hooks/useMarkers';
 import { useMapViews } from '../hooks/useMapViews';
 import { usePatients } from '../hooks/usePatients';
+import { useMapShapes, categoryFitsKind, shapeCategoryLabel, shapeCategoryMeta } from '../hooks/useMapShapes';
+import { useMapConfig } from '../hooks/useMapConfig';
+import { useAuth } from '../auth/AuthContext';
+import { hasAtLeast } from '../auth/roles';
 import { TRIAGE_META } from '../lib/fieldCommands';
 import { supabase } from '../lib/supabase';
-import { getOrgId } from '../lib/org';
+import { getOrgId, cachedOrgId } from '../lib/org';
 import { memberLink } from '../lib/link';
+import { logEvent } from '../lib/eventLog';
+import { distanceM, parseMapFile, toGeoJSON } from '../lib/geo';
 import { RadioTower } from 'lucide-react';
 import { useI18n } from '../i18n/index.jsx';
 
@@ -26,17 +32,71 @@ const FRESH_MS = 10 * 60 * 1000; // crew fixes older than 10 min are stale
 // Translate a key built from data; show the raw value when no text exists for it.
 const tOr = (t, key, fallback) => { const v = t(key); return v === key ? fallback : v; };
 
+// Layer visibility, remembered per viewer on this device
+const LAYERS_KEY = 'wt-tac-layers';
+const BASE_LAYERS = ['crew', 'devices', 'patients', 'markers', 'zones', 'routes'];
+function loadLayers() {
+  const d = { crew: true, devices: true, patients: true, markers: true, zones: true, routes: true, ov: {} };
+  try {
+    const s = JSON.parse(localStorage.getItem(LAYERS_KEY) || 'null');
+    if (s && typeof s === 'object') return { ...d, ...s, ov: { ...(s.ov ?? {}) } };
+  } catch { /* storage unavailable or corrupt */ }
+  return d;
+}
+function saveLayers(v) {
+  try { localStorage.setItem(LAYERS_KEY, JSON.stringify(v)); } catch { /* storage unavailable */ }
+}
+
+const IMPORT_MAX_SHAPES = 300;
+const IMPORT_MAX_POINTS = 150;
+const KIND_ICONS = { zone: Hexagon, circle: Circle, route: Spline };
+
 export const TacticalMapTab = () => {
   const { t } = useI18n();
+  const { profile, session } = useAuth() ?? {};
+  const myId = session?.user?.id ?? profile?.id;
+  const role = profile?.role;
+  const canDraw = hasAtLeast(role, 'field');
   const { devices } = useDevices();
   const { latest: teamPositions } = usePositions();
   const { liveMembers } = useTeam();
-  const { markers: liveMarkers, createMarker, updateMarker, removeMarker } = useMarkers();
+  const { markers: liveMarkers, createMarker, createMarkers, updateMarker, removeMarker } = useMarkers();
   const { patients, counts: triageCounts } = usePatients();
+  const { shapes, error: shapesError, createShape, createShapes, updateShape, removeShape } = useMapShapes();
+  const { config: mapConfig, loaded: configLoaded, markerKinds, shapeCategories } = useMapConfig();
   const [myPos, setMyPos] = useState(null);
   const [zeroKey, setZeroKey] = useState(0);
   const [locating, setLocating] = useState(false);
-  const [mapMode, setMapMode] = useState('satellite');
+  const [mapMode, setMapModeRaw] = useState('satellite');
+  const modeTouched = useRef(false);
+  const setMapMode = (m) => { modeTouched.current = true; setMapModeRaw(m); };
+  // the company's default map type, unless this viewer already picked one
+  useEffect(() => {
+    if (configLoaded && !modeTouched.current) setMapModeRaw(mapConfig.default_mode);
+  }, [configLoaded, mapConfig.default_mode]);
+
+  // ---------- layers ----------
+  const [layers, setLayers] = useState(loadLayers);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const toggleLayer = (k) => setLayers(l => { const n = { ...l, [k]: !l[k] }; saveLayers(n); return n; });
+  const overlayOn = (o) => layers.ov?.[o.id] ?? o.on_by_default;
+  const toggleOverlay = (o) => setLayers(l => { const n = { ...l, ov: { ...l.ov, [o.id]: !overlayOn(o) } }; saveLayers(n); return n; });
+  const visibleOverlays = mapConfig.overlays.filter(overlayOn);
+
+  // ---------- drawing ----------
+  const [drawOpen, setDrawOpen] = useState(false);
+  const [drawKind, setDrawKind] = useState('zone');
+  const [draft, setDraft] = useState(null); // { kind, category, color, alert, points, center, radius }
+  const [drawBusy, setDrawBusy] = useState(false);
+  const [shapeError, setShapeError] = useState(null);
+  const [editingShapeId, setEditingShapeId] = useState(null);
+  const [openShape, setOpenShape] = useState(null);
+  const customCats = mapConfig.custom_shape_categories;
+  const categoryLabel = (id) => shapeCategoryLabel(t, id, customCats);
+
+  // ---------- import ----------
+  const fileRef = useRef(null);
+  const [imp, setImp] = useState(null); // { name, result, zoneCat, routeCat, busy, error }
   const [showWeather, setShowWeather] = useState(() => localStorage.getItem('wt-tac-radar') === '1');
   const toggleWeather = () => setShowWeather(v => {
     localStorage.setItem('wt-tac-radar', v ? '0' : '1');
@@ -116,11 +176,12 @@ export const TacticalMapTab = () => {
 
   const tacticalMarkers = liveMarkers.map(m => {
     const meta = markerMeta(m.kind);
+    const kindLabel = markerKindLabel(t, m.kind);
     return {
       id: m.id,
-      name: m.label || t(`marker.${meta.id}`),
+      name: m.label || kindLabel,
       rawLabel: m.label,
-      kindLabel: t(`marker.${meta.id}`),
+      kindLabel,
       icon: meta.icon,
       position: { lat: m.lat, lng: m.lng },
       notes: m.notes,
@@ -142,18 +203,130 @@ export const TacticalMapTab = () => {
     }));
 
   const mapDevices = [
-    ...placed.map(d => ({
+    ...(layers.devices ? placed.map(d => ({
       id: d.id,
       name: d.name,
       type: KIND_TYPE[d.kind] ?? 'sensor',
       status: d.status,
       position: { lat: d.lat, lng: d.lng },
       icon: KIND_ICON[d.kind] ?? '📍',
-    })),
-    ...teamMarkers,
-    ...patientMarkers,
+    })) : []),
+    ...(layers.crew ? teamMarkers : []),
+    ...(layers.patients ? patientMarkers : []),
     ...(myPos ? [{ id: 'me', name: t('tac.myPosition'), type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
   ];
+
+  // Drawn shapes, filtered by layer (the one being reshaped always stays)
+  const mapShapes = shapes.filter(s =>
+    s.id === editingShapeId || (s.kind === 'route' ? layers.routes : layers.zones));
+  const canEditShape = (s) => s.created_by === myId || hasAtLeast(role, 'operator');
+  const describeShape = (s) =>
+    `${nameOf[s.created_by] ?? t('tac.team')} · ${new Date(s.updated_at ?? s.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+  const tableMissing = (msg) => /does not exist|schema cache/i.test(msg ?? '');
+
+  // ---------- drawing ----------
+  const startDraw = (kind, cat) => {
+    setEditingShapeId(null);
+    setShapeError(null);
+    setDraft({ kind, category: cat.id, color: cat.color, alert: kind === 'route' ? 'none' : cat.alert, points: [], center: null, radius: 0 });
+  };
+  const onDrawClick = (pos) => setDraft(d => {
+    if (!d) return d;
+    if (d.kind === 'circle') {
+      if (!d.center) return { ...d, center: pos };
+      return { ...d, radius: Math.max(1, Math.round(distanceM(d.center, pos))) };
+    }
+    return { ...d, points: [...d.points, pos] };
+  });
+  const undoPoint = () => setDraft(d => {
+    if (!d) return d;
+    if (d.kind === 'circle') return d.radius ? { ...d, radius: 0 } : { ...d, center: null };
+    return { ...d, points: d.points.slice(0, -1) };
+  });
+  const draftReady = draft && (draft.kind === 'zone' ? draft.points.length >= 3
+    : draft.kind === 'route' ? draft.points.length >= 2
+    : Boolean(draft.center) && draft.radius > 0);
+  const finishDraw = async () => {
+    if (!draftReady || drawBusy) return;
+    setDrawBusy(true);
+    setShapeError(null);
+    try {
+      const geometry = draft.kind === 'circle'
+        ? { center: draft.center, radius: draft.radius }
+        : { path: draft.points };
+      const s = await createShape({ kind: draft.kind, category: draft.category, color: draft.color, alert: draft.alert, label: '', geometry });
+      setDraft(null);
+      setDrawOpen(false);
+      if (s?.id) setOpenShape({ id: s.id, n: Date.now() }); // name it right away
+    } catch (err) {
+      setShapeError(tableMissing(err.message) ? t('map.tableMissing') : (err.message ?? t('map.saveFailed')));
+    }
+    setDrawBusy(false);
+  };
+  const draftHint = !draft ? ''
+    : draft.kind === 'circle'
+      ? (!draft.center ? t('map.draw.hintCenter') : t('map.draw.hintRadius'))
+      : draft.kind === 'route' ? t('map.draw.hintRoute') : t('map.draw.hintZone');
+
+  const finishReshape = () => {
+    if (editingShapeId) logEvent('shape.reshaped', {}, editingShapeId);
+    setEditingShapeId(null);
+  };
+
+  // ---------- import / export ----------
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { setImp({ name: file.name, error: t('map.import.tooBig') }); return; }
+    try {
+      const text = await file.text();
+      const result = parseMapFile(file.name, text);
+      const firstZone = shapeCategories.find(c => categoryFitsKind(c, 'zone'));
+      const firstRoute = shapeCategories.find(c => categoryFitsKind(c, 'route'));
+      setImp({ name: file.name, result, zoneCat: firstZone?.id ?? '', routeCat: firstRoute?.id ?? '' });
+    } catch (err) {
+      setImp({ name: file.name, error: t('map.import.unreadable', { msg: err.message ?? '' }) });
+    }
+  };
+  const runImport = async () => {
+    if (!imp?.result) return;
+    setImp(i => ({ ...i, busy: true, error: null }));
+    try {
+      const { zones, routes, points } = imp.result;
+      const zc = shapeCategoryMeta(imp.zoneCat, customCats);
+      const rc = shapeCategoryMeta(imp.routeCat, customCats);
+      const rows = [
+        ...zones.map(z => ({ kind: 'zone', category: imp.zoneCat, color: zc?.color ?? '#38bdf8', alert: zc?.alert ?? 'none', label: z.label, notes: z.notes, geometry: { path: z.path } })),
+        ...routes.map(r => ({ kind: 'route', category: imp.routeCat, color: rc?.color ?? '#38bdf8', alert: 'none', label: r.label, notes: r.notes, geometry: { path: r.path } })),
+      ].slice(0, IMPORT_MAX_SHAPES);
+      if (rows.length) await createShapes(rows);
+      const pts = points.slice(0, IMPORT_MAX_POINTS).map(p => ({ kind: 'poi', label: p.label, notes: p.notes, lat: p.lat, lng: p.lng }));
+      if (pts.length) await createMarkers(pts);
+      setImp(null);
+    } catch (err) {
+      setImp(i => ({ ...i, busy: false, error: tableMissing(err.message) ? t('map.tableMissing') : err.message }));
+    }
+  };
+  const exportGeoJSON = () => {
+    const org = cachedOrgId();
+    const fc = toGeoJSON({
+      shapes,
+      markers: liveMarkers.filter(m => !org || m.org_id === org), // never hand out a linked company's points
+      labels: { category: categoryLabel, markerKind: (k) => markerKindLabel(t, k) },
+      name: t('tac.title'),
+    });
+    const blob = new Blob([JSON.stringify(fc, null, 1)], { type: 'application/geo+json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `watchtower-map-${new Date().toISOString().slice(0, 10)}.geojson`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    logEvent('map.exported', { features: fc.features.length });
+  };
 
   const anchors = [...placed.map(d => ({ lat: d.lat, lng: d.lng })), ...teamMarkers.map(t => t.position)];
   const baseCenter = myPos ?? (anchors.length
@@ -314,9 +487,9 @@ export const TacticalMapTab = () => {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setMarkerPanelOpen(o => !o)}
+            onClick={() => { setMarkerPanelOpen(o => !o); setDrawOpen(false); setDraft(null); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
               markerPanelOpen ? 'bg-orange-500/20 border-orange-500/40 text-orange-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             }`}
@@ -324,6 +497,47 @@ export const TacticalMapTab = () => {
             <Plus className="w-3.5 h-3.5" />
             {t('tac.marker')}
           </button>
+          {canDraw && (
+            <button
+              onClick={() => { setDrawOpen(o => !o); setDraft(null); setMarkerPanelOpen(false); setEditingShapeId(null); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+                drawOpen || draft ? 'bg-orange-500/20 border-orange-500/40 text-orange-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+              }`}
+              title={t('map.drawTitle')}
+            >
+              <PenTool className="w-3.5 h-3.5" />
+              {t('map.draw')}
+            </button>
+          )}
+          <button
+            onClick={() => setLayersOpen(o => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+              layersOpen ? 'bg-sky-500/20 border-sky-500/40 text-sky-300' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+            title={t('map.layersTitle')}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            {t('map.layers')}
+          </button>
+          {canDraw && (
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-700"
+              title={t('map.importTitle')}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{t('map.import')}</span>
+            </button>
+          )}
+          <button
+            onClick={exportGeoJSON}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-700"
+            title={t('map.exportTitle')}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{t('map.export')}</span>
+          </button>
+          <input ref={fileRef} type="file" accept=".geojson,.json,.kml,application/geo+json,application/vnd.google-earth.kml+xml" onChange={onFile} className="hidden" />
           <button
             onClick={zeroIn}
             disabled={locating}
@@ -462,8 +676,8 @@ export const TacticalMapTab = () => {
       {/* Marker creation: tap a type -> it drops at the center of your view */}
       {markerPanelOpen && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-shrink-0 space-y-1.5">
-          <div className="grid grid-cols-3 sm:grid-cols-9 gap-1">
-            {MARKER_KINDS.map(k => (
+          <div className="grid grid-cols-4 sm:grid-cols-7 lg:grid-cols-10 gap-1">
+            {markerKinds.map(k => (
               <button
                 key={k.id}
                 onPointerDown={(e) => !markerBusy && startDrag(e, k.id)}
@@ -472,7 +686,7 @@ export const TacticalMapTab = () => {
                 className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-orange-500/15 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50 cursor-grab active:cursor-grabbing select-none"
               >
                 <span className="text-base leading-none pointer-events-none">{k.icon}</span>
-                <span className="pointer-events-none">{t(`marker.${k.id}`)}</span>
+                <span className="pointer-events-none text-center leading-tight">{k.custom ? k.label : t(`marker.${k.id}`)}</span>
               </button>
             ))}
           </div>
@@ -481,6 +695,112 @@ export const TacticalMapTab = () => {
           </p>
           {markerError && <p className="text-[10px] text-red-400">{markerError}</p>}
         </div>
+      )}
+
+      {/* Layers: what this viewer sees (remembered on this device) */}
+      {layersOpen && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-shrink-0 space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            {BASE_LAYERS.map(k => (
+              <button key={k} onClick={() => toggleLayer(k)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs ${layers[k] ? 'bg-sky-500/15 border-sky-500/40 text-sky-200' : 'bg-slate-800/50 border-slate-700 text-slate-500 line-through'}`}>
+                {layers[k] && <Check className="w-3 h-3" />}{t(`map.layer.${k}`)}
+              </button>
+            ))}
+          </div>
+          {mapConfig.overlays.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">{t('map.overlays')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {mapConfig.overlays.map(o => (
+                  <button key={o.id} onClick={() => toggleOverlay(o)} title={o.attribution || o.name}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs ${overlayOn(o) ? 'bg-sky-500/15 border-sky-500/40 text-sky-200' : 'bg-slate-800/50 border-slate-700 text-slate-500'}`}>
+                    {overlayOn(o) && <Check className="w-3 h-3" />}{o.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-[10px] text-slate-500">{t('map.layersHelp')}</p>
+        </div>
+      )}
+
+      {/* Draw: pick a kind and a category, then tap the map */}
+      {drawOpen && !draft && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex-shrink-0 space-y-2">
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1 w-fit">
+            {['zone', 'circle', 'route'].map(k => {
+              const Icon = KIND_ICONS[k];
+              return (
+                <button key={k} onClick={() => setDrawKind(k)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs ${drawKind === k ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  <Icon className="w-3.5 h-3.5" />{t(`map.kind.${k}`)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {shapeCategories.filter(c => categoryFitsKind(c, drawKind)).map(c => (
+              <button key={c.id} onClick={() => startDraw(drawKind, c)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/50 text-xs text-slate-200 hover:border-orange-500/40 hover:bg-orange-500/10">
+                <span className="w-3 h-3 rounded-sm inline-block" style={{ background: c.color }} />
+                {categoryLabel(c.id)}
+                {drawKind !== 'route' && c.alert !== 'none' && <span className="text-[9px] text-amber-300">🔔</span>}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-500">{t('map.drawHelp')}</p>
+          {shapeError && <p className="text-[10px] text-red-400">{shapeError}</p>}
+        </div>
+      )}
+
+      {/* Import preview */}
+      {imp && (
+        <div className="bg-slate-900 border border-sky-500/40 rounded-xl p-3 flex-shrink-0 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-white truncate">{t('map.import.title', { name: imp.name })}</p>
+            <button onClick={() => setImp(null)} className="p-1 text-slate-400 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+          </div>
+          {imp.result && (
+            <>
+              <p className="text-xs text-slate-300">
+                {t('map.import.counts', { zones: imp.result.zones.length, routes: imp.result.routes.length, points: imp.result.points.length })}
+                {imp.result.skipped > 0 && <span className="text-slate-500"> · {t('map.import.skipped', { n: imp.result.skipped })}</span>}
+              </p>
+              {(imp.result.zones.length + imp.result.routes.length > IMPORT_MAX_SHAPES || imp.result.points.length > IMPORT_MAX_POINTS) && (
+                <p className="text-[10px] text-amber-300">{t('map.import.capped', { shapes: IMPORT_MAX_SHAPES, points: IMPORT_MAX_POINTS })}</p>
+              )}
+              <div className="flex flex-wrap gap-3">
+                {imp.result.zones.length > 0 && (
+                  <label className="text-[10px] text-slate-400">{t('map.import.zonesAs')}
+                    <select value={imp.zoneCat} onChange={e => setImp(i => ({ ...i, zoneCat: e.target.value }))}
+                      className="block mt-0.5 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white">
+                      {shapeCategories.filter(c => categoryFitsKind(c, 'zone')).map(c => <option key={c.id} value={c.id}>{categoryLabel(c.id)}</option>)}
+                    </select>
+                  </label>
+                )}
+                {imp.result.routes.length > 0 && (
+                  <label className="text-[10px] text-slate-400">{t('map.import.routesAs')}
+                    <select value={imp.routeCat} onChange={e => setImp(i => ({ ...i, routeCat: e.target.value }))}
+                      className="block mt-0.5 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white">
+                      {shapeCategories.filter(c => categoryFitsKind(c, 'route')).map(c => <option key={c.id} value={c.id}>{categoryLabel(c.id)}</option>)}
+                    </select>
+                  </label>
+                )}
+                {imp.result.points.length > 0 && <p className="text-[10px] text-slate-400 self-end">{t('map.import.pointsAs')}</p>}
+              </div>
+              <button onClick={runImport}
+                disabled={imp.busy || imp.result.zones.length + imp.result.routes.length + imp.result.points.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 rounded-lg text-xs font-semibold text-white disabled:opacity-50">
+                <Upload className="w-3.5 h-3.5" />{imp.busy ? t('map.import.busy') : t('map.import.go')}
+              </button>
+            </>
+          )}
+          {imp.error && <p className="text-[10px] text-red-400">{imp.error}</p>}
+        </div>
+      )}
+      {shapesError && tableMissing(shapesError) && (
+        <p className="text-[10px] text-amber-300 flex-shrink-0">{t('map.tableMissing')}</p>
       )}
 
       <div
@@ -495,14 +815,86 @@ export const TacticalMapTab = () => {
           devices={mapDevices}
           center={center}
           zoom={zoom}
-          geofences={[]}
           alerts={[]}
           markers={tacticalMarkers}
+          showMarkers={layers.markers}
           onMarkerMove={(id, pos) => updateMarker(id, pos).catch(() => {})}
           onMarkerEdit={(id, patch) => updateMarker(id, patch).catch(() => {})}
           onMarkerDelete={(id) => removeMarker(id).catch(() => {})}
           onCameraChanged={(cam) => { if (cam?.center) cameraRef.current = cam; }}
+          onMapClick={draft ? onDrawClick : undefined}
+          draft={draft}
+          shapes={mapShapes}
+          shapeCategories={shapeCategories}
+          categoryLabel={categoryLabel}
+          describeShape={describeShape}
+          canEditShape={canEditShape}
+          onShapeSave={(id, patch) => updateShape(id, patch).catch(e => setShapeError(e.message))}
+          onShapeDelete={(id) => { if (editingShapeId === id) setEditingShapeId(null); removeShape(id).catch(e => setShapeError(e.message)); }}
+          editingShapeId={editingShapeId}
+          onShapeEditToggle={(id) => (id ? setEditingShapeId(id) : finishReshape())}
+          onShapeGeometry={(id, geometry) => updateShape(id, { geometry }, { quiet: true }).catch(e => setShapeError(e.message))}
+          openShape={openShape}
+          overlays={visibleOverlays}
         />
+        {/* Drawing toolbar */}
+        {draft && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[min(94%,440px)] bg-slate-900/95 border border-orange-500/50 rounded-xl px-3 py-2 space-y-1.5 shadow-xl">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ background: draft.color }} />
+              <span className="text-xs font-semibold text-white truncate">{categoryLabel(draft.category)} · {t(`map.kind.${draft.kind}`)}</span>
+              <span className="ml-auto text-[10px] text-slate-400 whitespace-nowrap">
+                {draft.kind === 'circle'
+                  ? (draft.radius ? t('map.draw.radiusM', { m: draft.radius }) : '')
+                  : t('map.draw.points', { n: draft.points.length })}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-300">{draftHint}</p>
+            {draft.kind === 'circle' && draft.center && (
+              <label className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                {t('map.draw.radius')}
+                <input type="number" min="1" step="10" value={draft.radius || ''} placeholder="500"
+                  onChange={e => { const v = Math.round(Number(e.target.value)); setDraft(d => ({ ...d, radius: Number.isFinite(v) && v > 0 ? v : 0 })); }}
+                  className="w-24 px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-xs text-white" />
+                m
+              </label>
+            )}
+            <div className="flex items-center gap-1.5">
+              <button onClick={undoPoint}
+                disabled={draft.kind === 'circle' ? !draft.center : draft.points.length === 0}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200 disabled:opacity-40">
+                <Undo2 className="w-3.5 h-3.5" />{t('map.draw.undo')}
+              </button>
+              <button onClick={finishDraw} disabled={!draftReady || drawBusy}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 text-xs font-semibold text-white disabled:opacity-40">
+                <Check className="w-3.5 h-3.5" />{t('map.draw.finish')}
+              </button>
+              <button onClick={() => setDraft(null)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-300">
+                <X className="w-3.5 h-3.5" />{t('map.draw.cancel')}
+              </button>
+            </div>
+            {shapeError && <p className="text-[10px] text-red-400">{shapeError}</p>}
+          </div>
+        )}
+        {/* Reshaping bar */}
+        {editingShapeId && !draft && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[min(94%,440px)] bg-slate-900/95 border border-sky-500/50 rounded-xl px-3 py-2 flex items-center gap-2 shadow-xl">
+            <p className="text-[11px] text-slate-200 flex-1">{t('map.reshapeHelp')}</p>
+            <button onClick={finishReshape} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 text-xs font-semibold text-white">
+              <Check className="w-3.5 h-3.5" />{t('map.reshapeDone')}
+            </button>
+          </div>
+        )}
+        {!draft && !editingShapeId && shapeError && (
+          <p className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] text-red-300 bg-slate-900/90 border border-red-500/40 rounded-lg px-2 py-1">{shapeError}</p>
+        )}
+        {/* Credit for company overlays */}
+        {visibleOverlays.some(o => o.attribution) && (
+          <p className="absolute bottom-0.5 left-1/2 -translate-x-1/2 max-w-[60%] truncate text-[9px] text-slate-200 bg-slate-900/70 px-1.5 rounded pointer-events-none">
+            {visibleOverlays.filter(o => o.attribution).map(o => o.attribution).join(' · ')}
+          </p>
+        )}
         {showSignal && (
           <div className="absolute left-2 bottom-8 bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-2 space-y-1.5 text-[10px]">
             <div className="flex items-center gap-1">
@@ -523,7 +915,7 @@ export const TacticalMapTab = () => {
             {coverage && coverage.length === 0 && <p className="text-slate-500">{t('tac.noSamples')}</p>}
           </div>
         )}
-        {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && (
+        {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && shapes.length === 0 && !draft && !editingShapeId && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
             <p className="text-[10px] text-slate-300">
               {t('tac.empty')}

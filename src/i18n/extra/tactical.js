@@ -8,6 +8,10 @@ export default {
   'marker.blocked': 'Road blocked',
   'marker.water': 'Water source',
   'marker.staging': 'Staging area',
+  'marker.rally': 'Rally point',
+  'marker.helispot': 'Helicopter landing zone',
+  'marker.command_post': 'Command post',
+  'marker.shelter': 'Shelter',
   'marker.vehicle': 'Vehicle',
   'marker.poi': 'Point of interest',
 
