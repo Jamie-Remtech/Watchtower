@@ -15,6 +15,27 @@ import { useI18n } from '../i18n/index.jsx';
 
 const blankRoutes = { broadcasts: true, alerts: ['critical'], channels: [] };
 
+// What real keys look like — a saved login email/password fails these.
+const SECRET_SHAPE = {
+  account_sid: /^AC[0-9a-fA-F]{32}$/,
+  auth_token: /^[0-9a-fA-F]{32}$/,
+  bot_token: /^\d{5,}:[\w-]{30,}$/,
+  routing_key: /^[0-9a-zA-Z]{32}$/,
+  url: /^https:\/\/\S+$/,
+};
+
+// "(431) 400-7039" → "+14314007039"; North American 10-digit numbers get +1
+function toE164(n) {
+  const s = String(n ?? '').trim();
+  if (!s) return s;
+  const plus = s.startsWith('+');
+  const d = s.replace(/\D/g, '');
+  if (plus) return `+${d}`;
+  if (d.length === 10) return `+1${d}`;
+  if (d.length === 11 && d.startsWith('1')) return `+${d}`;
+  return `+${d}`;
+}
+
 const Editor = ({ initial, channels, groups, onDone }) => {
   const { t } = useI18n();
   const kind = initial.catalog;
@@ -37,10 +58,19 @@ const Editor = ({ initial, channels, groups, onDone }) => {
     try {
       // secrets are replaced as a whole, so required ones come all together
       if (!kind.secretOptional && (needsSecret || hasSecretInput) && !kind.secret.every(([k]) => (secret[k] ?? '').trim())) throw new Error(t('int.needSecret'));
+      // catch browser autofill / wrong values before they are stored
+      for (const [k] of kind.secret) {
+        const v = (secret[k] ?? '').trim();
+        if (v && SECRET_SHAPE[k] && !SECRET_SHAPE[k].test(v)) throw new Error(t(`int.bad.${k}`));
+      }
       const cleanCfg = { ...config };
+      const phones = kind.config.some(([, ty]) => ty === 'tel');
       for (const [k, ty] of kind.config) {
         if (ty === 'list' || ty === 'groups') cleanCfg[k] = (Array.isArray(cleanCfg[k]) ? cleanCfg[k] : String(cleanCfg[k] ?? '').split(/[,\n]/)).map(s => s.trim()).filter(Boolean);
+        if (ty === 'tel' && cleanCfg[k]) cleanCfg[k] = toE164(cleanCfg[k]);
+        if (ty === 'list' && phones) cleanCfg[k] = cleanCfg[k].map(toE164);
       }
+      if (phones && cleanCfg.from && !/^\+\d{8,15}$/.test(cleanCfg.from)) throw new Error(t('int.bad.from'));
       const row = await saveConnector({
         id: initial.id, kind: kind.kind ?? kind.id, name: name.trim() || t(`int.kind.${kind.id}`), enabled: initial.enabled ?? true,
         config: cleanCfg, routes: kind.noOutbound ? {} : routes, inbound_enabled: !!kind.inbound && inboundOn, inbound_channel: inboundChannel || null,
@@ -98,7 +128,8 @@ const Editor = ({ initial, channels, groups, onDone }) => {
           </p>
           <div className="grid sm:grid-cols-2 gap-2">
             {kind.secret.map(([k, ty]) => (
-              <input key={k} className={input} type={ty === 'password' ? 'password' : ty === 'url' ? 'url' : 'text'} autoComplete="off"
+              <input key={k} className={input} type={ty === 'password' ? 'password' : ty === 'url' ? 'url' : 'text'}
+                autoComplete={ty === 'password' ? 'new-password' : 'off'} name={`wt-${kind.id}-${k}`} data-lpignore="true" data-1p-ignore="true" data-form-type="other" spellCheck={false}
                 value={secret[k] ?? ''} onChange={e => setSecretState(s => ({ ...s, [k]: e.target.value }))}
                 placeholder={`${t(`int.f.${k}`)}${kind.secretOptional && k !== 'url' ? ` (${t('int.optional')})` : ''}`} />
             ))}

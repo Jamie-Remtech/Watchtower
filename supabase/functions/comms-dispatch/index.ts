@@ -31,7 +31,16 @@ async function hmac256(key: string, data: string) {
 }
 async function sha256(s: string) { return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))); }
 
-const PERSON_KINDS = ['twilio_sms', 'twilio_whatsapp', 'resend', 'sendgrid'];
+// "(514) 883-2224" → "+15148832224" (North American 10-digit numbers get +1)
+function e164(n: string) {
+  const s = String(n ?? '').trim().replace(/^whatsapp:/, '');
+  const d = s.replace(/\D/g, '');
+  if (s.startsWith('+')) return `+${d}`;
+  if (d.length === 10) return `+1${d}`;
+  return `+${d}`;
+}
+
+const PERSON_KINDS =['twilio_sms', 'twilio_whatsapp', 'resend', 'sendgrid'];
 const SEV_ICON: Record<string, string> = { emergency: '🚨', urgent: '⚠️', info: 'ℹ️', critical: '🚨', warning: '⚠️' };
 
 // ---------- what to say ----------
@@ -122,11 +131,12 @@ async function send(c: Row, secret: Row, item: Item): Promise<Result[]> {
       const sid = secret.account_sid, tok = secret.auth_token;
       if (!sid || !tok || !cfg.from) return [{ target: '-', ok: false, detail: 'Account SID, auth token and From number are required' }];
       const wa = c.kind === 'twilio_whatsapp';
-      const to = await recipients(c, item);
+      const to = [...new Set((await recipients(c, item)).map(e164))];
       if (!to.length) return [{ target: '-', ok: false, detail: 'no recipients (add numbers or contact groups)' }];
+      const from = e164(String(cfg.from).replace(/^whatsapp:/, ''));
       const out: Result[] = [];
       for (const n of to) {
-        const form = new URLSearchParams({ To: wa ? `whatsapp:${n.replace(/^whatsapp:/, '')}` : n, From: wa ? `whatsapp:${String(cfg.from).replace(/^whatsapp:/, '')}` : cfg.from, Body: short });
+        const form = new URLSearchParams({ To: wa ? `whatsapp:${n}` : n, From: wa ? `whatsapp:${from}` : from, Body: short });
         const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
           method: 'POST', headers: { Authorization: `Basic ${btoa(`${sid}:${tok}`)}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: form,
         });
