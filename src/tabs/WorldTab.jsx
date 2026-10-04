@@ -1,3 +1,4 @@
+import { fetchNaturalEvents, fetchHotspots, daysAgo } from '../lib/fires';
 import { AirspacePanel } from '../components/AirspacePanel';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as maplibregl from 'maplibre-gl';
@@ -125,8 +126,13 @@ const OVERLAYS = [
   },
   {
     id: 'events', name: 'Natural events', icon: Flame, defaultOn: true,
-    source: 'NASA EONET (curated; every event links to its source)',
+    source: 'NASA EONET (fires reported in the last 14 days, no prescribed burns; every event links to its source)',
     desc: 'Live wildfires, volcanoes, severe storms',
+  },
+  {
+    id: 'heat', name: 'Satellite heat (24 h)', icon: Flame, defaultOn: true,
+    source: 'CWFIS / Natural Resources Canada — VIIRS & MODIS fire hotspots, last 24 h',
+    desc: 'Where satellites saw fire heat — red: in fuel, faint: likely farm burning',
   },
   {
     id: 'aerosol', name: 'Aerosol / dust', icon: Wind, defaultOn: false,
@@ -341,28 +347,27 @@ export const WorldTab = () => {
 
   const EVENT_COLORS = { wildfires: '#f97316', volcanoes: '#ef4444', severeStorms: '#38bdf8', seaLakeIce: '#a5f3fc', floods: '#3b82f6' };
 
+  // Natural events: only fires reported in the last 14 days, no planned burns
+  // (see lib/fires.js), plus Canada's satellite heat detections of the last 24 h.
   const loadEvents = useCallback(async (map) => {
     try {
-      const res = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=1000');
-      const data = await res.json();
-      const features = data.events.map((e) => {
-        const g = e.geometry?.at(-1);
-        if (!g) return null;
-        const coords = g.type === 'Point' ? g.coordinates : g.coordinates?.[0]?.[0];
-        if (!Array.isArray(coords)) return null;
-        const cat = e.categories?.[0]?.id ?? 'other';
-        return {
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: coords.slice(0, 2) },
-          properties: {
-            title: e.title, cat,
-            color: EVENT_COLORS[cat] ?? '#facc15',
-            date: g.date, link: e.sources?.[0]?.url ?? e.link,
-          },
-        };
-      }).filter(Boolean);
-      const src = map.getSource('eonet');
-      if (src) src.setData({ type: 'FeatureCollection', features });
+      const [events, heat] = await Promise.all([fetchNaturalEvents().catch(() => null), fetchHotspots()]);
+      if (events) {
+        map.getSource('eonet')?.setData({
+          type: 'FeatureCollection',
+          features: events.map(e => ({
+            type: 'Feature', geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+            properties: { title: e.title, cat: e.cat, color: EVENT_COLORS[e.cat] ?? '#facc15', date: e.date, link: e.link, size: e.size, unit: e.unit },
+          })),
+        });
+      }
+      if (heat.length) map.getSource('hotspots')?.setData({
+        type: 'FeatureCollection',
+        features: heat.map(h => ({
+          type: 'Feature', geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
+          properties: { date: h.date, fuel: h.fuel, agency: h.agency, sensor: h.sensor, hfi: h.hfi, fwi: h.fwi, farm: h.farm ? 1 : 0 },
+        })),
+      });
     } catch { /* keep last data */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -524,17 +529,52 @@ export const WorldTab = () => {
       map.on('click', 'eonet-circles', (e) => {
         const f = e.features[0];
         const tr = tRef.current;
+        const esc = (s) => String(s ?? '').replace(/[<>&"]/g, '');
+        const ago = daysAgo(f.properties.date);
         trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' }))
           .setLngLat(f.geometry.coordinates)
           .setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
-              <strong>${f.properties.title}</strong><br/>
-              ${f.properties.cat} · ${new Date(f.properties.date).toLocaleDateString()}<br/>
-              <a href="${f.properties.link}" target="_blank" rel="noreferrer" style="color:#ea580c">${tr('world.popup.verifySource')}</a>
+              <strong>${esc(f.properties.title)}</strong><br/>
+              ${esc(tr(`world.cat.${f.properties.cat}`))} · ${tr('world.popup.reported', { d: new Date(f.properties.date).toLocaleDateString(), n: ago })}
+              ${f.properties.size ? `<br/>${esc(f.properties.size)} ${esc(f.properties.unit)}` : ''}<br/>
+              <a href="${esc(f.properties.link)}" target="_blank" rel="noreferrer" style="color:#ea580c">${tr('world.popup.verifySource')}</a>
             </div>`
           )
           .addTo(map);
       });
+
+      // Satellite heat detections, last 24 h (CWFIS) — farm burns drawn faint
+      map.addSource('hotspots', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'hotspot-circles', type: 'circle', source: 'hotspots',
+        layout: { visibility: enabled.heat ? 'visible' : 'none' },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 1.6, 8, 4, 12, 7],
+          'circle-color': ['case', ['==', ['get', 'farm'], 1], '#fbbf24', '#ef4444'],
+          'circle-opacity': ['case', ['==', ['get', 'farm'], 1], 0.35, 0.85],
+          'circle-stroke-width': 0.5,
+          'circle-stroke-color': '#450a0a',
+        },
+      });
+      map.on('click', 'hotspot-circles', (e) => {
+        const p = e.features[0].properties;
+        const tr = tRef.current;
+        const esc = (s) => String(s ?? '').replace(/[<>&"]/g, '');
+        trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '260px' }))
+          .setLngLat(e.features[0].geometry.coordinates)
+          .setHTML(
+            `<div style="font-family:inherit;font-size:12px;color:#0f172a">
+              <strong>${tr(p.farm ? 'world.heat.farm' : 'world.heat.title')}</strong><br/>
+              ${new Date(p.date).toLocaleString()} · ${esc(p.sensor)}<br/>
+              ${tr('world.heat.fuel', { f: esc(p.fuel ?? '—') })}${p.fwi != null ? ` · FWI ${Math.round(p.fwi)}` : ''}${p.hfi != null ? ` · HFI ${Math.round(p.hfi)} kW/m` : ''}<br/>
+              <span style="color:#64748b">${tr('world.heat.note')}</span>
+            </div>`
+          )
+          .addTo(map);
+      });
+      map.on('mouseenter', 'hotspot-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'hotspot-circles', () => { map.getCanvas().style.cursor = ''; });
       map.on('mouseenter', 'eonet-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'eonet-circles', () => { map.getCanvas().style.cursor = ''; });
 
@@ -573,7 +613,7 @@ export const WorldTab = () => {
 
       // Click anywhere -> live point weather from Open-Meteo
       map.on('click', async (e) => {
-        if (map.queryRenderedFeatures(e.point, { layers: ['quake-circles', 'eonet-circles'] }).length) return;
+        if (map.queryRenderedFeatures(e.point, { layers: ['quake-circles', 'eonet-circles', 'hotspot-circles'] }).length) return;
         // A tap on the bare map while a popup is open just dismisses it
         if (activePopup) { activePopup.remove(); activePopup = null; return; }
         const { lng, lat } = e.lngLat;
@@ -926,7 +966,7 @@ export const WorldTab = () => {
   }, [enabled.wind, ready, fetchWind]);
 
   // ---------- layer toggling ----------
-  const LAYER_IDS = { satday: ['basemap'], places: ['labels', 'streets'], quakes: ['quake-circles'], events: ['eonet-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'], lidar: ['lidar-world', 'lidar-hrdem'] };
+  const LAYER_IDS = { satday: ['basemap'], places: ['labels', 'streets'], quakes: ['quake-circles'], events: ['eonet-circles'], heat: ['hotspot-circles'], fcst: ['fcst-clouds', 'fcst-precip'], wind: ['wind-casing', 'wind'], geoclouds: ['geo-east', 'geo-west', 'geo-him'], lidar: ['lidar-world', 'lidar-hrdem'] };
   const applyVisibility = (next) => {
     const map = mapRef.current;
     for (const o of OVERLAYS) {

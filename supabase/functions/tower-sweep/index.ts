@@ -250,9 +250,14 @@ Deno.serve(async (req) => {
 
     let fires: Array<{ id: string; title: string; lat: number; lng: number }> = [];
     try {
-      const d = await (await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=wildfires&limit=500')).json();
+      // Only fires reported in the last 14 days and not planned burns: EONET
+      // keeps most US incidents "open" for months after they are out.
+      const d = await (await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&category=wildfires&days=14&limit=500')).json();
+      const cutoff = Date.now() - 14 * 86400e3;
       for (const e of d.events ?? []) {
+        if (/prescribed|\bRX\b|pile burn/i.test(e.title ?? '')) continue;
         const g = e.geometry?.at(-1);
+        if (!g?.date || Date.parse(g.date) < cutoff) continue;
         const c = g?.type === 'Point' ? g.coordinates : g?.coordinates?.[0]?.[0];
         if (Array.isArray(c)) fires.push({ id: e.id, title: e.title, lng: c[0], lat: c[1] });
       }

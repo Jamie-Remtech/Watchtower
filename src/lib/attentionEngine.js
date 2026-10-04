@@ -1,4 +1,5 @@
 import { rvPixelDbz } from './radarPalette';
+import { fetchNaturalEvents } from './fires';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { logEvent } from './eventLog';
 import { pushToTeam, localNotify } from './push';
@@ -133,15 +134,12 @@ export async function runAttentionSweep() {
   if (centroid) {
     // ---- Natural events near the fleet (NASA EONET) ----
     try {
-      const res = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=1000');
-      const data = await res.json();
-      for (const e of data.events ?? []) {
-        const g = e.geometry?.at(-1);
-        const coords = g?.type === 'Point' ? g.coordinates : g?.coordinates?.[0]?.[0];
-        if (!Array.isArray(coords)) continue;
-        const pos = { lng: coords[0], lat: coords[1] };
+      // fresh, real fires only — EONET keeps months-old and planned burns "open"
+      const events = await fetchNaturalEvents();
+      for (const e of events) {
+        const pos = { lng: e.lng, lat: e.lat };
         const dist = nearestDist(pos);
-        const cat = e.categories?.[0]?.id;
+        const cat = e.cat;
         const isFire = cat === 'wildfires';
         const radius = isFire ? WILDFIRE_RADIUS_KM : HAZARD_RADIUS_KM;
         if (dist <= radius) {
@@ -151,7 +149,7 @@ export async function runAttentionSweep() {
             severity: isFire ? 'critical' : 'warning',
             kind: 'hazard',
             title: `${isFire ? 'Wildfire' : 'Natural event'} ${Math.round(dist)} km from your fleet`,
-            detail: `${e.title}. Source: NASA EONET${e.sources?.[0]?.url ? ` — verify: ${e.sources[0].url}` : ''}`,
+            detail: `${e.title}. Source: NASA EONET${e.link ? ` — verify: ${e.link}` : ''}`,
             subject: e.id,
             source: { lat: pos.lat, lng: pos.lng, category: cat, distance_km: Math.round(dist) },
           });
