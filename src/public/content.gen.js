@@ -197,9 +197,10 @@ export default {
       "Ativar/desativar camadas no globo",
       "Camadas → Terra nua, depois ◎ para ver uma camada isolada",
       "Espaço aéreo → aeronaves e drones na altitude deles, visão 3D, Drone up para declarar um voo",
-      "Reproduzir o loop de radar e nuvens",
-      "Previsões → a próxima temporada",
-      "Previsões → Histórico da área e histórico de acertos"
+      "Calor via satélite → onde os satélites detectaram fogo nas últimas 24 h; Eventos naturais mostra apenas incêndios reportados nos últimos 14 dias",
+      "Reproduzir a sequência de radar e nuvens",
+      "Previsões → a temporada à frente",
+      "Previsões → Histórico da área e Registro histórico"
      ]
     ],
     [
@@ -469,9 +470,10 @@ export default {
       "Ebenen auf dem Globus umschalten",
       "Ebenen → Kahle Erde, dann ◎ um nur eine Ebene zu sehen",
       "Luftraum → Flugzeuge und Drohnen auf ihrer Höhe, 3D-Ansicht, Drone up zum Melden eines Flugs",
+      "Satellitenwärme → wo Satelliten in den letzten 24 h Feuer erfasst haben; Natürliche Ereignisse zeigt nur Brände der letzten 14 Tage",
       "Radar- und Wolkenschleife abspielen",
-      "Vorhersagen → die kommende Saison",
-      "Vorhersagen → Gebietshistorie und Bilanz"
+      "Prognosen → die kommende Saison",
+      "Prognosen → Gebietshistorie und Bilanz"
      ]
     ],
     [
@@ -741,9 +743,10 @@ export default {
       "Attiva/disattiva i livelli sul globo",
       "Livelli → Terra nuda, poi ◎ per vedere un solo livello",
       "Spazio aereo → aerei e droni alla loro quota, vista 3D, alza il drone per dichiarare un volo",
+      "Calore satellitare → dove i satelliti hanno rilevato incendi nelle ultime 24 h; Eventi naturali mostra solo gli incendi segnalati negli ultimi 14 giorni",
       "Riproduci il loop di radar e nuvole",
-      "Previsioni → la stagione a venire",
-      "Previsioni → Storico area e precedenti"
+      "Previsioni → la stagione in arrivo",
+      "Previsioni → Storico area e Precedenti"
      ]
     ],
     [
@@ -1013,9 +1016,10 @@ export default {
       "Перемкнути шари на глобусі",
       "Шари → Гола земля, потім ◎, щоб побачити один шар окремо",
       "Повітряний простір → повітряні судна та дрони на їхній висоті, 3D-вигляд, підняти дрон, щоб заявити політ",
-      "Відтворити цикл радара та хмар",
+      "Супутникове тепло → де супутники зафіксували вогонь за останні 24 год; Природні явища показують лише пожежі, зареєстровані за останні 14 днів",
+      "Відтворити цикл радару та хмарності",
       "Прогнози → сезон попереду",
-      "Прогнози → Історія району та статистика"
+      "Прогнози → Історія території та Статистика"
      ]
     ],
     [
@@ -1285,9 +1289,10 @@ export default {
       "Przełączaj warstwy na globusie",
       "Warstwy → Goła ziemia, a potem ◎, by zobaczyć tylko jedną warstwę",
       "Przestrzeń powietrzna → samoloty i drony na ich wysokości, widok 3D, zgłoś lot drona",
-      "Odtwórz pętlę radaru i chmur",
+      "Ciepło satelitarne → gdzie satelity wykryły ogień w ciągu ostatnich 24 h; Zdarzenia naturalne pokazują tylko pożary zgłoszone w ciągu ostatnich 14 dni",
+      "Odtwórz sekwencję radaru i zachmurzenia",
       "Prognozy → nadchodzący sezon",
-      "Prognozy → Historia obszaru i dotychczasowa skuteczność"
+      "Prognozy → Historia obszaru i Statystyki skuteczności"
      ]
     ],
     [
@@ -1557,9 +1562,10 @@ export default {
       "Küre üzerindeki katmanları aç/kapat",
       "Katmanlar → Çıplak yeryüzü, ardından tek bir katmanı görmek için ◎",
       "Hava sahası → yükseklikteki uçaklar ve dronlar, 3D görünüm, uçuş bildirmek için Drone up",
+      "Uydu ısı → son 24 saatte uyduların yangın tespit ettiği yerler; Doğal olaylar yalnızca son 14 günde bildirilen yangınları gösterir",
       "Radar ve bulut döngüsünü oynat",
       "Tahminler → önümüzdeki sezon",
-      "Tahminler → Bölge geçmişi ve Performans kaydı"
+      "Tahminler → Alan geçmişi ve Performans kaydı"
      ]
     ],
     [
@@ -1829,9 +1835,10 @@ export default {
       "تبديل الطبقات على الكرة الأرضية",
       "الطبقات → الأرض العارية، ثم ◎ لرؤية طبقة واحدة فقط",
       "المجال الجوي → الطائرات والطائرات المسيّرة على ارتفاعها، عرض ثلاثي الأبعاد، أطلق طائرة مسيّرة للإعلان عن رحلة",
-      "شغّل حلقة الرادار والسحب",
+      "حرارة الأقمار الصناعية → أماكن رصد الحرائق بواسطة الأقمار الصناعية خلال آخر 24 ساعة؛ تعرض الأحداث الطبيعية الحرائق المُبلّغ عنها خلال آخر 14 يومًا فقط",
+      "تشغيل حلقة الرادار والسحب",
       "التوقعات → الموسم القادم",
-      "التوقعات → سجل المنطقة والأداء السابق"
+      "التوقعات → سجل المنطقة والسجل التاريخي"
      ]
     ],
     [
@@ -2101,7 +2108,8 @@ export default {
       "ग्लोब पर लेयर्स ऑन/ऑफ करें",
       "लेयर्स → बेयर अर्थ, फिर एक ही लेयर देखने के लिए ◎ दबाएँ",
       "एयरस्पेस → उनकी ऊंचाई पर विमान और ड्रोन, 3D व्यू, उड़ान घोषित करने के लिए Drone up",
-      "रडार और बादल लूप चलाएं",
+      "सैटेलाइट हीट → पिछले 24 घंटों में उपग्रहों ने जहाँ आग देखी; प्राकृतिक घटनाएँ केवल पिछले 14 दिनों में रिपोर्ट की गई आग दिखाती हैं",
+      "रडार और बादल लूप चलाएँ",
       "पूर्वानुमान → आगामी मौसम",
       "पूर्वानुमान → क्षेत्र इतिहास और ट्रैक रिकॉर्ड"
      ]
@@ -2373,9 +2381,10 @@ export default {
       "切换地球图层",
       "图层 → 裸地地形，然后点 ◎ 单独查看一个图层",
       "空域 → 所在高度的飞机和无人机,3D 视图,申报无人机飞行",
-      "播放雷达和云图循环",
+      "卫星热力 → 过去24小时内卫星探测到的火情；自然事件仅显示过去14天内报告的火情",
+      "播放雷达与云图回放",
       "预报 → 未来季节展望",
-      "预报 → 区域历史和过往记录"
+      "预报 → 区域历史与记录"
      ]
     ],
     [
@@ -2645,8 +2654,9 @@ export default {
       "地球儀のレイヤーを切り替え",
       "レイヤー → 「地表のみ」、◎で単一レイヤー表示",
       "空域 → 高度別の航空機とドローン、3Dビュー、Drone upでフライト申請",
-      "レーダーと雲のループを再生",
-      "予報 → 今シーズンの見通し",
+      "衛星熱 → 過去24 hに衛星が検知した火災の場所。自然現象では過去14日間に報告された火災のみを表示",
+      "レーダーと雲の推移を再生",
+      "予報 → これからのシーズン",
       "予報 → 地域の履歴と実績"
      ]
     ],
@@ -2917,8 +2927,9 @@ export default {
       "I-toggle ang mga layer sa globe",
       "Layers → Bare earth, tapos ◎ para makita ang isang layer lang",
       "Himpapawid → mga eroplano at drone sa kanilang taas, 3D view, Drone up para magdeklara ng paglipad",
+      "Satellite heat → kung saan nakita ng mga satellite ang apoy sa nakalipas na 24 h; sa Natural events, mga sunog na iniulat lang sa nakalipas na 14 na araw ang ipinapakita",
       "I-play ang loop ng radar at ulap",
-      "Mga Forecast → ang susunod na season",
+      "Mga Forecast → ang paparating na season",
       "Mga Forecast → Kasaysayan ng Lugar at Track Record"
      ]
     ],
@@ -3189,6 +3200,7 @@ export default {
       "Washa/zima tabaka kwenye globu",
       "Tabaka → Ardhi tupu, kisha ◎ kuona tabaka moja pekee",
       "Anga → ndege na droni katika mwinuko wao, mwonekano wa 3D, Tangaza safari ya droni",
+      "Joto la satelaiti → mahali satelaiti zilipoona moto katika masaa 24 yaliyopita; Matukio ya asili huonyesha tu mioto iliyoripotiwa katika siku 14 zilizopita",
       "Cheza mzunguko wa rada na mawingu",
       "Utabiri → msimu ujao",
       "Utabiri → Historia ya eneo na Rekodi ya utendaji"
