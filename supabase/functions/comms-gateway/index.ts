@@ -32,13 +32,13 @@ const text = (b: string, status = 200, type = 'text/plain') => new Response(b, {
 const ACK = /^\s*(ok|okay|ack|yes|y|oui|si|sí|copy|copied|received|reçu|recu|roger|10-4|👍)\b/i;
 
 async function findContact(orgId: string, from: string, field: 'phone' | 'email' | 'telegram') {
-  const all: Row[] = await q(`contacts?org_id=eq.${orgId}&select=id,name,agency,phone,whatsapp,email,telegram`);
+  const all: Row[] = await q(`contacts?org_id=eq.${orgId}&select=id,name,agency,phone,whatsapp,email,telegram,vip`);
   if (field === 'phone') { const d = digits(from); return d.length >= 7 ? all.find(c => digits(c.phone) === d || digits(c.whatsapp) === d) ?? null : null; }
   if (field === 'email') return all.find(c => (c.email ?? '').toLowerCase() === from.toLowerCase()) ?? null;
   return all.find(c => (c.telegram ?? '').replace(/^@/, '').toLowerCase() === from.replace(/^@/, '').toLowerCase()) ?? null;
 }
 
-async function pushInbound(orgId: string, channelId: string | null, title: string, body: string) {
+async function pushInbound(orgId: string, channelId: string | null, title: string, body: string, vip = false) {
   const vapidJson = Deno.env.get('VAPID_KEYS_JSON');
   if (!vapidJson) return;
   try {
@@ -53,7 +53,7 @@ async function pushInbound(orgId: string, channelId: string | null, title: strin
     for (const s of subs.filter(s => ok.has(s.profile_id))) {
       try {
         await app.subscribe({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }).pushTextMessage(JSON.stringify({
-          title, body: body.slice(0, 140), url: '/?tab=comms', kind: 'message', tag: 'comms', category: 'comms', severity: 'info',
+          title, body: body.slice(0, 140), url: '/?tab=comms', kind: 'message', tag: 'comms', category: 'comms', severity: vip ? 'warning' : 'info',
         }), {});
       } catch { /* expired subscription */ }
     }
@@ -65,6 +65,7 @@ async function inbound(c: Row, msg: { text: string; from: string; via: string; c
   await post('messages', {
     org_id: c.org_id, sender: null, text: msg.text.slice(0, 4000), source: msg.via, external_from: label,
     contact_id: msg.contact?.id ?? null, connector_id: c.id, channel_id: c.inbound_channel ?? null, meta: msg.meta ?? null,
+    ...(msg.contact?.vip ? { vip: true, vip_at: new Date().toISOString() } : {}),
   });
   // "OK" from a known contact acknowledges the company's latest active broadcast
   if (msg.contact && ACK.test(msg.text)) {
@@ -74,7 +75,7 @@ async function inbound(c: Row, msg: { text: string; from: string; via: string; c
   }
   await post('comms_deliveries', { org_id: c.org_id, connector_id: c.id, ref_type: 'inbound', target: label.slice(0, 200), status: 'received', detail: msg.text.slice(0, 120) });
   await patch(`connectors?id=eq.${c.id}`, { last_ok_at: new Date().toISOString() });
-  await pushInbound(c.org_id, c.inbound_channel ?? null, `${label} (${msg.via})`, msg.text);
+  await pushInbound(c.org_id, c.inbound_channel ?? null, `${msg.contact?.vip ? '⭐ VIP · ' : ''}${label} (${msg.via})`, msg.text, !!msg.contact?.vip);
 }
 
 function capAlert(b: Row, org: Row, base: string) {

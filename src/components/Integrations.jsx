@@ -191,9 +191,13 @@ const InboundInfo = ({ c, freshKey, onNewKey }) => {
   const { t } = useI18n();
   const k = kindOf(c);
   const url = `${GATEWAY_URL}?c=${c.id}`;
+  const lastLine = c.inbound_enabled && (c.lastIn
+    ? <p className="text-[10px] text-green-300">{t('int.in.last', { when: new Date(c.lastIn).toLocaleString() })}</p>
+    : <p className="text-[10px] text-amber-300">{t(k.inbound === 'twilio' ? 'int.in.neverTwilio' : 'int.in.never')}</p>);
   if (k.inbound === 'twilio' && c.inbound_enabled) return (
-    <div className="space-y-1"><p className="text-[10px] text-slate-400">{t('int.in.twilio')}</p><CopyLine value={url} /></div>
+    <div className="space-y-1"><p className="text-[10px] text-slate-400">{t('int.in.twilio')}</p><CopyLine value={url} />{lastLine}</div>
   );
+  if (k.inbound === 'telegram' && c.inbound_enabled) return lastLine;
   if (k.inbound === 'cap') return (
     <div className="space-y-1">
       <p className="text-[10px] text-slate-400">{t('int.in.cap')}</p>
@@ -210,6 +214,7 @@ const InboundInfo = ({ c, freshKey, onNewKey }) => {
             <CopyLine value={`curl -X POST "${url}" -H "x-watchtower-key: ${freshKey}" -H "Content-Type: application/json" -d '{"text":"Unit 12 on scene","from":"Unit 12","lat":45.5,"lng":-73.6}'`} /></>
         : <p className="text-[10px] text-slate-500">{t('int.in.keyHidden', { hint: c.inbound_key_hint ?? '' })}</p>}
       <button onClick={onNewKey} className="text-[10px] text-sky-300 underline">{t('int.in.newKey')}</button>
+      {lastLine}
     </div>
   );
   return null;
@@ -232,8 +237,13 @@ export const Integrations = () => {
 
   const load = useCallback(async () => {
     const org = await getOrgId();
-    const { data } = await supabase.from('connectors').select('*').eq('org_id', org).order('created_at');
-    setList(data ?? []);
+    const [{ data }, { data: rec }] = await Promise.all([
+      supabase.from('connectors').select('*').eq('org_id', org).order('created_at'),
+      supabase.from('comms_deliveries').select('connector_id, at').eq('org_id', org).eq('status', 'received').order('at', { ascending: false }).limit(200),
+    ]);
+    const last = {};
+    for (const r of rec ?? []) if (!last[r.connector_id]) last[r.connector_id] = r.at;
+    setList((data ?? []).map(c => ({ ...c, lastIn: last[c.id] ?? null })));
   }, []);
   useEffect(() => { if (canManage) load(); }, [canManage, load]);
   if (!canManage) return null;

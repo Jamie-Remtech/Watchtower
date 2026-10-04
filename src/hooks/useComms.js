@@ -57,7 +57,7 @@ export const useContacts = () => {
     const row = {
       name: c.name.trim().slice(0, 120), agency: c.agency || null, role: c.role || null, phone: c.phone || null,
       email: c.email || null, whatsapp: c.whatsapp || null, telegram: c.telegram || null, radio: c.radio || null,
-      notes: c.notes || null, groups: (c.groups ?? []).map(g => g.trim()).filter(Boolean), updated_at: new Date().toISOString(),
+      notes: c.notes || null, groups: (c.groups ?? []).map(g => g.trim()).filter(Boolean), vip: !!c.vip, updated_at: new Date().toISOString(),
     };
     const { error } = c.id
       ? await supabase.from('contacts').update(row).eq('id', c.id)

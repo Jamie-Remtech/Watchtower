@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Phone, MessageSquare, Mail, Send, Pencil, Trash2, Upload, X, Loader2, Radio } from 'lucide-react';
+import { Search, Plus, Phone, MessageSquare, Mail, Send, Pencil, Trash2, Upload, X, Loader2, Radio, Star } from 'lucide-react';
 import { useContacts } from '../hooks/useComms';
 import { contactLinks, parseContactsCsv } from '../lib/comms';
 import { useI18n } from '../i18n/index.jsx';
@@ -22,8 +22,9 @@ export const ContactsPanel = ({ canManage }) => {
   const [confirmDel, setConfirmDel] = useState(null);
 
   const needle = qText.trim().toLowerCase();
-  const shown = contacts.filter(c => (!group || (c.groups ?? []).includes(group))
-    && (!needle || [c.name, c.agency, c.role, c.phone, c.email, c.radio, ...(c.groups ?? [])].some(v => (v ?? '').toLowerCase().includes(needle))));
+  const shown = contacts.filter(c => (!group || (group === '★vip' ? c.vip : (c.groups ?? []).includes(group)))
+    && (!needle || [c.name, c.agency, c.role, c.phone, c.email, c.radio, ...(c.groups ?? [])].some(v => (v ?? '').toLowerCase().includes(needle))))
+    .sort((a, b) => Number(!!b.vip) - Number(!!a.vip)); // VIPs first
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -57,9 +58,10 @@ export const ContactsPanel = ({ canManage }) => {
           </>
         )}
       </div>
-      {groups.length > 0 && (
+      {(groups.length > 0 || contacts.some(c => c.vip)) && (
         <div className="flex flex-wrap gap-1">
           <button onClick={() => setGroup(null)} className={`px-2 py-0.5 rounded-md text-[11px] border ${!group ? 'bg-orange-500/20 border-orange-500/50 text-orange-200' : 'border-slate-700 text-slate-400'}`}>{t('cx.ct.all')}</button>
+          {contacts.some(c => c.vip) && <button onClick={() => setGroup(group === '★vip' ? null : '★vip')} className={`px-2 py-0.5 rounded-md text-[11px] border ${group === '★vip' ? 'bg-amber-500/20 border-amber-400/60 text-amber-200' : 'border-slate-700 text-slate-400'}`}>⭐ VIP</button>}
           {groups.map(g => <button key={g} onClick={() => setGroup(group === g ? null : g)} className={`px-2 py-0.5 rounded-md text-[11px] border ${group === g ? 'bg-orange-500/20 border-orange-500/50 text-orange-200' : 'border-slate-700 text-slate-400'}`}>👥 {g}</button>)}
         </div>
       )}
@@ -89,6 +91,9 @@ export const ContactsPanel = ({ canManage }) => {
           </div>
           <input className={input} value={(edit.groups ?? []).join(', ')} onChange={e => setEdit(v => ({ ...v, groups: e.target.value.split(',').map(s => s.trimStart()) }))} placeholder={t('cx.ct.f.groups')} />
           <textarea className={`${input} resize-y`} rows={2} value={edit.notes ?? ''} onChange={e => setEdit(v => ({ ...v, notes: e.target.value }))} placeholder={t('cx.ct.f.notes')} />
+          <label className="flex items-center gap-2 text-xs text-amber-200">
+            <input type="checkbox" className="accent-amber-400" checked={!!edit.vip} onChange={e => setEdit(v => ({ ...v, vip: e.target.checked }))} />⭐ {t('cx.ct.vip')}
+          </label>
           <button disabled={busy || !edit.name?.trim()} onClick={submit} className="px-3 py-1.5 rounded-lg bg-orange-600 text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1">
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('veh.save')}
           </button>
@@ -101,10 +106,10 @@ export const ContactsPanel = ({ canManage }) => {
       )}
       <div className="space-y-1.5">
         {shown.map(c => (
-          <div key={c.id} className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+          <div key={c.id} className={`p-2.5 rounded-lg bg-slate-900/60 border ${c.vip ? 'border-amber-400/50' : 'border-slate-800'}`}>
             <div className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-white font-medium truncate">{c.name}{c.role && <span className="text-slate-400 font-normal"> · {c.role}</span>}</p>
+                <p className="text-sm text-white font-medium truncate">{c.vip && <Star className="w-3.5 h-3.5 inline -mt-0.5 mr-1 fill-amber-300 text-amber-300" />}{c.name}{c.role && <span className="text-slate-400 font-normal"> · {c.role}</span>}</p>
                 <p className="text-[11px] text-slate-400 truncate">
                   {[c.agency, c.phone, c.email].filter(Boolean).join(' · ')}
                   {c.radio && <span className="ml-1 inline-flex items-center gap-0.5"><Radio className="w-3 h-3" />{c.radio}</span>}
@@ -114,6 +119,7 @@ export const ContactsPanel = ({ canManage }) => {
               </div>
               {canManage && (
                 <div className="flex items-center gap-0.5 shrink-0">
+                  <button onClick={() => save({ ...c, vip: !c.vip }).catch(e => setErr(e.message))} className={`p-1 ${c.vip ? 'text-amber-300' : 'text-slate-500 hover:text-amber-300'}`} title={t('cx.ct.vip')}><Star className={`w-3.5 h-3.5 ${c.vip ? 'fill-amber-300' : ''}`} /></button>
                   <button onClick={() => { setEdit({ ...EMPTY, ...c }); setErr(null); }} className="p-1 text-slate-500 hover:text-orange-300"><Pencil className="w-3.5 h-3.5" /></button>
                   {confirmDel === c.id
                     ? <button onClick={() => { remove(c.id).catch(e => setErr(e.message)); setConfirmDel(null); }} className="text-[10px] font-bold text-red-400 px-1">{t('tac.sure')}</button>
