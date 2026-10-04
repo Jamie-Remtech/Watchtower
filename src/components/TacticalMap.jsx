@@ -2,6 +2,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { Flame, Camera, Radio, Wind, Video } from 'lucide-react';
 import DeviceFeedViewer from './DeviceFeedViewer';
+import { useI18n } from '../i18n/index.jsx';
+
+// Translate a key built from data; show the raw value when no text exists for it.
+const tOr = (t, key, fallback) => { const v = t(key); return v === key ? fallback : v; };
 
 // Live precipitation radar (RainViewer) over the tactical map.
 // RainViewer's native tiles stop at zoom 7, so beyond that each Google
@@ -84,6 +88,7 @@ const RadarOverlay = ({ visible }) => {
 // Inline editor shown in a tactical marker's popup: label + notes,
 // saved for the whole team. Position changes by dragging the marker.
 const MarkerEditor = ({ marker, onSave, onDelete }) => {
+  const { t } = useI18n();
   const [label, setLabel] = useState(marker.rawLabel ?? '');
   const [notes, setNotes] = useState(marker.notes ?? '');
   return (
@@ -97,13 +102,13 @@ const MarkerEditor = ({ marker, onSave, onDelete }) => {
           <input
             value={label}
             onChange={e => setLabel(e.target.value)}
-            placeholder="Label — e.g. Hydrant behind school"
+            placeholder={t('tac.labelPh')}
             className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-slate-900 mb-1"
           />
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
+            placeholder={t('tac.notesPh')}
             rows={2}
             className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-slate-900"
           />
@@ -115,19 +120,19 @@ const MarkerEditor = ({ marker, onSave, onDelete }) => {
         </>
       )}
       {marker.meta && <p className="text-[10px] text-slate-500 mt-1">{marker.meta}</p>}
-      <p className="text-[10px] text-slate-400 mt-0.5">Drag the marker on the map to move it</p>
+      <p className="text-[10px] text-slate-400 mt-0.5">{t('tac.dragToMoveHint')}</p>
       <div className="flex gap-1.5 mt-2">
         {onSave && (
           <button
             onClick={() => onSave({ label: label.trim(), notes: notes.trim() || null })}
             className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
           >
-            Save
+            {t('veh.save')}
           </button>
         )}
         {onDelete && (
           <button onClick={onDelete} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
-            Remove
+            {t('tac.remove')}
           </button>
         )}
       </div>
@@ -157,6 +162,7 @@ const TacticalMap = ({
   onCameraChanged,   // (center {lat,lng}) => void — track current view
   coverage = null,   // [{lat, lng, quality}] — comms coverage samples
 }) => {
+  const { t } = useI18n();
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [activeFeed, setActiveFeed] = useState(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -186,18 +192,18 @@ const TacticalMap = ({
       <div className="w-full h-full bg-slate-900 flex items-center justify-center">
         <div className="text-center p-8 bg-slate-800 rounded-lg border border-slate-700 max-w-lg">
           <div className="text-yellow-500 text-5xl mb-4">⚠️</div>
-          <h3 className="text-white text-xl font-semibold mb-3">Google Maps API Key Required</h3>
+          <h3 className="text-white text-xl font-semibold mb-3">{t('tac.apiKey.title')}</h3>
           <p className="text-slate-300 mb-4">
-            To use the tactical map with Google Maps, you need to add your API key to the .env file:
+            {t('tac.apiKey.intro')}
           </p>
           <div className="bg-slate-950 p-3 rounded border border-slate-700 text-left text-sm font-mono text-green-400 mb-4">
             VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
           </div>
           <div className="text-slate-400 text-sm space-y-2">
-            <p>1. Get your API key from <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google Cloud Console</a></p>
-            <p>2. Enable Maps JavaScript API</p>
-            <p>3. Add the key to your .env file</p>
-            <p>4. Restart the dev server</p>
+            <p>{t('tac.apiKey.step1')} <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google Cloud Console</a></p>
+            <p>{t('tac.apiKey.step2')}</p>
+            <p>{t('tac.apiKey.step3')}</p>
+            <p>{t('tac.apiKey.step4')}</p>
           </div>
         </div>
       </div>
@@ -250,7 +256,7 @@ const TacticalMap = ({
                 justifyContent: 'center',
                 animation: device.type === 'drone' ? 'pulse 2s ease-in-out infinite' : 'none'
               }}
-              title={`${device.name} - Click to view feed`}
+              title={t('tac.clickToViewFeed', { name: device.name })}
             >
               <span style={{ fontSize: device.type === 'drone' ? '20px' : '16px' }}>
                 {device.icon}
@@ -285,7 +291,7 @@ const TacticalMap = ({
                 border: '2px solid #f97316',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
-              title={`${m.name} — drag to move`}
+              title={t('tac.dragToMove', { name: m.name })}
             >
               <span style={{ fontSize: '17px' }}>{m.icon}</span>
             </div>
@@ -332,9 +338,9 @@ const TacticalMap = ({
               ) : (
                 <>
                   <h3 className="font-semibold text-sm text-slate-900">{selectedMarker.name}</h3>
-                  <p className="text-xs text-slate-600 mt-1">Type: {selectedMarker.type}</p>
+                  <p className="text-xs text-slate-600 mt-1">{t('tac.typeLine', { v: tOr(t, `tac.type.${selectedMarker.type}`, selectedMarker.type) })}</p>
                   {selectedMarker.status && (
-                    <p className="text-xs text-slate-600">Status: {selectedMarker.status}</p>
+                    <p className="text-xs text-slate-600">{t('tac.statusLine', { v: tOr(t, `tac.status.${selectedMarker.status}`, selectedMarker.status) })}</p>
                   )}
                 </>
               )}
@@ -344,7 +350,7 @@ const TacticalMap = ({
                   className="mt-2 px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded flex items-center gap-1.5 transition-colors"
                 >
                   <Video className="w-3 h-3" />
-                  View Feed
+                  {t('tac.viewFeed')}
                 </button>
               )}
             </div>

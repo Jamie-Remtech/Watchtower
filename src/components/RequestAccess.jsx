@@ -3,10 +3,12 @@ import { KeyRound, X, Loader2, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
 import { logEvent } from '../lib/eventLog';
+import { useI18n } from '../i18n/index.jsx';
 
 // Viewers (including stood-down members) can knock on the door:
 // the request lands in the admins' attention bell and Activity feed.
 export const RequestAccess = () => {
+  const { t } = useI18n();
   const { profile, session } = useAuth();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -44,7 +46,7 @@ export const RequestAccess = () => {
         setMessage('');
       }
     } catch (e) {
-      setState(e.message ?? 'Could not send');
+      setState(e.message ?? t('shell.x.sendFail'));
     }
     setBusy(false);
   };
@@ -55,35 +57,35 @@ export const RequestAccess = () => {
         onClick={() => setOpen(true)}
         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-medium"
       >
-        <KeyRound className="w-3.5 h-3.5" />Request access
+        <KeyRound className="w-3.5 h-3.5" />{t('shell.x.requestAccess')}
       </button>
 
       {open && (
         <div className="fixed inset-0 bg-black/60 z-[95] flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Request access</h3>
+              <h3 className="text-sm font-bold text-white">{t('shell.x.requestAccess')}</h3>
               <button onClick={() => setOpen(false)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
             <p className="text-xs text-slate-400">
-              Your account currently has world-view access only. Send a note to the administrators to request operational access.
+              {t('shell.x.reqBody')}
             </p>
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
               rows={3}
-              placeholder="Who you are and why you need access…"
+              placeholder={t('shell.x.reqPh')}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500 resize-none"
             />
-            {state === 'sent' && <p className="text-xs text-green-400 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Sent — an administrator will review it.</p>}
-            {state === 'already' && <p className="text-xs text-yellow-400">A request from you is already waiting for review.</p>}
+            {state === 'sent' && <p className="text-xs text-green-400 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{t('shell.x.reqSent')}</p>}
+            {state === 'already' && <p className="text-xs text-yellow-400">{t('shell.x.reqAlready')}</p>}
             {state && state !== 'sent' && state !== 'already' && <p className="text-xs text-red-400">{state}</p>}
             <button
               onClick={send}
               disabled={busy}
               className="w-full py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Send request
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('shell.x.sendRequest')}
             </button>
           </div>
         </div>

@@ -1,0 +1,75 @@
+// Device management, live feeds and the device feed viewer.
+export default {
+  // device kinds (ids from src/hooks/useDevices.js DEVICE_KINDS)
+  'dev.kind.drone': 'Drone',
+  'dev.kind.drone.d': 'Flight AI + detection + control',
+  'dev.kind.ptz_camera': 'PTZ Camera',
+  'dev.kind.ptz_camera.d': 'Pan/tilt/zoom + detection',
+  'dev.kind.camera': 'Fixed Camera',
+  'dev.kind.camera.d': 'Detection only',
+  'dev.kind.sensor': 'Sensor',
+  'dev.kind.sensor.d': 'Weather, smoke, IR, telemetry',
+  'dev.kind.edge_box': 'Edge AI Box',
+  'dev.kind.edge_box.d': 'On-site processing hardware',
+
+  // device statuses (lowercase; screens capitalize with CSS where they did before)
+  'dev.status.offline': 'offline',
+  'dev.status.active': 'active',
+  'dev.status.maintenance': 'maintenance',
+  'dev.status.alert': 'alert',
+
+  // device manager
+  'dev.title': 'Devices & Channels',
+  'dev.device1': '{n} device',
+  'dev.deviceN': '{n} devices',
+  'dev.channel1': '{n} channel in use',
+  'dev.channelN': '{n} channels in use',
+  'dev.register': 'Register Device',
+  'dev.noneTitle': 'No devices registered yet',
+  'dev.noneNote': 'Register your first drone, camera, or sensor — it will appear on the tactical map and in live streams.',
+  'dev.ch': '{n} ch',
+  'dev.setHereTitle': 'Set device to my current location',
+  'dev.confirm': 'Confirm',
+  'dev.removeTitle': 'Remove device',
+  'dev.footer': 'Connected to Supabase · every change is recorded in the events log',
+  'dev.geoUnsupported': 'Geolocation is not supported on this device',
+  'dev.geoDenied': 'Location permission denied — allow it in your browser',
+  'dev.geoUnavailable': 'Position unavailable',
+  'dev.geoTimeout': 'Location request timed out',
+
+  // register modal
+  'dev.registerTitle': 'Register a device',
+  'dev.name': 'Name',
+  'dev.namePh': 'e.g. North Ridge PTZ',
+  'dev.type': 'Type',
+  'dev.position': 'Position (optional)',
+  'dev.useMyLocation': 'Use my location',
+  'dev.latPh': 'Latitude — 43.2141',
+  'dev.lngPh': 'Longitude — 2.3522',
+  'dev.located': 'Located to within ~{m} m',
+  'dev.initialStatus': 'Initial status',
+  'dev.registerFailed': 'Could not register device',
+  'dev.registerSubmit': 'Register device',
+
+  // streams tab
+  'dev.noFeeds': 'No feeds connected',
+  'dev.noFeedsNote': 'Register devices in Settings and their feeds appear here.',
+  'dev.registered': 'Registered devices',
+  'dev.activeNow': 'Active now',
+  'dev.liveMode': 'Connected to Supabase · live mode',
+  'dev.liveFeeds': 'Live Feeds',
+  'dev.activeCount': '{n} active',
+  'dev.awaitingVideo': 'Awaiting video ingest',
+  'dev.awaitingTelemetry': 'Awaiting telemetry',
+  'dev.streamsFooter': 'Connected to Supabase · video ingest (RTSP/WebRTC) is a roadmap step',
+
+  // feed viewer
+  'dev.live': 'LIVE',
+  'dev.loadingFeed': 'Loading feed...',
+  'dev.feedAlt': '{name} feed',
+  'dev.rec': 'REC',
+  'dev.battery': 'Battery',
+  'dev.signal': 'Signal',
+  'dev.excellent': 'Excellent',
+  'dev.altitude': 'Altitude',
+};

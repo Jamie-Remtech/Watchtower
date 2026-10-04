@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, CheckCircle } from 'lucide-react';
+import { useI18n } from '../i18n/index.jsx';
 
 // Polls /version.json (emitted at build time) and compares it against the
 // build id baked into this running bundle. A mismatch means a newer build
@@ -11,6 +12,7 @@ import { RefreshCw, CheckCircle } from 'lucide-react';
 const CHECK_INTERVAL = 5 * 60 * 1000;
 
 export const UpdateBanner = () => {
+  const { t } = useI18n();
   const [phase, setPhase] = useState('idle'); // idle | downloading | ready
   const startedRef = useRef(false);
 
@@ -74,14 +76,14 @@ export const UpdateBanner = () => {
         ? <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
         : <RefreshCw className="w-4 h-4 text-orange-400 flex-shrink-0 animate-spin" />}
       <span className="text-xs text-slate-200">
-        {ready ? 'Update ready.' : 'Downloading update…'}
+        {ready ? t('shell.x.updateReady') : t('shell.x.downloading')}
       </span>
       {ready && (
         <button
           onClick={() => window.location.reload()}
           className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold hover:opacity-90 flex-shrink-0"
         >
-          Refresh
+          {t('shell.x.refresh')}
         </button>
       )}
     </div>

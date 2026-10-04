@@ -1,8 +1,18 @@
-import { createContext, useContext, useMemo, useState, useCallback } from 'react';
+import { createContext, useContext, useMemo, useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { en } from './en';
+import { en as enCore } from './en';
 import { fr } from './fr';
 import { es } from './es';
+
+// English interface text also lives in per-area files (src/i18n/extra/*.js,
+// default export = { key: 'English text' }) so screens can be worked on
+// independently. Other languages: hand-written fr/es first, then the
+// generated dictionaries in src/i18n/gen/<lang>.js (scripts/i18n-translate.mjs),
+// loaded only when that language is chosen.
+const EXTRA = import.meta.glob('./extra/*.js', { eager: true, import: 'default' });
+const en = Object.assign({}, ...Object.values(EXTRA), enCore);
+const GEN = import.meta.glob('./gen/*.js', { import: 'default' });
+const genLoader = (code) => GEN[`./gen/${code}.js`];
 
 // ============================================
 // LANGUAGE — each member reads Watchtower in their own language.
@@ -33,7 +43,8 @@ export const LANGUAGES = [
   { code: 'tl', name: 'Filipino' },
   { code: 'sw', name: 'Kiswahili' },
 ];
-export const hasDictionary = (code) => Boolean(DICTS[code]);
+export const hasDictionary = (code) => code === 'en' || Boolean(DICTS[code]) || Boolean(genLoader(code));
+export const EN = en;
 
 const DEVICE_KEY = 'wt-lang';
 const deviceLang = () => {
@@ -62,11 +73,22 @@ export const I18nProvider = ({ children }) => {
     setDevice(code);
   }, []);
 
+  // generated dictionary for this language (fills what fr/es don't hand-write)
+  const [gen, setGen] = useState({});
+  useEffect(() => {
+    const load = genLoader(lang);
+    if (!load || gen[lang]) return;
+    let cancelled = false;
+    load().then(d => { if (!cancelled) setGen(g => ({ ...g, [lang]: d })); }).catch(() => { /* English until it loads */ });
+    return () => { cancelled = true; };
+  }, [lang, gen]);
+
   const value = useMemo(() => {
-    const dict = DICTS[lang] ?? en;
-    const t = (key, vars) => interpolate(dict[key] ?? en[key] ?? key, vars);
+    const hand = DICTS[lang] ?? {};
+    const machine = gen[lang] ?? {};
+    const t = (key, vars) => interpolate(hand[key] ?? machine[key] ?? en[key] ?? key, vars);
     return { lang, t, setDeviceLang };
-  }, [lang, setDeviceLang]);
+  }, [lang, setDeviceLang, gen]);
 
   if (typeof document !== 'undefined') {
     document.documentElement.lang = lang;

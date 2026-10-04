@@ -6,6 +6,7 @@ import { useSpeech } from '../hooks/useSpeech';
 import { say } from '../lib/speechFeedback';
 import { logEvent } from '../lib/eventLog';
 import { executeAiAction } from '../lib/aiActions';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // WATCHTOWER AI — voice Q&A over the live operation
@@ -14,15 +15,17 @@ import { executeAiAction } from '../lib/aiActions';
 // own session, so permissions apply) and answers radio-style.
 // ============================================
 
+// translation keys (English in src/i18n/extra/ai.js); asked in the member's language
 const SUGGESTIONS = [
-  'What is the situation right now?',
-  'Which patients are still red?',
-  'Any open alerts I should know about?',
-  'Start the severe weather protocol',
-  'Tell the team to check in',
+  'ai.suggest.situation',
+  'ai.suggest.patients',
+  'ai.suggest.alerts',
+  'ai.suggest.weather',
+  'ai.suggest.checkin',
 ];
 
 export const AIAssistant = ({ isOpen, onClose }) => {
+  const { t } = useI18n();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,7 +64,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
         try {
           outcome = await executeAiAction(action, q);
         } catch (e) {
-          outcome = `Action failed: ${e.message ?? 'unknown error'}`;
+          outcome = t('ai.actionFailed', { error: e.message ?? t('ai.unknownError') });
         }
         setMessages(prev => [...prev, { role: 'assistant', content: `⚡ ${outcome}`, action: true }]);
         if (speakRef.current) say(outcome);
@@ -69,8 +72,8 @@ export const AIAssistant = ({ isOpen, onClose }) => {
       logEvent('ai.asked', { question: q, actions: (data.actions ?? []).map(a => a.name) });
     } catch (err) {
       const msg = /ANTHROPIC_API_KEY|unknown mode/i.test(err?.message ?? '')
-        ? 'The AI function needs updating — redeploy field-assist with the latest code.'
-        : `I could not reach the AI service (${err?.message ?? 'network'}).`;
+        ? t('ai.needsRedeploy')
+        : t('ai.unreachable', { error: err?.message ?? t('ai.network') });
       setMessages(prev => [...prev, { role: 'assistant', content: msg, error: true }]);
     }
     setBusy(false);
@@ -92,15 +95,15 @@ export const AIAssistant = ({ isOpen, onClose }) => {
             <Zap className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h3 className="font-semibold text-white text-sm">Watchtower AI</h3>
-            <p className="text-[10px] text-slate-500">answers from your live operation</p>
+            <h3 className="font-semibold text-white text-sm">{t('ai.title')}</h3>
+            <p className="text-[10px] text-slate-500">{t('ai.subtitle')}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => { setSpeak(s => !s); if (speak) window.speechSynthesis?.cancel(); }}
             className={`p-2 rounded-lg hover:bg-slate-800 ${speak ? 'text-orange-400' : 'text-slate-500'}`}
-            title={speak ? 'Voice replies on' : 'Voice replies off'}
+            title={speak ? t('ai.voiceOn') : t('ai.voiceOff')}
           >
             {speak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
@@ -115,16 +118,16 @@ export const AIAssistant = ({ isOpen, onClose }) => {
         {messages.length === 0 && (
           <div className="space-y-2">
             <p className="text-xs text-slate-400">
-              Ask by voice or text — I see your live devices, crew, patients, markers, alerts and weather.
+              {t('ai.intro')}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {SUGGESTIONS.map(s => (
                 <button
                   key={s}
-                  onClick={() => ask(s)}
+                  onClick={() => ask(t(s))}
                   className="px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-slate-300 hover:border-orange-500/40 hover:text-orange-300 text-left"
                 >
-                  {s}
+                  {t(s)}
                 </button>
               ))}
             </div>
@@ -163,7 +166,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
           className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${
             listening ? 'bg-red-500 animate-pulse' : 'bg-gradient-to-br from-orange-500 to-orange-600 hover:scale-105'
           } disabled:opacity-40 transition-all`}
-          title={supported ? 'Ask by voice' : 'Speech recognition not supported here'}
+          title={supported ? t('ai.askVoice') : t('ai.noSpeech')}
         >
           {listening ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-white" />}
         </button>
@@ -172,7 +175,7 @@ export const AIAssistant = ({ isOpen, onClose }) => {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') ask(input); }}
-          placeholder={listening ? 'Listening…' : 'Ask about your operation…'}
+          placeholder={listening ? t('comms.listening') : t('ai.placeholder')}
           className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
         />
         <button

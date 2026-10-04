@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { getOrgId } from '../lib/org';
 import { memberLink } from '../lib/link';
 import { RadioTower } from 'lucide-react';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // TACTICAL MAP — the shared operational picture.
@@ -22,7 +23,11 @@ const KIND_ICON = { drone: '🚁', ptz_camera: '📹', camera: '📷', sensor: '
 const KIND_TYPE = { drone: 'drone', ptz_camera: 'camera', camera: 'camera', sensor: 'sensor', edge_box: 'sensor' };
 const FRESH_MS = 10 * 60 * 1000; // crew fixes older than 10 min are stale
 
+// Translate a key built from data; show the raw value when no text exists for it.
+const tOr = (t, key, fallback) => { const v = t(key); return v === key ? fallback : v; };
+
 export const TacticalMapTab = () => {
+  const { t } = useI18n();
   const { devices } = useDevices();
   const { latest: teamPositions } = usePositions();
   const { liveMembers } = useTeam();
@@ -102,7 +107,7 @@ export const TacticalMapTab = () => {
     .filter(p => Date.now() - new Date(p.at) < FRESH_MS)
     .map(p => ({
       id: `pos-${p.profile_id}`,
-      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? 'Team member'} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})${p.net_quality ? ` · 📶 ${memberLink(p).quality}${p.net_rtt_ms != null ? ` ${p.net_rtt_ms} ms` : ''}` : ''}`,
+      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? t('veh.someone')} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})${p.net_quality ? ` · 📶 ${tOr(t, `sig.q.${memberLink(p).quality}`, memberLink(p).quality)}${p.net_rtt_ms != null ? ` ${p.net_rtt_ms} ms` : ''}` : ''}`,
       type: 'person',
       status: 'live',
       position: { lat: p.lat, lng: p.lng },
@@ -113,13 +118,13 @@ export const TacticalMapTab = () => {
     const meta = markerMeta(m.kind);
     return {
       id: m.id,
-      name: m.label || meta.label,
+      name: m.label || t(`marker.${meta.id}`),
       rawLabel: m.label,
-      kindLabel: meta.label,
+      kindLabel: t(`marker.${meta.id}`),
       icon: meta.icon,
       position: { lat: m.lat, lng: m.lng },
       notes: m.notes,
-      meta: `${nameOf[m.created_by] ?? 'Team'} · ${new Date(m.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`,
+      meta: `${nameOf[m.created_by] ?? t('tac.team')} · ${new Date(m.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`,
     };
   });
 
@@ -128,7 +133,7 @@ export const TacticalMapTab = () => {
     .filter(p => p.status === 'active' && p.lat != null && p.lng != null)
     .map(p => ({
       id: `pat-${p.id}`,
-      name: `${p.tag ? `Tag ${p.tag}` : `P${p.num}`} · ${TRIAGE_META[p.triage]?.label ?? p.triage}`,
+      name: `${p.tag ? t('tac.tag', { tag: p.tag }) : `P${p.num}`} · ${TRIAGE_META[p.triage] ? t(`tac.triage.${p.triage}`) : p.triage}`,
       type: 'person',
       status: p.triage,
       position: { lat: p.lat, lng: p.lng },
@@ -147,7 +152,7 @@ export const TacticalMapTab = () => {
     })),
     ...teamMarkers,
     ...patientMarkers,
-    ...(myPos ? [{ id: 'me', name: 'My position', type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
+    ...(myPos ? [{ id: 'me', name: t('tac.myPosition'), type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
   ];
 
   const anchors = [...placed.map(d => ({ lat: d.lat, lng: d.lng })), ...teamMarkers.map(t => t.position)];
@@ -187,8 +192,8 @@ export const TacticalMapTab = () => {
       setSaveName('');
     } catch (err) {
       setViewsError(/does not exist/i.test(err.message ?? '')
-        ? 'The map_views table is missing — run migration 0008 in the Supabase SQL Editor.'
-        : (err.message ?? 'Could not save the view'));
+        ? t('tac.viewsTableMissing')
+        : (err.message ?? t('tac.viewSaveFailed')));
     }
   };
 
@@ -213,8 +218,8 @@ export const TacticalMapTab = () => {
       // Never fail silently — a missing table or refused permission must be visible
       setMarkerError(
         /does not exist/i.test(err.message ?? '')
-          ? 'The markers table is missing — run migration 0006/0007 in the Supabase SQL Editor.'
-          : (err.message ?? 'Could not create the marker')
+          ? t('tac.markersTableMissing')
+          : (err.message ?? t('tac.markerCreateFailed'))
       );
     }
     setMarkerBusy(false);
@@ -291,16 +296,16 @@ export const TacticalMapTab = () => {
       <div className="flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Map className="w-4 h-4 text-orange-400" />
-          <h2 className="text-sm font-bold text-white">Tactical Map</h2>
+          <h2 className="text-sm font-bold text-white">{t('tac.title')}</h2>
           <span className="text-xs text-slate-500">
-            {placed.length} device{placed.length === 1 ? '' : 's'} · {teamMarkers.length} live crew
+            {t(placed.length === 1 ? 'tac.device1' : 'tac.deviceN', { n: placed.length })} · {t('tac.liveCrew', { n: teamMarkers.length })}
           </span>
           {/* Triage board: live casualty counts by SALT category */}
           {Object.keys(triageCounts).length > 0 && (
             <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/70 border border-slate-700 rounded-lg">
               {['red', 'yellow', 'green', 'gray', 'black', 'unknown'].map(c =>
                 triageCounts[c] ? (
-                  <span key={c} className="flex items-center gap-1 text-[10px] font-bold text-white" title={TRIAGE_META[c].label}>
+                  <span key={c} className="flex items-center gap-1 text-[10px] font-bold text-white" title={t(`tac.triage.${c}`)}>
                     <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: TRIAGE_META[c].dot }} />
                     {triageCounts[c]}
                   </span>
@@ -317,7 +322,7 @@ export const TacticalMapTab = () => {
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            Marker
+            {t('tac.marker')}
           </button>
           <button
             onClick={zeroIn}
@@ -325,16 +330,16 @@ export const TacticalMapTab = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-xs font-medium hover:bg-sky-500/25 disabled:opacity-50"
           >
             <Crosshair className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
-            My area
+            {t('tac.myArea')}
           </button>
           {!isPopped && (
             <button
               onClick={() => window.open(`${window.location.origin}/?pop=tactical`, '_blank', 'width=1280,height=850,popup=yes')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium hover:bg-slate-700"
-              title="Open the tactical map in its own window (stays live-synced)"
+              title={t('tac.popOutTitle')}
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Pop out
+              {t('tac.popOut')}
             </button>
           )}
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
@@ -344,24 +349,24 @@ export const TacticalMapTab = () => {
                 onClick={() => setMapMode(m)}
                 className={`px-2 py-1 rounded text-xs capitalize ${mapMode === m ? 'bg-orange-500 text-white' : 'text-slate-400 hover:text-white'}`}
               >
-                {m}
+                {t(`tac.mode.${m}`)}
               </button>
             ))}
             <button
               onClick={toggleWeather}
-              title="Live precipitation radar (RainViewer, updates every 5 min)"
+              title={t('tac.radarTitle')}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${showWeather ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}
             >
               <CloudRain className="w-3.5 h-3.5" />
-              Radar
+              {t('tac.radar')}
             </button>
             <button
               onClick={toggleSignal}
-              title="Communications coverage — where devices had good, weak or no link"
+              title={t('tac.signalTitle')}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${showSignal ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}
             >
               <RadioTower className="w-3.5 h-3.5" />
-              Signal
+              {t('tac.signal')}
             </button>
           </div>
         </div>
@@ -391,7 +396,7 @@ export const TacticalMapTab = () => {
               <button
                 onClick={() => applyView(v)}
                 onDoubleClick={() => { setRenamingId(v.id); setRenameText(v.name); }}
-                title="Click to jump · double-click to rename"
+                title={t('tac.viewJumpTitle')}
                 className="font-medium"
               >
                 {v.name}
@@ -401,7 +406,7 @@ export const TacticalMapTab = () => {
               <button
                 onClick={() => refreezeView(v.id)}
                 className="p-0.5 text-slate-400 hover:text-orange-300"
-                title="Re-freeze this view to what's on screen now"
+                title={t('tac.refreezeTitle')}
               >
                 <RefreshCw className="w-3 h-3" />
               </button>
@@ -410,15 +415,15 @@ export const TacticalMapTab = () => {
               <button
                 onClick={() => { removeView(v.id).catch(e => setViewsError(e.message)); setConfirmDeleteId(null); if (activeViewId === v.id) setActiveViewId(null); }}
                 className="px-1 py-0.5 text-[10px] font-bold text-red-400"
-                title="Confirm delete"
+                title={t('tac.confirmDelete')}
               >
-                sure?
+                {t('tac.sure')}
               </button>
             ) : (
               <button
                 onClick={() => { setConfirmDeleteId(v.id); setTimeout(() => setConfirmDeleteId(c => (c === v.id ? null : c)), 2500); }}
                 className="p-0.5 text-slate-500 hover:text-red-400"
-                title="Delete view"
+                title={t('tac.deleteView')}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -437,7 +442,7 @@ export const TacticalMapTab = () => {
               placeholder={`Front ${views.length + 1}`}
               className="w-28 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-xs text-white placeholder-slate-500 focus:outline-none"
             />
-            <button onClick={saveCurrentView} className="p-0.5 text-green-400 hover:text-green-300" title="Save">
+            <button onClick={saveCurrentView} className="p-0.5 text-green-400 hover:text-green-300" title={t('veh.save')}>
               <Check className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -445,10 +450,10 @@ export const TacticalMapTab = () => {
           <button
             onClick={() => setSavingView(true)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-slate-600 text-xs text-slate-400 hover:border-orange-500/40 hover:text-orange-300"
-            title="Freeze the current view as a named quick reference"
+            title={t('tac.saveViewTitle')}
           >
             <Star className="w-3 h-3" />
-            Save view
+            {t('tac.saveView')}
           </button>
         )}
         {viewsError && <span className="text-[10px] text-red-400">{viewsError}</span>}
@@ -467,12 +472,12 @@ export const TacticalMapTab = () => {
                 className="flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg border text-[9px] bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-orange-500/15 hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50 cursor-grab active:cursor-grabbing select-none"
               >
                 <span className="text-base leading-none pointer-events-none">{k.icon}</span>
-                <span className="pointer-events-none">{k.label}</span>
+                <span className="pointer-events-none">{t(`marker.${k.id}`)}</span>
               </button>
             ))}
           </div>
           <p className="text-[10px] text-slate-500">
-            <b className="text-slate-400">Drag</b> a type onto the map to place it exactly — or tap it to drop at the center. Then drag the marker to adjust, tap it for label &amp; notes. Everyone sees changes live.
+            <b className="text-slate-400">{t('tac.drag')}</b> {t('tac.dragHelp')}
           </p>
           {markerError && <p className="text-[10px] text-red-400">{markerError}</p>}
         </div>
@@ -502,33 +507,33 @@ export const TacticalMapTab = () => {
           <div className="absolute left-2 bottom-8 bg-slate-900/90 border border-slate-700 rounded-lg px-2.5 py-2 space-y-1.5 text-[10px]">
             <div className="flex items-center gap-1">
               <RadioTower className="w-3 h-3 text-green-400" />
-              <span className="text-slate-200 font-semibold">Coverage</span>
+              <span className="text-slate-200 font-semibold">{t('tac.coverage')}</span>
               {[1, 6, 24].map(h => (
                 <button key={h} onClick={() => { setSignalHours(h); localStorage.setItem('wt-tac-signal-h', String(h)); }}
-                  className={`px-1.5 py-0.5 rounded ${signalHours === h ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>{h}h</button>
+                  className={`px-1.5 py-0.5 rounded ${signalHours === h ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>{t('tac.hours', { h })}</button>
               ))}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {[['good', '#22c55e', 'Good'], ['fair', '#eab308', 'Fair'], ['poor', '#f97316', 'Weak'], ['offline', '#ef4444', 'No signal']].map(([q, c, l]) => (
+              {[['good', '#22c55e', 'Good'], ['fair', '#eab308', 'Fair'], ['poor', '#f97316', 'Weak'], ['offline', '#ef4444', 'No signal']].map(([q, c]) => (
                 <span key={q} className="flex items-center gap-1 text-slate-300">
-                  <span className="w-2 h-2 rounded-full" style={{ background: c }} />{l} {coverageCounts[q] ?? 0}
+                  <span className="w-2 h-2 rounded-full" style={{ background: c }} />{t(`sig.q.${q}`)} {coverageCounts[q] ?? 0}
                 </span>
               ))}
             </div>
-            {coverage && coverage.length === 0 && <p className="text-slate-500">No samples yet — they arrive with each tracked position.</p>}
+            {coverage && coverage.length === 0 && <p className="text-slate-500">{t('tac.noSamples')}</p>}
           </div>
         )}
         {placed.length === 0 && teamMarkers.length === 0 && tacticalMarkers.length === 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/85 border border-slate-700 rounded-lg px-3 py-1.5 pointer-events-none">
             <p className="text-[10px] text-slate-300">
-              Nothing on the map yet — drop a marker, register devices, or share your position from the Field Log
+              {t('tac.empty')}
             </p>
           </div>
         )}
       </div>
       <p className="text-xs text-slate-600 flex items-center gap-1.5 flex-shrink-0">
         <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />
-        Connected to Supabase · devices, live crew positions, and shared markers
+        {t('tac.footer')}
       </p>
 
       {/* Ghost icon that follows the pointer while dragging from the palette */}

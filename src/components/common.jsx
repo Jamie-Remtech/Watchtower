@@ -1,6 +1,7 @@
 import {
   Video, Thermometer, Camera, Flame, Wifi, Globe, RefreshCw, Cpu, Maximize2, Grid, User, Battery, Square, Minus
 } from 'lucide-react';
+import { useI18n } from '../i18n/index.jsx';
 
 
 // ============================================
@@ -68,18 +69,27 @@ export const getDeviceBgColor = (deviceType, status) => {
   return 'bg-slate-700';
 };
 
+// On-screen label for an enum value; values without a key show as-is.
+const enumLabel = (t, prefix, value) => {
+  const key = `${prefix}.${value}`;
+  const s = t(key);
+  return s === key ? value : s;
+};
+
 export const StatusBadge = ({ status }) => {
+  const { t } = useI18n();
   const styles = {
     active: 'bg-green-500/20 text-green-400 border-green-500/30',
     inactive: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
     maintenance: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>{status}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${styles[status]}`}>{enumLabel(t, 'common.status', status)}</span>;
 };
 
 export const RoleBadge = ({ role }) => {
+  const { t } = useI18n();
   const styles = { admin: 'bg-purple-500/20 text-purple-400', operator: 'bg-blue-500/20 text-blue-400', viewer: 'bg-slate-500/20 text-slate-400' };
-  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[role]}`}>{role}</span>;
+  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[role]}`}>{enumLabel(t, 'common.role', role)}</span>;
 };
 
 export const HealthBar = ({ value }) => {
@@ -148,18 +158,19 @@ export const SignalStrength = ({ strength, showLabel = true }) => {
 
 // Processing Location Badge
 export const ProcessingBadge = ({ location, edgeBoxId }) => {
+  const { t } = useI18n();
   if (location === 'edge') {
     return (
       <span className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
         <Cpu className="w-3 h-3" />
-        Edge {edgeBoxId ? `(${edgeBoxId})` : ''}
+        {t('common.edge')} {edgeBoxId ? `(${edgeBoxId})` : ''}
       </span>
     );
   }
   return (
     <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">
       <Globe className="w-3 h-3" />
-      Cloud
+      {t('common.cloud')}
     </span>
   );
 };
@@ -186,6 +197,7 @@ export const ConnectionBadge = ({ type, strength }) => {
 
 // Control Mode Badge - Watchtower Autonomous vs Manual Human Control
 export const ControlModeBadge = ({ mode, pilot, showToggle = false, onToggle }) => {
+  const { t } = useI18n();
   if (mode === null) return null; // Not applicable for cameras/sensors
   
   const isAutonomous = mode === 'watchtower';
@@ -204,14 +216,14 @@ export const ControlModeBadge = ({ mode, pilot, showToggle = false, onToggle }) 
           {isAutonomous ? (
             <>
               <Flame className="w-4 h-4" />
-              <span className="text-xs font-medium">Watchtower Auto</span>
+              <span className="text-xs font-medium">{t('common.watchtowerAuto')}</span>
             </>
           ) : (
             <>
               <User className="w-4 h-4" />
               <div className="flex flex-col items-start">
-                <span className="text-xs font-medium">Manual Control</span>
-                {pilot && <span className="text-[10px] opacity-75">Pilot: {pilot}</span>}
+                <span className="text-xs font-medium">{t('common.manualControl')}</span>
+                {pilot && <span className="text-[10px] opacity-75">{t('common.pilot', { pilot })}</span>}
               </div>
             </>
           )}
@@ -227,13 +239,13 @@ export const ControlModeBadge = ({ mode, pilot, showToggle = false, onToggle }) 
           {isAutonomous ? (
             <>
               <Flame className="w-3 h-3" />
-              <span>Watchtower AI</span>
+              <span>{t('common.watchtowerAi')}</span>
             </>
           ) : (
             <div className="flex items-center gap-1.5">
               <User className="w-3 h-3" />
               <div className="flex flex-col">
-                <span>Manual</span>
+                <span>{t('common.manual')}</span>
                 {pilot && <span className="text-[10px] opacity-75">{pilot}</span>}
               </div>
             </div>
@@ -324,6 +336,7 @@ export const VIEW_SIZES = {
 
 // View Size Selector Component
 export const ViewSizeSelector = ({ currentSize, onSizeChange, compact = false }) => {
+  const { t } = useI18n();
   const sizes = ['minimized', 'thumbnail', 'small', 'medium', 'large'];
   
   if (compact) {
@@ -339,7 +352,7 @@ export const ViewSizeSelector = ({ currentSize, onSizeChange, compact = false })
                 : 'bg-slate-600 hover:bg-slate-500'
             }`}
             style={{ transform: `scale(${0.6 + (index * 0.1)})` }}
-            title={VIEW_SIZES[size].name}
+            title={t(`common.view.${size}.name`)}
           />
         ))}
       </div>
@@ -357,9 +370,9 @@ export const ViewSizeSelector = ({ currentSize, onSizeChange, compact = false })
               ? 'bg-orange-500 text-white' 
               : 'text-slate-400 hover:text-white hover:bg-slate-700'
           }`}
-          title={VIEW_SIZES[size].description}
+          title={t(`common.view.${size}.desc`)}
         >
-          {VIEW_SIZES[size].name}
+          {t(`common.view.${size}.name`)}
         </button>
       ))}
     </div>

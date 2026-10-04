@@ -1,3 +1,4 @@
+import GENERATED from './content.gen.js';
 // Homepage + tutorial copy. Every claim here is something Watchtower
 // does today — keep it that way when editing.
 
@@ -241,7 +242,8 @@ const es = {
   },
 };
 
-export const CONTENT = { en, fr, es };
+// Other languages are generated (scripts/i18n-translate.mjs) from English
+export const CONTENT = { ...GENERATED, en, fr, es };
 
 // Language-independent ids for features.items, in order. Every app tab
 // must be covered here (scripts/check-homepage.mjs runs before each

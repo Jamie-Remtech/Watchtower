@@ -14,6 +14,7 @@ import { parseCommand, TRIAGE_META } from '../lib/fieldCommands';
 import { beep, say } from '../lib/speechFeedback';
 import { useAuth } from '../auth/AuthContext';
 import { ROLES } from '../auth/roles';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // FIELD LOG v2 — multi-casualty, voice-commanded
@@ -33,32 +34,32 @@ const quickPosition = () =>
     );
   });
 
-const timeAgo = (iso) => {
+const timeAgo = (iso, t) => {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 60) return t('log.justNow');
+  if (s < 3600) return t('log.mAgo', { m: Math.floor(s / 60) });
+  if (s < 86400) return t('log.hAgo', { h: Math.floor(s / 3600) });
   return new Date(iso).toLocaleString();
 };
 
-const patientLabel = (p) => (p.tag ? `Tag ${p.tag}` : `P${p.num}`);
+const patientLabel = (p, t) => (p.tag ? t('log.tag', { tag: p.tag }) : t('log.pNum', { num: p.num }));
 
 // Plain (non-AI) IMIST-AMBO skeleton from the timeline — works with no
 // API key. The AI edge function upgrades this when configured.
-const basicHandoff = (patient, entries) => {
+const basicHandoff = (patient, entries, t) => {
   const lines = entries
     .slice().reverse()
     .map(e => `  ${new Date(e.payload?.at_client ?? e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.payload?.text ?? e.type}`);
   return [
-    `IMIST-AMBO HANDOVER — ${patientLabel(patient)} · triage ${patient.triage.toUpperCase()}`,
-    `I — Identity: ${patientLabel(patient)}${patient.tag ? '' : ' (no physical tag)'}`,
-    `M — Mechanism / complaint: [state]`,
-    `I — Injuries / information: [state]`,
-    `S — Signs & symptoms: [state]`,
-    `T — Treatment & trends (timeline):`,
+    t('log.ho.header', { p: patientLabel(patient, t), triage: patient.triage.toUpperCase() }),
+    t(patient.tag ? 'log.ho.identity' : 'log.ho.identityNoTag', { p: patientLabel(patient, t) }),
+    t('log.ho.mechanism'),
+    t('log.ho.injuries'),
+    t('log.ho.signs'),
+    t('log.ho.treatment'),
     ...lines,
-    `A — Allergies: [state]   M — Medications: [state]`,
-    `B — Background: [state]   O — Other: [state]`,
+    t('log.ho.allergiesMeds'),
+    t('log.ho.backgroundOther'),
   ].join('\n');
 };
 
@@ -67,6 +68,7 @@ const NOTE_TYPES = ['field.report', 'patient.entry'];
 // One timeline entry. Notes can be corrected or removed by their author or a
 // coordinator+ — the original is kept in event_revisions, never lost.
 const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) => {
+  const { t } = useI18n();
   const [mode, setMode] = useState(null); // 'edit' | 'remove' | 'history'
   const [draft, setDraft] = useState('');
   const [reason, setReason] = useState('');
@@ -97,44 +99,44 @@ const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) =>
       {mode === 'edit' ? (
         <div className="space-y-2">
           <textarea value={draft} onChange={ev => setDraft(ev.target.value)} rows={3} className={`${input} resize-none`} autoFocus />
-          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder="Why the change? (optional — kept with the record)" className={input} maxLength={500} />
+          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder={t('log.entry.reasonEditPh')} className={input} maxLength={500} />
           <div className="flex gap-2">
             <button disabled={busy || !draft.trim()} onClick={() => run('edit_log_entry', { p_id: e.id, p_text: draft, p_reason: reason || null })}
               className="px-3 py-1.5 bg-orange-500 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-50">
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}Save correction
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{t('log.entry.saveCorrection')}
             </button>
-            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Cancel</button>
+            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">{t('log.cancel')}</button>
           </div>
         </div>
       ) : (
         <p className={`text-sm whitespace-pre-wrap ${removed ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
-          {e.type === 'patient.triage' ? `Triage → ${e.payload?.triage}` :
-           e.type === 'patient.status' ? `Status → ${e.payload?.status}` :
-           e.type === 'patient.created' ? 'Patient created' :
+          {e.type === 'patient.triage' ? t('log.entry.triage', { v: e.payload?.triage }) :
+           e.type === 'patient.status' ? t('log.entry.status', { v: e.payload?.status }) :
+           e.type === 'patient.created' ? t('log.entry.created') :
            e.payload?.text}
         </p>
       )}
       {mode === 'remove' && (
         <div className="mt-2 space-y-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
-          <p className="text-xs text-red-200">Remove this entry from the log? It stays in the record's history and a coordinator can restore it.</p>
-          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder="Reason (optional) — e.g. wrong patient" className={input} maxLength={500} autoFocus />
+          <p className="text-xs text-red-200">{t('log.entry.removeConfirm')}</p>
+          <input value={reason} onChange={ev => setReason(ev.target.value)} placeholder={t('log.entry.reasonRemovePh')} className={input} maxLength={500} autoFocus />
           <div className="flex gap-2">
             <button disabled={busy} onClick={() => run('remove_log_entry', { p_id: e.id, p_reason: reason || null })}
               className="px-3 py-1.5 bg-red-600 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-50">
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}Remove
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}{t('log.entry.remove')}
             </button>
-            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Keep it</button>
+            <button onClick={() => setMode(null)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">{t('log.entry.keep')}</button>
           </div>
         </div>
       )}
       {mode === 'history' && (
         <div className="mt-2 space-y-1.5 p-2.5 rounded-lg bg-slate-800/60 border border-slate-700">
           {!revs && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
-          {revs?.length === 0 && <p className="text-[11px] text-slate-500">No changes — this is the original entry.</p>}
+          {revs?.length === 0 && <p className="text-[11px] text-slate-500">{t('log.entry.noChanges')}</p>}
           {revs?.map(r => (
             <div key={r.id} className="text-[11px] text-slate-300">
-              <span className="text-slate-500">{new Date(r.at).toLocaleString()} · {names[r.by_id] ?? 'Team'} · </span>
-              <span className="font-semibold">{r.action === 'edit' ? 'corrected' : r.action === 'remove' ? 'removed' : 'restored'}</span>
+              <span className="text-slate-500">{new Date(r.at).toLocaleString()} · {names[r.by_id] ?? t('log.entry.team')} · </span>
+              <span className="font-semibold">{r.action === 'edit' ? t('log.entry.corrected') : r.action === 'remove' ? t('log.entry.removed') : t('log.entry.restored')}</span>
               {r.reason && <span className="text-slate-400"> — “{r.reason}”</span>}
               {r.action === 'edit' && <p className="text-slate-500 line-through whitespace-pre-wrap">{r.old_payload?.text}</p>}
             </div>
@@ -143,9 +145,9 @@ const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) =>
       )}
       {err && <p className="text-[11px] text-red-400 mt-1">{err}</p>}
       <div className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-2 flex-wrap">
-        <span>{names[e.actor_id] ?? 'Team'}</span>
+        <span>{names[e.actor_id] ?? t('log.entry.team')}</span>
         <span>·</span>
-        <span>{timeAgo(e.payload?.at_client ?? e.at)}</span>
+        <span>{timeAgo(e.payload?.at_client ?? e.at, t)}</span>
         {patientTag && (<><span>·</span><span className="text-orange-300">{patientTag}</span></>)}
         {e.payload?.lat != null && (
           <>
@@ -156,21 +158,21 @@ const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) =>
             </span>
           </>
         )}
-        {e.edited_at && !removed && <span className="text-sky-300">· corrected</span>}
-        {removed && <span className="text-red-300">· removed</span>}
+        {e.edited_at && !removed && <span className="text-sky-300">· {t('log.entry.corrected')}</span>}
+        {removed && <span className="text-red-300">· {t('log.entry.removed')}</span>}
         {isNote && (
           <span className="ml-auto flex items-center gap-1">
             {(e.edited_at || removed) && (
-              <button onClick={openHistory} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-200" title="History of changes"><History className="w-3.5 h-3.5" /></button>
+              <button onClick={openHistory} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-200" title={t('log.entry.historyTitle')}><History className="w-3.5 h-3.5" /></button>
             )}
             {canChange && !removed && mode !== 'edit' && (
-              <button onClick={() => { setDraft(e.payload?.text ?? ''); setReason(''); setMode('edit'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-orange-300" title="Correct this entry"><Pencil className="w-3.5 h-3.5" /></button>
+              <button onClick={() => { setDraft(e.payload?.text ?? ''); setReason(''); setMode('edit'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-orange-300" title={t('log.entry.correctTitle')}><Pencil className="w-3.5 h-3.5" /></button>
             )}
             {canChange && !removed && (
-              <button onClick={() => { setReason(''); setMode(mode === 'remove' ? null : 'remove'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-red-300" title="Remove this entry"><Trash2 className="w-3.5 h-3.5" /></button>
+              <button onClick={() => { setReason(''); setMode(mode === 'remove' ? null : 'remove'); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-red-300" title={t('log.entry.removeTitle')}><Trash2 className="w-3.5 h-3.5" /></button>
             )}
             {canRestore && removed && (
-              <button disabled={busy} onClick={() => run('restore_log_entry', { p_id: e.id })} className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-1" title="Put this entry back"><RotateCcw className="w-3 h-3" />Restore</button>
+              <button disabled={busy} onClick={() => run('restore_log_entry', { p_id: e.id })} className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-200 flex items-center gap-1" title={t('log.entry.restoreTitle')}><RotateCcw className="w-3 h-3" />{t('log.entry.restore')}</button>
             )}
           </span>
         )}
@@ -180,6 +182,7 @@ const LogEntry = ({ e, names, patientTag, canChange, canRestore, onChanged }) =>
 };
 
 export const FieldLogTab = () => {
+  const { t } = useI18n();
   const isLive = isSupabaseConfigured;
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -240,47 +243,47 @@ export const FieldLogTab = () => {
           const pos = await quickPosition();
           const p = await createPatient({ lat: pos?.lat ?? null, lng: pos?.lng ?? null });
           setActivePatientId(p.id);
-          ack(`Patient ${p.num} created`, `patient ${p.num}`);
+          ack(t('log.ack.created', { n: p.num }), t('log.say.patient', { id: p.num }));
           break;
         }
         case 'switch_patient': {
           const p = cmd.tag
             ? ps.find(x => (x.tag ?? '').toLowerCase() === String(cmd.tag).toLowerCase())
             : ps.find(x => x.num === cmd.num);
-          if (!p) { nack(`no patient ${cmd.tag ?? cmd.num}`); return; }
+          if (!p) { nack(t('log.nack.noPatient', { id: cmd.tag ?? cmd.num })); return; }
           setActivePatientId(p.id);
-          ack(`Active: ${patientLabel(p)}`, `patient ${p.tag ?? p.num}`);
+          ack(t('log.ack.active', { p: patientLabel(p, t) }), t('log.say.patient', { id: p.tag ?? p.num }));
           break;
         }
         case 'triage': {
-          if (!active) { nack('no active patient'); return; }
+          if (!active) { nack(t('log.nack.noActive')); return; }
           await updatePatient(active.id, { triage: cmd.color }, 'patient.triage');
-          ack(`${patientLabel(active)} → ${cmd.color}`, `triage ${cmd.color}`);
+          ack(t('log.ack.triage', { p: patientLabel(active, t), color: cmd.color }), t('log.say.triage', { color: cmd.color }));
           break;
         }
         case 'status': {
-          if (!active) { nack('no active patient'); return; }
+          if (!active) { nack(t('log.nack.noActive')); return; }
           await updatePatient(active.id, { status: cmd.status }, 'patient.status');
-          ack(`${patientLabel(active)} ${cmd.status.replace('_', ' ')}`, cmd.status.replace('_', ' '));
+          ack(t('log.ack.status', { p: patientLabel(active, t), status: t(`log.status.${cmd.status}`) }), t(`log.status.${cmd.status}`));
           break;
         }
         case 'mark': {
           await logEntry(`— time mark —`, active?.id);
-          ack('Time marked', 'marked');
+          ack(t('log.ack.marked'), t('log.say.marked'));
           break;
         }
         case 'entry': {
           await logEntry(cmd.text, active?.id);
-          ack(`Logged${active ? ` → ${patientLabel(active)}` : ''}`, 'logged');
+          ack(active ? t('log.ack.loggedTo', { p: patientLabel(active, t) }) : t('log.ack.logged'), t('log.say.logged'));
           break;
         }
         default: break;
       }
     } catch (err) {
-      nack(/does not exist/i.test(err?.message ?? '') ? 'patients table missing — run migration 0009' : 'failed');
+      nack(/does not exist/i.test(err?.message ?? '') ? t('log.nack.noTable') : t('log.nack.failed'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createPatient, updatePatient, logEntry]);
+  }, [createPatient, updatePatient, logEntry, t]);
 
   const { supported, listening, interim, start, stop } = useSpeech({
     onFinal: (t) => { const cmd = parseCommand(t); if (cmd) execute(cmd); },
@@ -308,7 +311,7 @@ export const FieldLogTab = () => {
       if (error || !data?.handoff) throw error ?? new Error('no result');
       setHandoff({ patient, text: data.handoff, ai: true });
     } catch {
-      setHandoff({ patient, text: basicHandoff(patient, timeline), ai: false });
+      setHandoff({ patient, text: basicHandoff(patient, timeline, t), ai: false });
     }
     setHandoffBusy(false);
   };
@@ -324,15 +327,15 @@ export const FieldLogTab = () => {
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-orange-400" />
-            Field Log
+            {t('log.title')}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            Say <b className="text-slate-300">"new patient"</b>, <b className="text-slate-300">"patient two"</b>, <b className="text-slate-300">"triage red"</b>, <b className="text-slate-300">"transported"</b> — everything else you say is logged to the active patient.
+            {t('log.hint.say')} <b className="text-slate-300">"new patient"</b>, <b className="text-slate-300">"patient two"</b>, <b className="text-slate-300">"triage red"</b>, <b className="text-slate-300">"transported"</b> {t('log.hint.rest')}
           </p>
         </div>
         {queued > 0 && (
           <span className="flex items-center gap-1.5 px-2 py-1 bg-yellow-500/15 border border-yellow-500/30 rounded-lg text-[10px] text-yellow-400 flex-shrink-0">
-            <WifiOff className="w-3 h-3" />{queued} queued offline
+            <WifiOff className="w-3 h-3" />{t('log.queued', { n: queued })}
           </span>
         )}
       </div>
@@ -343,7 +346,7 @@ export const FieldLogTab = () => {
           onClick={() => execute({ type: 'new_patient' })}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-slate-600 text-xs text-slate-400 hover:border-orange-500/40 hover:text-orange-300"
         >
-          <UserPlus className="w-3.5 h-3.5" />New patient
+          <UserPlus className="w-3.5 h-3.5" />{t('log.newPatient')}
         </button>
         {patients.filter(p => p.status === 'active').map(p => (
           <button
@@ -356,7 +359,7 @@ export const FieldLogTab = () => {
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: TRIAGE_META[p.triage]?.dot }} />
-            {patientLabel(p)}
+            {patientLabel(p, t)}
           </button>
         ))}
       </div>
@@ -366,14 +369,14 @@ export const FieldLogTab = () => {
         <div className="bg-slate-900 border border-orange-500/30 rounded-xl p-3 space-y-2">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-sm font-bold text-white">
-              {patientLabel(activePatient)}
+              {patientLabel(activePatient, t)}
               <span className="text-[10px] font-normal text-slate-500 ml-2">
-                {TRIAGE_META[activePatient.triage]?.label} · since {timeAgo(activePatient.created_at)}
+                {TRIAGE_META[activePatient.triage] && t(`log.triage.${activePatient.triage}`)} · {t('log.since', { ago: timeAgo(activePatient.created_at, t) })}
               </span>
             </p>
             <div className="flex items-center gap-1">
               {(isCoord || activePatient.created_by === myId) && (
-                <button onClick={() => setConfirmRemovePatient(v => !v)} className="p-1 text-slate-500 hover:text-red-300" title="Remove this patient (created by mistake)">
+                <button onClick={() => setConfirmRemovePatient(v => !v)} className="p-1 text-slate-500 hover:text-red-300" title={t('log.removePatientTitle')}>
                   <UserMinus className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -382,10 +385,10 @@ export const FieldLogTab = () => {
           </div>
           {confirmRemovePatient && (
             <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2 flex-wrap">
-              <p className="text-xs text-red-200 flex-1 min-w-[12rem]">Remove {patientLabel(activePatient)} from the board? Use this for a patient created by mistake — the record keeps the history.</p>
+              <p className="text-xs text-red-200 flex-1 min-w-[12rem]">{t('log.removePatientConfirm', { p: patientLabel(activePatient, t) })}</p>
               <button onClick={async () => { await updatePatient(activePatient.id, { status: 'removed' }, 'patient.status'); setConfirmRemovePatient(false); setActivePatientId(null); }}
-                className="px-3 py-1.5 bg-red-600 rounded-lg text-xs font-semibold text-white">Remove patient</button>
-              <button onClick={() => setConfirmRemovePatient(false)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">Cancel</button>
+                className="px-3 py-1.5 bg-red-600 rounded-lg text-xs font-semibold text-white">{t('log.removePatient')}</button>
+              <button onClick={() => setConfirmRemovePatient(false)} className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300">{t('log.cancel')}</button>
             </div>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -393,7 +396,7 @@ export const FieldLogTab = () => {
               <button
                 key={c}
                 onClick={() => execute({ type: 'triage', color: c })}
-                title={TRIAGE_META[c].label}
+                title={t(`log.triage.${c}`)}
                 className={`w-7 h-7 rounded-full border-2 ${activePatient.triage === c ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
                 style={{ background: TRIAGE_META[c].dot }}
               />
@@ -403,7 +406,7 @@ export const FieldLogTab = () => {
               onClick={() => execute({ type: 'status', status: 'transported' })}
               className="px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[10px] text-slate-300 hover:bg-slate-700"
             >
-              Transported
+              {t('log.transported')}
             </button>
             <button
               onClick={() => generateHandoff(activePatient)}
@@ -411,7 +414,7 @@ export const FieldLogTab = () => {
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-[10px] font-semibold text-white disabled:opacity-50"
             >
               {handoffBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
-              Handoff
+              {t('log.handoff')}
             </button>
           </div>
         </div>
@@ -428,7 +431,7 @@ export const FieldLogTab = () => {
                 ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/40'
                 : 'bg-gradient-to-br from-orange-500 to-orange-600 hover:scale-105'
             } disabled:opacity-40 disabled:hover:scale-100`}
-            title={supported ? (listening ? 'Stop hands-free mode' : 'Start hands-free mode') : 'Speech recognition not supported in this browser'}
+            title={supported ? (listening ? t('log.mic.stop') : t('log.mic.start')) : t('log.mic.unsupported')}
           >
             {listening ? <MicOff className="w-7 h-7 text-white" /> : <Mic className="w-7 h-7 text-white" />}
           </button>
@@ -438,8 +441,8 @@ export const FieldLogTab = () => {
               onChange={e => setText(e.target.value)}
               rows={3}
               placeholder={listening
-                ? 'Hands-free mode: speak commands or actions — each sentence is executed or logged instantly.'
-                : 'Type an entry or command here — or tap the mic for hands-free mode.'}
+                ? t('log.ph.listening')
+                : t('log.ph.idle')}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500 resize-none"
             />
             {interim && <p className="text-xs text-orange-300/80 italic mt-1">{interim}…</p>}
@@ -450,7 +453,7 @@ export const FieldLogTab = () => {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-[10px] text-slate-500 flex items-center gap-1">
-            <MapPin className="w-3 h-3" />Time & position attach automatically · entries queue offline
+            <MapPin className="w-3 h-3" />{t('log.autoAttach')}
           </p>
           <button
             onClick={saveTyped}
@@ -458,13 +461,13 @@ export const FieldLogTab = () => {
             className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-white text-xs font-semibold flex items-center gap-2 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            Log entry
+            {t('log.logEntry')}
           </button>
         </div>
         {!supported && (
           <p className="text-[10px] text-yellow-500/90 flex items-start gap-1.5">
             <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            This browser has no built-in speech recognition — Chrome and Android work best. On iPhone, use the keyboard mic key.
+            {t('log.noSpeech')}
           </p>
         )}
       </div>
@@ -474,14 +477,14 @@ export const FieldLogTab = () => {
         <div className="min-w-0">
           <p className="text-sm font-medium text-white flex items-center gap-2">
             <Radio className={`w-4 h-4 ${tracker.active ? 'text-green-400' : 'text-slate-500'}`} />
-            Live position tracking
+            {t('log.track.title')}
           </p>
           <p className="text-[10px] text-slate-500 mt-0.5">
             {tracker.active
-              ? `Automatic — your team sees you on the tactical map${tracker.lastFix ? ` · last fix ${timeAgo(tracker.lastFix.toISOString())}` : ' · acquiring GPS…'}`
+              ? (tracker.lastFix ? t('log.track.autoFix', { ago: timeAgo(tracker.lastFix.toISOString(), t) }) : t('log.track.autoAcquiring'))
               : isTrackingPaused()
-                ? 'Paused by you — your team cannot see your position'
-                : tracker.error ?? 'Starting…'}
+                ? t('log.track.paused')
+                : tracker.error ?? t('log.track.starting')}
           </p>
           {tracker.error && !isTrackingPaused() && <p className="text-[10px] text-red-400 mt-0.5">{tracker.error}</p>}
         </div>
@@ -493,7 +496,7 @@ export const FieldLogTab = () => {
               : 'bg-green-500/20 border border-green-500/40 text-green-400'
           }`}
         >
-          {tracker.active ? 'Pause' : 'Resume'}
+          {tracker.active ? t('log.track.pause') : t('log.track.resume')}
         </button>
       </div>
 
@@ -501,24 +504,24 @@ export const FieldLogTab = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-xs font-bold text-white">
-            {activePatient ? `${patientLabel(activePatient)} timeline` : 'Recent entries'}
+            {activePatient ? t('log.timeline', { p: patientLabel(activePatient, t) }) : t('log.recent')}
             {visibleEntries.length > 0 && <span className="text-slate-500 font-normal"> ({visibleEntries.length})</span>}
           </h3>
           {isCoord && removedCount > 0 && (
             <button onClick={() => setShowRemoved(v => !v)} className="text-[11px] text-slate-400 hover:text-white">
-              {showRemoved ? 'Hide removed' : `Show removed (${removedCount})`}
+              {showRemoved ? t('log.hideRemoved') : t('log.showRemoved', { n: removedCount })}
             </button>
           )}
         </div>
         {visibleEntries.length === 0 ? (
           <p className="text-xs text-slate-500">
-            Nothing yet. Every spoken action becomes part of the record — timestamped, located, per patient.
+            {t('log.empty')}
           </p>
         ) : (
           visibleEntries.map(e => {
             const p = !activePatient && e.subject ? patients.find(x => x.id === e.subject) : null;
             return (
-              <LogEntry key={e.id} e={e} names={names} patientTag={p ? patientLabel(p) : null}
+              <LogEntry key={e.id} e={e} names={names} patientTag={p ? patientLabel(p, t) : null}
                 canChange={e.actor_id === myId || isCoord} canRestore={isCoord} onChanged={refresh} />
             );
           })
@@ -531,9 +534,9 @@ export const FieldLogTab = () => {
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-5 max-h-[85dvh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white">
-                Handoff — {patientLabel(handoff.patient)}
+                {t('log.handoffTitle', { p: patientLabel(handoff.patient, t) })}
                 <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded ${handoff.ai ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'}`}>
-                  {handoff.ai ? 'AI · IMIST-AMBO' : 'template — AI assist not configured'}
+                  {handoff.ai ? t('log.handoffAi') : t('log.handoffTemplate')}
                 </span>
               </h3>
               <button onClick={() => setHandoff(null)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
@@ -544,13 +547,13 @@ export const FieldLogTab = () => {
                 onClick={() => say(handoff.text)}
                 className="flex-1 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 flex items-center justify-center gap-1.5 hover:bg-slate-700"
               >
-                <Volume2 className="w-3.5 h-3.5" />Read aloud
+                <Volume2 className="w-3.5 h-3.5" />{t('log.readAloud')}
               </button>
               <button
                 onClick={() => navigator.clipboard.writeText(handoff.text)}
                 className="flex-1 py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1.5"
               >
-                <Copy className="w-3.5 h-3.5" />Copy
+                <Copy className="w-3.5 h-3.5" />{t('log.copy')}
               </button>
             </div>
           </div>

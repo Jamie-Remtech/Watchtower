@@ -65,6 +65,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
   const { latest: positions } = usePositions();
   const { liveMembers } = useTeam();
   const { markers, createMarker } = useMarkers();
+  const kindLabel = (k) => t(`marker.${markerMeta(k).id}`);
 
   // ---------- my position ----------
   const [me, setMe] = useState(() => validPos(getLastCoords()));
@@ -270,7 +271,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
     if (!fix) { flash(t('veh.noFix'), 'err'); return; }
     setBusy('hazard');
     try {
-      await createMarker({ kind, label: `${markerMeta(kind).label} — ${unit}`, lat: fix.lat, lng: fix.lng, notes: t('veh.markedFromCab') });
+      await createMarker({ kind, label: `${kindLabel(kind)} — ${unit}`, lat: fix.lat, lng: fix.lng, notes: t('veh.markedFromCab') });
       beep(true);
       flash(t('veh.hazardMarked'));
     } catch (e) { flash(e.message ?? t('veh.failed'), 'err'); }
@@ -285,7 +286,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
     for (const r of ck?.responses ?? []) {
       if (r.status === 'help' && validPos(r) && openIds.has(r.checkin_id)) out.push({ id: `h-${r.checkin_id}-${r.profile_id}`, icon: '🆘', label: `${nameOf[r.profile_id] ?? t('veh.someone')} — ${t('veh.needsHelp')}`, pos: validPos(r) });
     }
-    for (const m of markers.filter(x => validPos(x))) out.push({ id: `m-${m.id}`, icon: markerMeta(m.kind).icon, label: m.label || markerMeta(m.kind).label, pos: validPos(m) });
+    for (const m of markers.filter(x => validPos(x))) out.push({ id: `m-${m.id}`, icon: markerMeta(m.kind).icon, label: m.label || kindLabel(m.kind), pos: validPos(m) });
     const seen = new Set();
     return out
       .filter(d => (seen.has(d.id) ? false : seen.add(d.id)))
@@ -302,7 +303,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
     .map(p => ({ id: `pos-${p.profile_id}`, name: `${nameOf[p.profile_id] ?? t('veh.someone')} (${hhmm(new Date(p.at))})`, type: 'person', status: 'live', position: validPos(p), icon: '🚒' }));
   const mapDevices = [...crew, ...(me ? [{ id: 'me', name: unit, type: 'person', status: 'here', position: me, icon: '📍' }] : [])];
   const mapMarkers = [
-    ...markers.filter(m => validPos(m)).map(m => ({ id: m.id, name: m.label || markerMeta(m.kind).label, icon: markerMeta(m.kind).icon, position: validPos(m), notes: m.notes, kindLabel: markerMeta(m.kind).label })),
+    ...markers.filter(m => validPos(m)).map(m => ({ id: m.id, name: m.label || kindLabel(m.kind), icon: markerMeta(m.kind).icon, position: validPos(m), notes: m.notes, kindLabel: kindLabel(m.kind) })),
     ...important.map(i => ({ i, p: locOf(i) })).filter(x => x.p).map(({ i, p }) => ({ id: `alert-${i.id}`, name: A(i.title), icon: i.severity === 'critical' ? '🚨' : '⚠️', position: p, notes: A(i.detail) })),
   ];
   const center = me ?? crew[0]?.position ?? { lat: 46.8, lng: -71.2 };
@@ -432,7 +433,7 @@ export const VehicleMode = ({ attentionItems = [], onExit }) => {
             <div className="flex flex-wrap gap-2">
               {HAZARD_KINDS.map(k => (
                 <button key={k} onClick={() => markHazard(k)} className={chip}>
-                  <span className="text-lg" aria-hidden="true">{markerMeta(k).icon}</span>{markerMeta(k).label}
+                  <span className="text-lg" aria-hidden="true">{markerMeta(k).icon}</span>{kindLabel(k)}
                 </button>
               ))}
             </div>

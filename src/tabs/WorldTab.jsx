@@ -7,6 +7,7 @@ import {
   LocateFixed, Loader2, Navigation2, Play, Pause, Calendar, Leaf, Mountain, Cloud, Clock,
   Satellite, MapPin, EyeOff, Focus
 } from 'lucide-react';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // WORLD TAB — the World Engine's first surface
@@ -210,6 +211,12 @@ const Section = ({ id, icon, title, subtitle, action, defaultOpen = true, classN
 };
 
 export const WorldTab = () => {
+  const { t } = useI18n();
+  // Map popups are built outside render — they read the current translator here
+  const tRef = useRef(t);
+  tRef.current = t;
+  const wxName = (code) => (WEATHER_CODES[code] != null ? t(`world.wx.${code}`) : t('world.conditions'));
+  const layerName = (id) => t(`world.layer.${id}.name`);
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -280,20 +287,20 @@ export const WorldTab = () => {
   }, [showMyMarker]);
 
   const locateMe = useCallback(() => {
-    if (!navigator.geolocation) { setLocError('Geolocation is not supported here'); return; }
+    if (!navigator.geolocation) { setLocError('world.loc.unsupported'); return; }
     setLocating(true);
     setLocError(null);
     navigator.geolocation.getCurrentPosition(
       async (p) => {
         try {
           await loadMyWeather({ lat: p.coords.latitude, lng: p.coords.longitude }, { fly: true });
-        } catch { setLocError('Weather source unreachable — try again'); }
+        } catch { setLocError('world.loc.weatherDown'); }
         setLocating(false);
       },
       (err) => {
         setLocError(
-          err.code === 1 ? 'Location permission denied — allow it in your browser' :
-          err.code === 2 ? 'Position unavailable' : 'Location request timed out'
+          err.code === 1 ? 'world.loc.denied' :
+          err.code === 2 ? 'world.loc.unavailable' : 'world.loc.timeout'
         );
         setLocating(false);
       },
@@ -514,13 +521,14 @@ export const WorldTab = () => {
       });
       map.on('click', 'eonet-circles', (e) => {
         const f = e.features[0];
+        const tr = tRef.current;
         trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' }))
           .setLngLat(f.geometry.coordinates)
           .setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
               <strong>${f.properties.title}</strong><br/>
               ${f.properties.cat} · ${new Date(f.properties.date).toLocaleDateString()}<br/>
-              <a href="${f.properties.link}" target="_blank" rel="noreferrer" style="color:#ea580c">Verify source ↗</a>
+              <a href="${f.properties.link}" target="_blank" rel="noreferrer" style="color:#ea580c">${tr('world.popup.verifySource')}</a>
             </div>`
           )
           .addTo(map);
@@ -545,14 +553,15 @@ export const WorldTab = () => {
       map.on('click', 'quake-circles', (e) => {
         const f = e.features[0];
         const [lng, lat, depth] = f.geometry.coordinates;
+        const tr = tRef.current;
         trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '280px' }))
           .setLngLat([lng, lat])
           .setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
-              <strong>M${f.properties.mag} — ${f.properties.place ?? 'unknown'}</strong><br/>
-              Depth ${Math.round(depth)} km · ${new Date(f.properties.time).toLocaleTimeString()}<br/>
-              ${f.properties.tsunami === 1 ? '<span style="color:#e11d48;font-weight:700">⚠ TSUNAMI SIGNAL</span><br/>' : ''}
-              <a href="${f.properties.url}" target="_blank" rel="noreferrer" style="color:#ea580c">Verify at USGS ↗</a>
+              <strong>M${f.properties.mag} — ${f.properties.place ?? tr('world.popup.unknownPlace')}</strong><br/>
+              ${tr('world.popup.depth', { d: Math.round(depth) })} · ${new Date(f.properties.time).toLocaleTimeString()}<br/>
+              ${f.properties.tsunami === 1 ? `<span style="color:#e11d48;font-weight:700">⚠ ${tr('world.tsunamiSignal')}</span><br/>` : ''}
+              <a href="${f.properties.url}" target="_blank" rel="noreferrer" style="color:#ea580c">${tr('world.popup.verifyUsgs')}</a>
             </div>`
           )
           .addTo(map);
@@ -566,9 +575,10 @@ export const WorldTab = () => {
         // A tap on the bare map while a popup is open just dismisses it
         if (activePopup) { activePopup.remove(); activePopup = null; return; }
         const { lng, lat } = e.lngLat;
+        const tr = tRef.current;
         const popup = trackPopup(new maplibregl.Popup({ closeButton: true, closeOnClick: false, maxWidth: '260px' }))
           .setLngLat(e.lngLat)
-          .setHTML('<div style="font-size:12px;color:#334155">Fetching live weather…</div>')
+          .setHTML(`<div style="font-size:12px;color:#334155">${tr('world.popup.fetching')}</div>`)
           .addTo(map);
         try {
           const r = await fetch(
@@ -578,15 +588,15 @@ export const WorldTab = () => {
           const w = (await r.json()).current;
           popup.setHTML(
             `<div style="font-family:inherit;font-size:12px;color:#0f172a">
-              <strong>${WEATHER_CODES[w.weather_code] ?? 'Conditions'}</strong><br/>
+              <strong>${WEATHER_CODES[w.weather_code] != null ? tr(`world.wx.${w.weather_code}`) : tr('world.conditions')}</strong><br/>
               🌡 ${w.temperature_2m}°C · 💧 ${w.relative_humidity_2m}%<br/>
               💨 ${w.wind_speed_10m} km/h @ ${w.wind_direction_10m}°<br/>
               ☔ ${w.precipitation} mm<br/>
-              <span style="color:#64748b">${lat.toFixed(2)}, ${lng.toFixed(2)} · Source: Open-Meteo</span>
+              <span style="color:#64748b">${lat.toFixed(2)}, ${lng.toFixed(2)} · ${tr('world.popup.sourceOpenMeteo')}</span>
             </div>`
           );
         } catch {
-          popup.setHTML('<div style="font-size:12px;color:#991b1b">Weather source unreachable</div>');
+          popup.setHTML(`<div style="font-size:12px;color:#991b1b">${tr('world.popup.weatherDown')}</div>`);
         }
       });
 
@@ -963,7 +973,7 @@ export const WorldTab = () => {
         <Section
           id="myweather"
           icon={<LocateFixed className="w-3.5 h-3.5 text-sky-400" />}
-          title="My Weather"
+          title={t('world.myWeather')}
           action={
             <button
               onClick={locateMe}
@@ -971,15 +981,15 @@ export const WorldTab = () => {
               className="flex items-center gap-1.5 px-2 py-1 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg text-[10px] font-medium hover:bg-sky-500/25 disabled:opacity-50"
             >
               {locating ? <Loader2 className="w-3 h-3 animate-spin" /> : <LocateFixed className="w-3 h-3" />}
-              {myWx ? 'My location' : 'Use my GPS'}
+              {myWx ? t('fc.myLocation') : t('world.useGps')}
             </button>
           }
         >
-          {locError && <p className="text-[10px] text-red-400 mb-1">{locError}</p>}
+          {locError && <p className="text-[10px] text-red-400 mb-1">{t(locError)}</p>}
 
           {!myWx ? (
             <p className="text-[10px] text-slate-500">
-              Tap “Use my GPS” to see live conditions and the 7-day forecast wherever you are.
+              {t('world.gpsHint', { btn: t('world.useGps') })}
             </p>
           ) : (
             <>
@@ -991,7 +1001,7 @@ export const WorldTab = () => {
                     {Math.round(myWx.current.temperature_2m)}°C
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    {WEATHER_CODES[myWx.current.weather_code] ?? 'Conditions'} · feels {Math.round(myWx.current.apparent_temperature)}°
+                    {wxName(myWx.current.weather_code)} · {t('fc.feels', { t: Math.round(myWx.current.apparent_temperature) })}
                   </p>
                 </div>
               </div>
@@ -1005,7 +1015,7 @@ export const WorldTab = () => {
               {myWx.air && (
                 <div className="mt-2 pt-2 border-t border-slate-800">
                   <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Leaf className="w-2.5 h-2.5" />Air & pollen
+                    <Leaf className="w-2.5 h-2.5" />{t('world.airPollen')}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400">
                     {myWx.air.pm2_5 != null && <span>PM2.5 <b className={pmColor(myWx.air.pm2_5)}>{Math.round(myWx.air.pm2_5)}</b></span>}
@@ -1016,15 +1026,15 @@ export const WorldTab = () => {
                     const species = POLLEN_SPECIES.filter(([k]) => myWx.air[k] != null);
                     return species.length ? (
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-400 mt-1">
-                        {species.map(([k, label]) => (
-                          <span key={k}>{label} <b className={pollenColor(myWx.air[k])}>{Math.round(myWx.air[k])}</b></span>
+                        {species.map(([k]) => (
+                          <span key={k}>{t(`world.pollen.${k}`)} <b className={pollenColor(myWx.air[k])}>{Math.round(myWx.air[k])}</b></span>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[9px] text-slate-600 mt-1">Pollen forecast: no coverage at this location (European model)</p>
+                      <p className="text-[9px] text-slate-600 mt-1">{t('world.pollenNoCoverage')}</p>
                     );
                   })()}
-                  <p className="text-[8px] text-slate-600 mt-1">pollen: grains/m³ · air: µg/m³ · Source: Open-Meteo Air Quality (CAMS)</p>
+                  <p className="text-[8px] text-slate-600 mt-1">{t('world.airUnits')}</p>
                 </div>
               )}
 
@@ -1033,7 +1043,7 @@ export const WorldTab = () => {
                 {myWx.daily.time.map((day, i) => (
                   <div key={day} className="flex items-center gap-2 text-[11px] py-0.5">
                     <span className="w-8 text-slate-400">
-                      {i === 0 ? 'Today' : new Date(day + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' })}
+                      {i === 0 ? t('fc.today') : new Date(day + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' })}
                     </span>
                     <span className="w-5 text-center">{WEATHER_EMOJI(myWx.daily.weather_code[i])}</span>
                     <span className="w-8 text-sky-400 text-[10px]">
@@ -1045,7 +1055,7 @@ export const WorldTab = () => {
                 ))}
               </div>
               <p className="text-[9px] text-slate-600 mt-1.5">
-                Updated {myWx.at.toLocaleTimeString()} · Source: Open-Meteo (national weather services)
+                {t('world.updatedAt', { time: myWx.at.toLocaleTimeString() })}
               </p>
             </>
           )}
@@ -1055,16 +1065,16 @@ export const WorldTab = () => {
         <Section
           id="time"
           icon={<Clock className="w-3.5 h-3.5 text-orange-400" />}
-          title="Time"
-          subtitle="past · now · forecast"
+          title={t('world.time')}
+          subtitle={t('world.timeSub')}
         >
           <div className="space-y-1.5">
             {frames && (
-              <div className="flex items-center gap-2" title="Rain radar loop — last 2 hours">
+              <div className="flex items-center gap-2" title={t('world.radarLoopTip')}>
                 <button
                   onClick={() => setPlaying(p => !p)}
                   className="p-0.5 text-orange-400 hover:text-orange-300 flex-shrink-0"
-                  title={playing ? 'Pause radar loop' : 'Play radar loop (last 2 h)'}
+                  title={playing ? t('world.pauseRadar') : t('world.playRadar')}
                 >
                   {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 </button>
@@ -1078,13 +1088,13 @@ export const WorldTab = () => {
                   {(() => {
                     const idx = frameIdx === -1 ? frames.list.length - 1 : frameIdx;
                     return idx === frames.list.length - 1
-                      ? 'LIVE'
+                      ? t('world.live')
                       : new Date(frames.list[idx].time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   })()}
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-2" title="Model forecast — next 48 hours">
+            <div className="flex items-center gap-2" title={t('world.fcstTip')}>
               <Cloud className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
               <input
                 type="range" min={0} max={48} value={fcstHour}
@@ -1095,10 +1105,10 @@ export const WorldTab = () => {
                 className="flex-1 accent-green-500 h-1"
               />
               <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
-                {fcstHour === 0 ? 'Now' : `+${fcstHour}h`}
+                {fcstHour === 0 ? t('world.now') : `+${fcstHour}h`}
               </span>
             </div>
-            <div className="flex items-center gap-2" title="NASA satellite history — 30 days">
+            <div className="flex items-center gap-2" title={t('world.satHistoryTip')}>
               <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
               <input
                 type="range" min={1} max={30} value={daysBack}
@@ -1107,11 +1117,11 @@ export const WorldTab = () => {
                 className="flex-1 accent-sky-500 h-1"
               />
               <span className="text-[10px] text-slate-300 w-12 text-right flex-shrink-0 font-medium">
-                {daysBack === 1 ? 'Latest' : gibsDate(daysBack).slice(5)}
+                {daysBack === 1 ? t('world.latest') : gibsDate(daysBack).slice(5)}
               </span>
             </div>
             <p className="text-[8px] text-slate-500 leading-none">
-              Orange: radar loop (2 h) · Green: forecast (+48 h) · Blue: satellite history (30 d) · click the globe anywhere for live weather
+              {t('world.sliderLegend')}
             </p>
           </div>
         </Section>
@@ -1120,19 +1130,19 @@ export const WorldTab = () => {
         <Section
           id="layers"
           icon={<Layers className="w-3.5 h-3.5 text-orange-400" />}
-          title="Layers"
+          title={t('world.layers')}
         >
           <div className="flex gap-1.5 mb-1.5">
             <button onClick={() => setLayers(null)}
               className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium border ${allOff ? 'bg-orange-500/15 border-orange-500/40 text-orange-300' : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white'}`}>
-              <EyeOff className="w-3.5 h-3.5" />Bare earth
+              <EyeOff className="w-3.5 h-3.5" />{t('world.bareEarth')}
             </button>
             <button onClick={resetLayers}
               className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium border bg-slate-800/60 border-slate-700 text-slate-300 hover:text-white">
-              <RefreshCw className="w-3.5 h-3.5" />Default layers
+              <RefreshCw className="w-3.5 h-3.5" />{t('world.defaultLayers')}
             </button>
           </div>
-          {allOff && <p className="text-[10px] text-slate-500 mb-1.5">Bare-earth globe: NASA Blue Marble (cloud-free composite). Tap a layer to add it, or ◎ to view only that layer.</p>}
+          {allOff && <p className="text-[10px] text-slate-500 mb-1.5">{t('world.bareEarthNote')}</p>}
           <div className="space-y-1">
             {OVERLAYS.map(o => (
               <div key={o.id} className="flex items-stretch gap-1">
@@ -1145,15 +1155,15 @@ export const WorldTab = () => {
                 <o.icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${enabled[o.id] ? 'text-orange-400' : 'text-slate-500'}`} />
                 <span className="min-w-0">
                   <span className={`block text-xs font-medium ${enabled[o.id] ? 'text-orange-300' : 'text-slate-300'}`}>
-                    {o.name}
+                    {layerName(o.id)}
                     {o.id === 'quakes' && quakeCount > 0 && ` (${quakeCount})`}
-                    {o.id === 'wind' && enabled.wind && windCount != null && ` (${windCount} samples)`}
+                    {o.id === 'wind' && enabled.wind && windCount != null && ` (${t('world.windSamples', { n: windCount })})`}
                   </span>
-                  <span className="block text-[10px] text-slate-500 leading-tight">{o.desc}</span>
+                  <span className="block text-[10px] text-slate-500 leading-tight">{t(`world.layer.${o.id}.desc`)}</span>
                   <span className="block text-[9px] text-slate-600 leading-tight">{o.source}</span>
                 </span>
               </button>
-              <button onClick={() => setLayers(o.id)} title={`Only ${o.name} on the bare globe`} aria-label={`Only ${o.name}`}
+              <button onClick={() => setLayers(o.id)} title={t('world.onlyOnBare', { name: layerName(o.id) })} aria-label={t('world.only', { name: layerName(o.id) })}
                 className="w-8 flex-shrink-0 rounded-lg bg-slate-800/40 hover:bg-slate-800 text-slate-500 hover:text-orange-300 flex items-center justify-center">
                 <Focus className="w-3.5 h-3.5" />
               </button>
@@ -1166,7 +1176,7 @@ export const WorldTab = () => {
         <Section
           id="cascade"
           icon={<AlertTriangle className="w-3.5 h-3.5 text-orange-400" />}
-          title="Cascade Watch"
+          title={t('world.cascadeWatch')}
           className="flex-shrink-0"
           action={lastRefresh && (
             <span className="text-[9px] text-slate-500 flex items-center gap-1">
@@ -1175,7 +1185,7 @@ export const WorldTab = () => {
           )}
         >
           {quakeFlags.length === 0 ? (
-            <p className="text-[10px] text-slate-500">No cascade-capable seismic events in the last 24h.</p>
+            <p className="text-[10px] text-slate-500">{t('world.noCascade')}</p>
           ) : (
             <div className="space-y-1.5">
               {quakeFlags.map(q => (
@@ -1188,11 +1198,11 @@ export const WorldTab = () => {
                 >
                   <span className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white">M{q.mag?.toFixed(1)}</span>
-                    {q.tsunami && <span className="text-[9px] font-bold text-rose-400">TSUNAMI SIGNAL</span>}
+                    {q.tsunami && <span className="text-[9px] font-bold text-rose-400">{t('world.tsunamiSignal')}</span>}
                   </span>
                   <span className="block text-[10px] text-slate-400 truncate">{q.place}</span>
                   <span className="block text-[9px] text-slate-500">
-                    depth {Math.round(q.depth)} km · {new Date(q.time).toLocaleTimeString()} · tap to view
+                    {t('world.quakeLine', { d: Math.round(q.depth), time: new Date(q.time).toLocaleTimeString() })}
                   </span>
                 </button>
               ))}
@@ -1205,19 +1215,19 @@ export const WorldTab = () => {
             className="mt-3 w-full flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 hover:text-orange-400"
           >
             {chainsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Known cascade chains
+            {t('world.knownChains')}
           </button>
           {chainsOpen && (
             <div className="mt-1.5 space-y-1.5">
               {CASCADE_CHAINS.map((c, i) => (
                 <div key={i} className="px-2 py-1.5 bg-slate-800/40 rounded-lg">
                   <p className="text-[10px] text-slate-300">
-                    <span className="font-semibold text-orange-300">{c.trigger}</span>
+                    <span className="font-semibold text-orange-300">{t(`world.chain.${i}.trigger`)}</span>
                     <span className="text-slate-500"> → </span>
-                    <span className="font-semibold text-slate-200">{c.effect}</span>
+                    <span className="font-semibold text-slate-200">{t(`world.chain.${i}.effect`)}</span>
                   </p>
                   <p className="text-[9px] text-slate-500 flex items-start gap-1 mt-0.5">
-                    <Info className="w-2.5 h-2.5 mt-px flex-shrink-0" />{c.watch}
+                    <Info className="w-2.5 h-2.5 mt-px flex-shrink-0" />{t(`world.chain.${i}.watch`)}
                   </p>
                 </div>
               ))}

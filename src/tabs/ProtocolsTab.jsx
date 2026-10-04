@@ -6,6 +6,7 @@ import {
 import { useProtocols } from '../hooks/useProtocols';
 import { useAuth } from '../auth/AuthContext';
 import { hasAtLeast } from '../auth/roles';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // PROTOCOLS — playbooks executed together, patterns recorded.
@@ -22,16 +23,17 @@ const KIND_META = {
 };
 const kindMeta = (k) => KIND_META[k] ?? KIND_META.custom;
 
-const timeAgo = (iso) => {
+const timeAgo = (iso, t) => {
   const s = Math.floor((Date.now() - new Date(iso)) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  if (s < 60) return t('proto.justNow');
+  if (s < 3600) return t('proto.mAgo', { m: Math.floor(s / 60) });
+  if (s < 86400) return t('proto.hAgo', { h: Math.floor(s / 3600) });
   return new Date(iso).toLocaleDateString();
 };
 
 // ---------- editor (create / edit, with AI draft) ----------
 const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
+  const { t } = useI18n();
   const [name, setName] = useState(initial?.name ?? '');
   const [kind, setKind] = useState(initial?.trigger_kind ?? 'custom');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -52,21 +54,21 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
       setDescription(d.description ?? '');
       setSteps((d.steps ?? []).map(String));
     } catch (e) {
-      setError(e.message ?? 'Draft failed');
+      setError(e.message ?? t('proto.ed.draftFailed'));
     }
     setDrafting(false);
   };
 
   const save = async () => {
     const clean = steps.map(s => s.trim()).filter(Boolean);
-    if (!name.trim() || clean.length === 0) { setError('Name and at least one step are required'); return; }
+    if (!name.trim() || clean.length === 0) { setError(t('proto.ed.required')); return; }
     setBusy(true);
     setError(null);
     try {
       await onSave({ name: name.trim(), trigger_kind: kind, description: description.trim(), steps: clean });
       onClose();
     } catch (e) {
-      setError(e.message ?? 'Could not save');
+      setError(e.message ?? t('proto.ed.saveFailed'));
       setBusy(false);
     }
   };
@@ -77,7 +79,7 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-orange-400" />
-            {initial ? 'Edit protocol' : 'New protocol'}
+            {initial ? t('proto.edit') : t('proto.new')}
           </h3>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg"><X className="w-4 h-4 text-slate-400" /></button>
         </div>
@@ -87,14 +89,14 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
           {!initial && (
             <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg space-y-2">
               <p className="text-[11px] text-purple-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />Describe the situation — the AI drafts the checklist, you edit it.
+                <Sparkles className="w-3.5 h-3.5" />{t('proto.ed.aiHint')}
               </p>
               <div className="flex gap-2">
                 <input
                   value={situation}
                   onChange={e => setSituation(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') draft(); }}
-                  placeholder="e.g. crew cut off by rising river during storm"
+                  placeholder={t('proto.ed.situationPh')}
                   className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500"
                 />
                 <button
@@ -103,7 +105,7 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
                   className="px-3 py-2 bg-purple-500/20 border border-purple-500/40 text-purple-300 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {drafting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  Draft
+                  {t('proto.ed.draft')}
                 </button>
               </div>
             </div>
@@ -111,26 +113,26 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wide">Name</label>
+              <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('proto.ed.name')}</label>
               <input value={name} onChange={e => setName(e.target.value)}
                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-orange-500" />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wide">Trigger</label>
+              <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('proto.ed.trigger')}</label>
               <select value={kind} onChange={e => setKind(e.target.value)}
                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-orange-500">
-                {Object.entries(KIND_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+                {Object.keys(KIND_META).map(k => <option key={k} value={k}>{t(`proto.kind.${k}`)}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wide">When to run it</label>
-            <input value={description} onChange={e => setDescription(e.target.value)} placeholder="One sentence"
+            <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('proto.ed.when')}</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t('proto.ed.whenPh')}
               className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500" />
           </div>
 
           <div>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wide">Steps (in order)</label>
+            <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('proto.ed.steps')}</label>
             <div className="space-y-1.5 mt-1">
               {steps.map((s, i) => (
                 <div key={i} className="flex items-center gap-1.5">
@@ -148,7 +150,7 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
             </div>
             <button onClick={() => setSteps(arr => [...arr, ''])}
               className="mt-2 flex items-center gap-1 text-xs text-orange-300 hover:text-orange-200">
-              <Plus className="w-3.5 h-3.5" />Add step
+              <Plus className="w-3.5 h-3.5" />{t('proto.ed.addStep')}
             </button>
           </div>
         </div>
@@ -156,10 +158,10 @@ const ProtocolEditor = ({ initial, onSave, onClose, draftWithAI }) => {
         <div className="flex items-center justify-between gap-2 p-3 border-t border-slate-700">
           <span className="text-xs text-red-400">{error}</span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs">Cancel</button>
+            <button onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs">{t('proto.ed.cancel')}</button>
             <button onClick={save} disabled={busy}
               className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Save protocol
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('proto.ed.save')}
             </button>
           </div>
         </div>
@@ -185,6 +187,7 @@ const SectionHeader = ({ open, onToggle, label, count }) => (
 
 // ---------- a live run card ----------
 const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
+  const { t } = useI18n();
   const done = run.steps.filter(s => s.done).length;
   const total = run.steps.length;
   const [confirmAbort, setConfirmAbort] = useState(false);
@@ -196,7 +199,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
           {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
           <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse inline-block" />
           <h4 className="text-sm font-bold text-white">{run.name}</h4>
-          <span className="text-[10px] text-slate-500">started {timeAgo(run.started_at)}</span>
+          <span className="text-[10px] text-slate-500">{t('proto.run.started', { ago: timeAgo(run.started_at, t) })}</span>
         </button>
         <div className="flex items-center gap-2">
           <span className="text-xs text-orange-300 font-mono">{done}/{total}</span>
@@ -209,7 +212,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
       {open && (<>
       {run.context?.attention?.title && (
         <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-2.5 py-1.5">
-          Triggered by alert: {run.context.attention.title}
+          {t('proto.run.triggeredBy', { title: run.context.attention.title })}
         </p>
       )}
 
@@ -227,7 +230,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
               : <Square className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />}
             <span className="min-w-0 flex-1">
               <span className={`block text-xs ${s.done ? 'text-slate-400 line-through' : 'text-slate-100'}`}>{s.text}</span>
-              {s.done && <span className="text-[10px] text-green-500">{s.by_name ?? 'someone'} · {timeAgo(s.at)}</span>}
+              {s.done && <span className="text-[10px] text-green-500">{s.by_name ?? t('proto.run.someone')} · {timeAgo(s.at, t)}</span>}
             </span>
           </button>
         ))}
@@ -237,17 +240,17 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
         <div className="flex items-center justify-end gap-2 pt-1">
           {confirmAbort ? (
             <button onClick={() => onEnd(run.id, 'aborted')} className="px-3 py-1.5 bg-red-500/20 border border-red-500/40 text-red-300 rounded-lg text-xs font-bold">
-              Confirm abort
+              {t('proto.run.confirmAbort')}
             </button>
           ) : (
             <button onClick={() => { setConfirmAbort(true); setTimeout(() => setConfirmAbort(false), 3000); }}
               className="px-3 py-1.5 text-slate-500 hover:text-red-400 text-xs">
-              Abort
+              {t('proto.run.abort')}
             </button>
           )}
           <button onClick={() => onEnd(run.id, 'completed')}
             className="px-3 py-1.5 bg-green-500/20 border border-green-500/40 text-green-300 rounded-lg text-xs font-medium flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5" />Complete & debrief
+            <Check className="w-3.5 h-3.5" />{t('proto.run.complete')}
           </button>
         </div>
       )}
@@ -260,6 +263,7 @@ const RunCard = ({ run, onToggle, onEnd, canEnd }) => {
 export const ProtocolsTab = () => {
   const { protocols, runs, loading, error, createProtocol, updateProtocol, deleteProtocol, seedStarters, startRun, toggleStep, endRun, draftWithAI } = useProtocols();
   const { profile } = useAuth();
+  const { t } = useI18n();
   const canManage = hasAtLeast(profile?.role, 'coordinator');
   const canRun = hasAtLeast(profile?.role, 'field');
   const [editing, setEditing] = useState(null);      // null | 'new' | protocol
@@ -299,12 +303,12 @@ export const ProtocolsTab = () => {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <ClipboardList className="w-6 h-6 text-orange-400" />
-          Protocols
+          {t('proto.title')}
         </h2>
         {canManage && (
           <button onClick={() => setEditing('new')}
             className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-xs font-medium flex items-center gap-1.5 text-white">
-            <Plus className="w-3.5 h-3.5" />New protocol
+            <Plus className="w-3.5 h-3.5" />{t('proto.new')}
           </button>
         )}
       </div>
@@ -313,7 +317,7 @@ export const ProtocolsTab = () => {
       {/* ACTIVE RUNS — the live checklists, top priority */}
       {activeRuns.length > 0 && (
         <div className="space-y-2">
-          <SectionHeader open={liveOpen} onToggle={toggleLive} label="Live runs" count={activeRuns.length} />
+          <SectionHeader open={liveOpen} onToggle={toggleLive} label={t('proto.sec.live')} count={activeRuns.length} />
           {liveOpen && activeRuns.map(r => (
             <RunCard key={r.id} run={r} onToggle={doToggle} onEnd={doEnd} canEnd={canRun} />
           ))}
@@ -322,11 +326,11 @@ export const ProtocolsTab = () => {
 
       {/* LIBRARY */}
       <div className="space-y-2">
-        <SectionHeader open={libOpen} onToggle={toggleLib} label="Playbook library" count={protocols.length} />
-        {libOpen && loading && <p className="text-xs text-slate-500">Loading…</p>}
+        <SectionHeader open={libOpen} onToggle={toggleLib} label={t('proto.sec.library')} count={protocols.length} />
+        {libOpen && loading && <p className="text-xs text-slate-500">{t('proto.loading')}</p>}
         {libOpen && !loading && protocols.length === 0 && (
           <div className="p-6 bg-slate-900/50 border border-slate-800 rounded-xl text-center space-y-3">
-            <p className="text-sm text-slate-400">No protocols yet. This is where the organization's playbooks live — checklists the whole team executes together when something happens.</p>
+            <p className="text-sm text-slate-400">{t('proto.empty')}</p>
             {canManage && (
               <button
                 onClick={async () => { setSeeding(true); try { await seedStarters(); } catch (e) { setActionError(e.message); } setSeeding(false); }}
@@ -334,37 +338,38 @@ export const ProtocolsTab = () => {
                 className="px-4 py-2 bg-orange-500/20 border border-orange-500/40 text-orange-300 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
               >
                 {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                Add the three starter playbooks (wildfire · earthquake · severe weather)
+                {t('proto.seed')}
               </button>
             )}
           </div>
         )}
         {libOpen && protocols.map(p => {
           const meta = kindMeta(p.trigger_kind);
+          const kindId = KIND_META[p.trigger_kind] ? p.trigger_kind : 'custom';
           const Icon = meta.icon;
           const stepsOpen = openSteps.has(p.id);
           return (
             <div key={p.id} className="bg-slate-900/50 border border-slate-800 rounded-xl">
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <button onClick={() => flip(setOpenSteps, p.id)} className="p-0.5 -ml-1 text-slate-500 hover:text-white" aria-expanded={stepsOpen} title={stepsOpen ? 'Hide steps' : 'Show steps'}>
+              <button onClick={() => flip(setOpenSteps, p.id)} className="p-0.5 -ml-1 text-slate-500 hover:text-white" aria-expanded={stepsOpen} title={stepsOpen ? t('proto.hideSteps') : t('proto.showSteps')}>
                 {stepsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               </button>
               <Icon className={`w-4 h-4 flex-shrink-0 ${meta.color}`} />
               <div className="min-w-0 flex-1 cursor-pointer" onClick={() => flip(setOpenSteps, p.id)}>
                 <p className="text-sm text-white font-medium truncate">{p.name}</p>
-                <p className="text-[11px] text-slate-500 truncate">{p.description ?? meta.label} · {(p.steps ?? []).length} steps</p>
+                <p className="text-[11px] text-slate-500 truncate">{p.description ?? t(`proto.kind.${kindId}`)} · {t('proto.stepsCount', { n: (p.steps ?? []).length })}</p>
               </div>
               {canManage && (
                 <>
-                  <button onClick={() => setEditing(p)} className="p-1.5 text-slate-500 hover:text-white" title="Edit">
+                  <button onClick={() => setEditing(p)} className="p-1.5 text-slate-500 hover:text-white" title={t('proto.editTitle')}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   {confirmDelete === p.id ? (
                     <button onClick={() => { deleteProtocol(p.id).catch(e => setActionError(e.message)); setConfirmDelete(null); }}
-                      className="px-2 py-1 text-[10px] font-bold text-red-400">sure?</button>
+                      className="px-2 py-1 text-[10px] font-bold text-red-400">{t('proto.sure')}</button>
                   ) : (
                     <button onClick={() => { setConfirmDelete(p.id); setTimeout(() => setConfirmDelete(c => (c === p.id ? null : c)), 2500); }}
-                      className="p-1.5 text-slate-600 hover:text-red-400" title="Delete">
+                      className="p-1.5 text-slate-600 hover:text-red-400" title={t('proto.deleteTitle')}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -375,10 +380,10 @@ export const ProtocolsTab = () => {
                   onClick={() => begin(p)}
                   disabled={starting === p.id}
                   className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50"
-                  title="Start a live run — the whole team sees the checklist and gets a push"
+                  title={t('proto.runTitle')}
                 >
                   {starting === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  Run
+                  {t('proto.run')}
                 </button>
               )}
             </div>
@@ -387,7 +392,7 @@ export const ProtocolsTab = () => {
                 {(p.steps ?? []).map((st, i) => (
                   <li key={st.id ?? i} className="text-xs text-slate-300 pl-1">{st.text}</li>
                 ))}
-                {(p.steps ?? []).length === 0 && <li className="text-xs text-slate-500 list-none -ml-4">No steps yet.</li>}
+                {(p.steps ?? []).length === 0 && <li className="text-xs text-slate-500 list-none -ml-4">{t('proto.noSteps')}</li>}
               </ol>
             )}
             </div>
@@ -398,7 +403,7 @@ export const ProtocolsTab = () => {
       {/* HISTORY — recorded patterns */}
       {pastRuns.length > 0 && (
         <div className="space-y-2">
-          <SectionHeader open={pastOpen} onToggle={togglePast} label="Past runs — the record the org learns from" count={pastRuns.length} />
+          <SectionHeader open={pastOpen} onToggle={togglePast} label={t('proto.sec.past')} count={pastRuns.length} />
           {pastOpen && pastRuns.map(r => {
             const done = r.steps.filter(s => s.done).length;
             const open = openHistory.has(r.id);
@@ -409,16 +414,16 @@ export const ProtocolsTab = () => {
                   {open ? <ChevronDown className="w-3.5 h-3.5 text-slate-500" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-500" />}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
                     r.status === 'completed' ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'bg-red-500/15 text-red-400 border-red-500/30'
-                  }`}>{r.status}</span>
+                  }`}>{t(`proto.status.${r.status}`)}</span>
                   <span className="text-xs text-white font-medium flex-1 truncate">{r.name}</span>
-                  <span className="text-[10px] text-slate-500">{done}/{r.steps.length} · {timeAgo(r.ended_at ?? r.started_at)}</span>
+                  <span className="text-[10px] text-slate-500">{done}/{r.steps.length} · {timeAgo(r.ended_at ?? r.started_at, t)}</span>
                 </button>
                 {open && (
                   <div className="px-4 pb-3 space-y-2">
                     {r.debrief && (
                       <div className="p-3 bg-slate-800/60 rounded-lg">
                         <p className="text-[10px] text-purple-300 uppercase tracking-wide flex items-center gap-1 mb-1">
-                          <FileText className="w-3 h-3" />AI after-action debrief
+                          <FileText className="w-3 h-3" />{t('proto.debrief')}
                         </p>
                         <p className="text-xs text-slate-200 whitespace-pre-wrap">{r.debrief}</p>
                       </div>

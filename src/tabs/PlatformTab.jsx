@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
 import { ROLES, ROLE_LABELS } from '../auth/roles';
 import { logEvent } from '../lib/eventLog';
+import { useI18n } from '../i18n/index.jsx';
 
 // ============================================
 // PLATFORM — the creator's portal, above every company.
@@ -25,16 +26,18 @@ const STATUS_STYLE = {
 };
 
 const InviteQRBig = ({ code }) => {
+  const { t } = useI18n();
   const [dataUrl, setDataUrl] = useState(null);
   useEffect(() => {
     QRCode.toDataURL(`${window.location.origin}/?join=${encodeURIComponent(code)}`, { width: 200, margin: 1 })
       .then(setDataUrl).catch(() => {});
   }, [code]);
-  return dataUrl ? <img src={dataUrl} alt="Join code" className="rounded-lg border-4 border-paper w-[160px] h-[160px]" /> : null;
+  return dataUrl ? <img src={dataUrl} alt={t('admin.joinCode')} className="rounded-lg border-4 border-paper w-[160px] h-[160px]" /> : null;
 };
 
 export const PlatformTab = () => {
   const { profile } = useAuth();
+  const { t } = useI18n();
   const [orgs, setOrgs] = useState([]);
   const [people, setPeople] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -77,10 +80,12 @@ export const PlatformTab = () => {
 
   const myPlatformRole = profile?.platform_role ?? (profile?.platform_owner ? 'owner' : null);
   if (!['owner', 'staff'].includes(myPlatformRole)) {
-    return <p className="text-sm text-slate-500 text-center py-12">Platform portal is reserved for system administrators.</p>;
+    return <p className="text-sm text-slate-500 text-center py-12">{t('admin.reserved')}</p>;
   }
 
   const orgName = (id) => orgs.find(o => o.id === id)?.name ?? '?';
+  // translated label for a status enum; unknown values show as stored
+  const tStatus = (key, raw) => { const s = t(key); return s === key ? raw : s; };
 
   const createCompany = async () => {
     const name = newCompany.trim();
@@ -128,7 +133,7 @@ export const PlatformTab = () => {
 
   const saveInvoice = async () => {
     const d = invoiceDraft;
-    if (!d?.label?.trim() || !(+d.amount > 0)) { setError('Invoice needs a label and an amount'); return; }
+    if (!d?.label?.trim() || !(+d.amount > 0)) { setError(t('admin.err.invoiceNeeds')); return; }
     setBusy(true);
     setError(null);
     try {
@@ -152,7 +157,7 @@ export const PlatformTab = () => {
 
   const saveLink = async () => {
     const d = linkDraft;
-    if (!d?.a || !d?.b || d.a === d.b) { setError('Pick two different companies to link'); return; }
+    if (!d?.a || !d?.b || d.a === d.b) { setError(t('admin.err.pickTwo')); return; }
     setBusy(true);
     setError(null);
     try {
@@ -181,9 +186,9 @@ export const PlatformTab = () => {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Building2 className="w-6 h-6 text-purple-400" />
-          Platform
+          {t('nav.platform')}
           <span className="text-[10px] font-normal px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-            {myPlatformRole === 'owner' ? 'creator' : 'system admin'}
+            {myPlatformRole === 'owner' ? t('admin.creator') : t('admin.sysAdmin')}
           </span>
         </h2>
         <div className="flex items-center gap-2">
@@ -191,12 +196,12 @@ export const PlatformTab = () => {
             value={newCompany}
             onChange={e => setNewCompany(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') createCompany(); }}
-            placeholder="New company name…"
+            placeholder={t('admin.newCompanyPh')}
             className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 w-44"
           />
           <button onClick={createCompany} disabled={busy || !newCompany.trim()}
             className="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
-            <Plus className="w-3.5 h-3.5" />Create
+            <Plus className="w-3.5 h-3.5" />{t('admin.create')}
           </button>
         </div>
       </div>
@@ -217,27 +222,27 @@ export const PlatformTab = () => {
                 <Building2 className="w-4 h-4 text-purple-400" />
                 <span className="text-sm font-bold text-white flex-1 truncate">{org.name}</span>
                 <span className="text-[10px] text-slate-500 flex items-center gap-1"><Users className="w-3 h-3" />{members.length}</span>
-                {unpaid > 0 && <span className="text-[10px] text-yellow-300">{money(unpaid, 'CAD')} due</span>}
+                {unpaid > 0 && <span className="text-[10px] text-yellow-300">{t('admin.due', { amount: money(unpaid, 'CAD') })}</span>}
               </button>
 
               {open && (
                 <div className="px-4 pb-4 space-y-3">
                   {/* members */}
                   <div className="space-y-1">
-                    {members.length === 0 && <p className="text-[11px] text-slate-500">No members yet — mint the admin invite below.</p>}
+                    {members.length === 0 && <p className="text-[11px] text-slate-500">{t('admin.noMembers')}</p>}
                     {members.map(m => (
                       <div key={m.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/50 rounded-lg">
                         <span className="text-xs text-white flex-1 truncate">{m.display_name || m.email}</span>
                         {m.platform_role && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                            {m.platform_role === 'owner' ? 'creator' : 'system admin'}
+                            {m.platform_role === 'owner' ? t('admin.creator') : t('admin.sysAdmin')}
                           </span>
                         )}
-                        <span className="text-[10px] text-slate-500">{ROLE_LABELS[m.role] ?? m.role}</span>
+                        <span className="text-[10px] text-slate-500">{ROLE_LABELS[m.role] ? t(`role.${m.role}`) : m.role}</span>
                         {!m.platform_role && m.id !== profile.id && (
                           <button
                             onClick={() => { setMoving(m); setMoveOrg(''); setMoveRole(m.role === 'viewer' ? 'field' : m.role); }}
-                            className="p-1 text-slate-500 hover:text-purple-300" title="Move to another company">
+                            className="p-1 text-slate-500 hover:text-purple-300" title={t('admin.moveTitle')}>
                             <ArrowRightLeft className="w-3.5 h-3.5" />
                           </button>
                         )}
@@ -249,11 +254,11 @@ export const PlatformTab = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <button onClick={() => mintAdminInvite(org)} disabled={busy}
                       className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[11px] text-slate-200 flex items-center gap-1.5 hover:border-purple-500/40 disabled:opacity-50">
-                      <UserPlus className="w-3.5 h-3.5" />Mint admin invite
+                      <UserPlus className="w-3.5 h-3.5" />{t('admin.mintInvite')}
                     </button>
                     {pendingInv.map(i => (
                       <span key={i.id} className="text-[10px] font-mono px-2 py-1 bg-slate-800 rounded border border-slate-700 text-orange-300">
-                        {i.code} · {i.role}
+                        {i.code} · {ROLE_LABELS[i.role] ? t(`admin.inviteRole.${i.role}`) : i.role}
                       </span>
                     ))}
                   </div>
@@ -261,25 +266,25 @@ export const PlatformTab = () => {
                   {/* invoices */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Receipt className="w-3 h-3" />Invoices</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Receipt className="w-3 h-3" />{t('admin.invoices')}</p>
                       <button onClick={() => setInvoiceDraft({ org_id: org.id, label: '', amount: '', due: '', notes: '' })}
                         className="text-[11px] text-purple-300 hover:text-purple-200 flex items-center gap-1">
-                        <Plus className="w-3 h-3" />New invoice
+                        <Plus className="w-3 h-3" />{t('admin.newInvoice')}
                       </button>
                     </div>
                     {orgInvoices.map(inv => (
                       <div key={inv.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/50 rounded-lg">
                         <span className="text-xs text-white flex-1 truncate">{inv.label}</span>
                         <span className="text-xs text-slate-300 font-mono">{money(inv.amount_cents, inv.currency)}</span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${STATUS_STYLE[inv.status]}`}>{inv.status}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${STATUS_STYLE[inv.status]}`}>{tStatus(`admin.invoice.${inv.status}`, inv.status)}</span>
                         {inv.status === 'draft' && (
-                          <button onClick={() => setInvoiceStatus(inv.id, 'sent')} className="text-[10px] text-yellow-300 hover:underline">send</button>
+                          <button onClick={() => setInvoiceStatus(inv.id, 'sent')} className="text-[10px] text-yellow-300 hover:underline">{t('admin.send')}</button>
                         )}
                         {inv.status === 'sent' && (
-                          <button onClick={() => setInvoiceStatus(inv.id, 'paid')} className="text-[10px] text-green-300 hover:underline">mark paid</button>
+                          <button onClick={() => setInvoiceStatus(inv.id, 'paid')} className="text-[10px] text-green-300 hover:underline">{t('admin.markPaid')}</button>
                         )}
                         {inv.status !== 'void' && inv.status !== 'paid' && (
-                          <button onClick={() => setInvoiceStatus(inv.id, 'void')} className="text-[10px] text-slate-500 hover:underline">void</button>
+                          <button onClick={() => setInvoiceStatus(inv.id, 'void')} className="text-[10px] text-slate-500 hover:underline">{t('admin.void')}</button>
                         )}
                       </div>
                     ))}
@@ -295,17 +300,17 @@ export const PlatformTab = () => {
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Inbox className="w-4 h-4 text-orange-400" />Contact requests
+            <Inbox className="w-4 h-4 text-orange-400" />{t('admin.contactRequests')}
             {requests.filter(r => r.status === 'new').length > 0 && (
-              <span className="px-1.5 py-0.5 bg-orange-500 rounded text-[10px] font-bold text-white">{requests.filter(r => r.status === 'new').length} new</span>
+              <span className="px-1.5 py-0.5 bg-orange-500 rounded text-[10px] font-bold text-white">{t('admin.newCount', { n: requests.filter(r => r.status === 'new').length })}</span>
             )}
           </h3>
           <button onClick={() => setShowClosed(v => !v)} className="text-[11px] text-slate-400 hover:text-slate-200">
-            {showClosed ? 'Hide closed' : 'Show closed'}
+            {showClosed ? t('admin.hideClosed') : t('admin.showClosed')}
           </button>
         </div>
-        <p className="text-[10px] text-slate-600">Sent from the homepage contact form — access, dispatch/CAD connections, pricing, questions. Reply by email, then mark it.</p>
-        {requests.filter(r => showClosed || r.status !== 'closed').length === 0 && <p className="text-[11px] text-slate-500">No requests yet.</p>}
+        <p className="text-[10px] text-slate-600">{t('admin.contactNote')}</p>
+        {requests.filter(r => showClosed || r.status !== 'closed').length === 0 && <p className="text-[11px] text-slate-500">{t('admin.noRequests')}</p>}
         {requests.filter(r => showClosed || r.status !== 'closed').map(r => (
           <div key={r.id} className={`px-3 py-2 rounded-lg border ${r.status === 'new' ? 'bg-orange-500/5 border-orange-500/30' : 'bg-slate-800/50 border-slate-800'}`}>
             <div className="flex items-center gap-2 flex-wrap">
@@ -318,10 +323,10 @@ export const PlatformTab = () => {
             </div>
             {r.message && <p className="text-xs text-slate-300 mt-1 whitespace-pre-wrap">{r.message}</p>}
             <div className="flex gap-3 mt-1.5 text-[10px]">
-              <span className="text-slate-500">{r.status}</span>
-              {r.status === 'new' && <button onClick={() => setRequestStatus(r.id, 'replied')} className="text-green-300 hover:underline">mark replied</button>}
-              {r.status !== 'closed' && <button onClick={() => setRequestStatus(r.id, 'closed')} className="text-slate-400 hover:underline">close</button>}
-              {r.status === 'closed' && <button onClick={() => setRequestStatus(r.id, 'new')} className="text-slate-400 hover:underline">reopen</button>}
+              <span className="text-slate-500">{tStatus(`admin.request.${r.status}`, r.status)}</span>
+              {r.status === 'new' && <button onClick={() => setRequestStatus(r.id, 'replied')} className="text-green-300 hover:underline">{t('admin.markReplied')}</button>}
+              {r.status !== 'closed' && <button onClick={() => setRequestStatus(r.id, 'closed')} className="text-slate-400 hover:underline">{t('admin.close')}</button>}
+              {r.status === 'closed' && <button onClick={() => setRequestStatus(r.id, 'new')} className="text-slate-400 hover:underline">{t('admin.reopen')}</button>}
             </div>
           </div>
         ))}
@@ -330,18 +335,18 @@ export const PlatformTab = () => {
       {/* LINKS */}
       <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-sky-400" />Company links</h3>
+          <h3 className="text-sm font-bold text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-sky-400" />{t('admin.companyLinks')}</h3>
           <button onClick={() => setLinkDraft({ a: '', b: '', note: '' })}
-            className="text-[11px] text-sky-300 hover:text-sky-200 flex items-center gap-1"><Plus className="w-3 h-3" />Link companies</button>
+            className="text-[11px] text-sky-300 hover:text-sky-200 flex items-center gap-1"><Plus className="w-3 h-3" />{t('admin.linkCompanies')}</button>
         </div>
-        <p className="text-[10px] text-slate-600">Mutual-aid registry — mark which companies work together on special cases. (Shared live data across linked companies comes next.)</p>
-        {links.length === 0 && <p className="text-[11px] text-slate-500">No links yet.</p>}
+        <p className="text-[10px] text-slate-600">{t('admin.linksNote')}</p>
+        {links.length === 0 && <p className="text-[11px] text-slate-500">{t('admin.noLinks')}</p>}
         {links.map(l => (
           <div key={l.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/50 rounded-lg">
             <span className="text-xs text-white flex-1 truncate">{orgName(l.org_a)} ⇄ {orgName(l.org_b)}{l.note ? ` — ${l.note}` : ''}</span>
-            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${l.status === 'active' ? 'bg-green-500/15 text-green-300 border-green-500/30' : 'bg-slate-700/40 text-slate-500 border-slate-700'}`}>{l.status}</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${l.status === 'active' ? 'bg-green-500/15 text-green-300 border-green-500/30' : 'bg-slate-700/40 text-slate-500 border-slate-700'}`}>{tStatus(`admin.link.${l.status}`, l.status)}</span>
             <button onClick={() => toggleLink(l)} className="text-[10px] text-slate-400 hover:underline">
-              {l.status === 'active' ? 'suspend' : 'reactivate'}
+              {l.status === 'active' ? t('admin.suspend') : t('admin.reactivate')}
             </button>
           </div>
         ))}
@@ -351,17 +356,17 @@ export const PlatformTab = () => {
       {freshInvite && (
         <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={() => setFreshInvite(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm p-5 space-y-3 text-center" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-bold text-white flex items-center justify-center gap-2"><QrCode className="w-4 h-4 text-purple-400" />Admin invite — {freshInvite.org}</h3>
+            <h3 className="text-sm font-bold text-white flex items-center justify-center gap-2"><QrCode className="w-4 h-4 text-purple-400" />{t('admin.adminInviteTitle', { org: freshInvite.org })}</h3>
             <div className="flex justify-center"><InviteQRBig code={freshInvite.code} /></div>
             <p className="text-lg font-mono text-orange-300">{freshInvite.code}</p>
-            <p className="text-[11px] text-slate-500">Scan or send the code — signing up with it makes them the administrator of {freshInvite.org}, isolated from every other company.</p>
+            <p className="text-[11px] text-slate-500">{t('admin.inviteNote', { org: freshInvite.org })}</p>
             <div className="flex gap-2 justify-center">
               <button
-                onClick={() => { navigator.clipboard?.writeText(`Join ${freshInvite.org} on Watchtower: ${window.location.origin}/?join=${freshInvite.code}`).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
+                onClick={() => { navigator.clipboard?.writeText(t('admin.inviteShare', { org: freshInvite.org, url: `${window.location.origin}/?join=${freshInvite.code}` })).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
                 className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 flex items-center gap-1.5">
-                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}{copied ? 'Copied' : 'Copy link'}
+                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}{copied ? t('admin.copied') : t('admin.copyLink')}
               </button>
-              <button onClick={() => setFreshInvite(null)} className="px-4 py-2 bg-purple-500 text-white rounded-lg text-xs">Done</button>
+              <button onClick={() => setFreshInvite(null)} className="px-4 py-2 bg-purple-500 text-white rounded-lg text-xs">{t('admin.done')}</button>
             </div>
           </div>
         </div>
@@ -372,28 +377,28 @@ export const PlatformTab = () => {
         <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={() => setMoving(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Move {moving.display_name || moving.email}</h3>
+              <h3 className="text-sm font-bold text-white">{t('admin.moveName', { name: moving.display_name || moving.email })}</h3>
               <button onClick={() => setMoving(null)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
-            <p className="text-[11px] text-slate-500">Their account moves to the new company; their old company's history stays where it happened.</p>
+            <p className="text-[11px] text-slate-500">{t('admin.moveNote')}</p>
             <div>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wide">To company</label>
+              <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('admin.toCompany')}</label>
               <select value={moveOrg} onChange={e => setMoveOrg(e.target.value)}
                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-purple-500">
-                <option value="">Choose…</option>
+                <option value="">{t('admin.choose')}</option>
                 {orgs.filter(o => o.id !== moving.org_id).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wide">As role</label>
+              <label className="text-[10px] text-slate-500 uppercase tracking-wide">{t('admin.asRole')}</label>
               <select value={moveRole} onChange={e => setMoveRole(e.target.value)}
                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-purple-500">
-                {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                {ROLES.map(r => <option key={r} value={r}>{t(`role.${r}`)}</option>)}
               </select>
             </div>
             <button onClick={doMove} disabled={busy || !moveOrg}
               className="w-full py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50">
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Move member
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('admin.moveMember')}
             </button>
           </div>
         </div>
@@ -404,22 +409,22 @@ export const PlatformTab = () => {
         <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={() => setInvoiceDraft(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Invoice — {orgName(invoiceDraft.org_id)}</h3>
+              <h3 className="text-sm font-bold text-white">{t('admin.invoiceFor', { org: orgName(invoiceDraft.org_id) })}</h3>
               <button onClick={() => setInvoiceDraft(null)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
-            <input value={invoiceDraft.label} onChange={e => setInvoiceDraft(d => ({ ...d, label: e.target.value }))} placeholder="Label — e.g. September 2026"
+            <input value={invoiceDraft.label} onChange={e => setInvoiceDraft(d => ({ ...d, label: e.target.value }))} placeholder={t('admin.labelPh')}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500" />
             <div className="grid grid-cols-2 gap-2">
-              <input type="number" min="0" step="0.01" value={invoiceDraft.amount} onChange={e => setInvoiceDraft(d => ({ ...d, amount: e.target.value }))} placeholder="Amount (CAD)"
+              <input type="number" min="0" step="0.01" value={invoiceDraft.amount} onChange={e => setInvoiceDraft(d => ({ ...d, amount: e.target.value }))} placeholder={t('admin.amountPh')}
                 className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500" />
               <input type="date" value={invoiceDraft.due} onChange={e => setInvoiceDraft(d => ({ ...d, due: e.target.value }))}
                 className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-purple-500" />
             </div>
-            <textarea value={invoiceDraft.notes} onChange={e => setInvoiceDraft(d => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Notes (what this covers — cost recovery)"
+            <textarea value={invoiceDraft.notes} onChange={e => setInvoiceDraft(d => ({ ...d, notes: e.target.value }))} rows={2} placeholder={t('admin.notesPh')}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500 resize-none" />
             <button onClick={saveInvoice} disabled={busy}
               className="w-full py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50">
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Create draft invoice
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('admin.createDraft')}
             </button>
           </div>
         </div>
@@ -430,21 +435,21 @@ export const PlatformTab = () => {
         <div className="fixed inset-0 bg-black/70 z-[90] flex items-center justify-center p-4" onClick={() => setLinkDraft(null)}>
           <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Link two companies</h3>
+              <h3 className="text-sm font-bold text-white">{t('admin.linkTwo')}</h3>
               <button onClick={() => setLinkDraft(null)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
             {['a', 'b'].map(k => (
               <select key={k} value={linkDraft[k]} onChange={e => setLinkDraft(d => ({ ...d, [k]: e.target.value }))}
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-sky-500">
-                <option value="">{k === 'a' ? 'First company…' : 'Second company…'}</option>
+                <option value="">{k === 'a' ? t('admin.firstCompany') : t('admin.secondCompany')}</option>
                 {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             ))}
-            <input value={linkDraft.note} onChange={e => setLinkDraft(d => ({ ...d, note: e.target.value }))} placeholder="Note — e.g. 2026 fire season mutual aid"
+            <input value={linkDraft.note} onChange={e => setLinkDraft(d => ({ ...d, note: e.target.value }))} placeholder={t('admin.linkNotePh')}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-sky-500" />
             <button onClick={saveLink} disabled={busy}
               className="w-full py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50">
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Create link
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{t('admin.createLink')}
             </button>
           </div>
         </div>

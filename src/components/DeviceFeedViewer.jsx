@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Maximize2, Minimize2, Camera, Radio, Video } from 'lucide-react';
+import { useI18n } from '../i18n/index.jsx';
 
 const DeviceFeedViewer = ({ device, onClose }) => {
+  const { t } = useI18n();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -48,7 +50,7 @@ const DeviceFeedViewer = ({ device, onClose }) => {
           {isCamera && <Camera className="w-4 h-4 text-blue-400" />}
           <span className="text-white font-semibold text-sm">{device.name}</span>
           <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
-            LIVE
+            {t('dev.live')}
           </span>
         </div>
 
@@ -75,13 +77,13 @@ const DeviceFeedViewer = ({ device, onClose }) => {
       <div className="relative w-full h-[calc(100%-40px)] bg-black">
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-white/50 text-sm">Loading feed...</div>
+            <div className="text-white/50 text-sm">{t('dev.loadingFeed')}</div>
           </div>
         )}
         {feedUrl && (
           <img
             src={feedUrl}
-            alt={`${device.name} feed`}
+            alt={t('dev.feedAlt', { name: device.name })}
             className="w-full h-full object-cover"
             style={{
               filter: isDrone ? 'contrast(1.1) saturate(1.2)' : 'contrast(1.05)',
@@ -100,7 +102,7 @@ const DeviceFeedViewer = ({ device, onClose }) => {
           <div className="flex items-center justify-between text-xs text-white/90">
             <div className="flex items-center gap-3">
               <span className="font-mono">{new Date().toLocaleTimeString()}</span>
-              <span className="px-2 py-0.5 bg-red-500/80 rounded">REC</span>
+              <span className="px-2 py-0.5 bg-red-500/80 rounded">{t('dev.rec')}</span>
             </div>
             <div className="font-mono">
               {device.position.lat.toFixed(6)}, {device.position.lng.toFixed(6)}
@@ -111,18 +113,18 @@ const DeviceFeedViewer = ({ device, onClose }) => {
         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
           <div className="grid grid-cols-3 gap-2 text-xs text-white/90">
             <div>
-              <div className="text-white/60 mb-0.5">Battery</div>
+              <div className="text-white/60 mb-0.5">{t('dev.battery')}</div>
               <div className="font-mono">{isDrone ? '78%' : '100%'}</div>
             </div>
             <div>
-              <div className="text-white/60 mb-0.5">Signal</div>
+              <div className="text-white/60 mb-0.5">{t('dev.signal')}</div>
               <div className="font-mono flex items-center gap-1">
                 <Radio className="w-3 h-3" />
-                Excellent
+                {t('dev.excellent')}
               </div>
             </div>
             <div>
-              <div className="text-white/60 mb-0.5">Altitude</div>
+              <div className="text-white/60 mb-0.5">{t('dev.altitude')}</div>
               <div className="font-mono">{isDrone ? '120m' : '45m'}</div>
             </div>
           </div>

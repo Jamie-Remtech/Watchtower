@@ -1,0 +1,21 @@
+// Watchtower AI assistant panel (interface only — answers come from the server in the member's language).
+export default {
+  'ai.title': 'Watchtower AI',
+  'ai.subtitle': 'answers from your live operation',
+  'ai.voiceOn': 'Voice replies on',
+  'ai.voiceOff': 'Voice replies off',
+  'ai.intro': 'Ask by voice or text — I see your live devices, crew, patients, markers, alerts and weather.',
+  'ai.suggest.situation': 'What is the situation right now?',
+  'ai.suggest.patients': 'Which patients are still red?',
+  'ai.suggest.alerts': 'Any open alerts I should know about?',
+  'ai.suggest.weather': 'Start the severe weather protocol',
+  'ai.suggest.checkin': 'Tell the team to check in',
+  'ai.askVoice': 'Ask by voice',
+  'ai.noSpeech': 'Speech recognition not supported here',
+  'ai.placeholder': 'Ask about your operation…',
+  'ai.actionFailed': 'Action failed: {error}',
+  'ai.unknownError': 'unknown error',
+  'ai.needsRedeploy': 'The AI function needs updating — redeploy field-assist with the latest code.',
+  'ai.unreachable': 'I could not reach the AI service ({error}).',
+  'ai.network': 'network',
+};

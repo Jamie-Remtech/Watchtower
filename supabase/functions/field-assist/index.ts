@@ -66,7 +66,18 @@ Deno.serve(async (req) => {
     if (mode === 'translate') {
       const list = (Array.isArray(texts) ? texts : []).map((t: unknown) => String(t ?? '').slice(0, 2000)).slice(0, 40);
       if (!list.length || !target) return json({ translations: [] });
-      const prompt = `Translate each item of the JSON array below into ${langName(target)} (${target}).
+      const prompt = format === 'ui'
+        ? `Translate each item of the JSON array below into ${langName(target)} (${target}).
+These are user-interface strings of Watchtower, an emergency-response coordination app used by firefighters, paramedics, search-and-rescue crews and their coordinators: buttons, labels, headings, short help text, alert wording.
+Rules:
+- Tokens like ⟦0⟧, ⟦1⟧ are placeholders: copy them exactly, once each, positioned naturally for the target grammar.
+- Keep exactly: emoji, numbers, units (km, km/h, mm, °C, ha, ms, dBZ, Mbit/s), arrows (→ ·), the product name Watchtower, and names like Waze, NASA, NOAA, ECMWF, SEAS5, USGS, EONET, RainViewer, Open-Meteo, Esri, Google, Claude, CWFIS, ERA5, AI, GPS, PAR, CAD, QR, SMS, PDF, CSV, IMIST-AMBO, SALT.
+- Be as concise as the English; button labels stay short. Address the user informally (second person singular: tu / tú / du / você / ти / ty / sen / आप is fine for Hindi / 你 / ja: neutral polite).${target === 'fr' ? ' Use Québec French.' : ''}${target === 'pt' ? ' Use Brazilian Portuguese.' : ''}
+- Use the standard emergency-services terminology of the language. Keep UPPERCASE where the English is uppercase.
+Respond with STRICT JSON only: {"translations":["…", …]} — same length and order as the input.
+
+${JSON.stringify(list)}`
+        : `Translate each item of the JSON array below into ${langName(target)} (${target}).
 Context: operational messages between emergency responders. Keep it faithful and terse; keep numbers, units, times, coordinates, place names, call signs and proper names exactly as written. If an item is already in ${langName(target)}, return it unchanged.
 Respond with STRICT JSON only: {"translations":["…", …]} — same length and order as the input.
 
