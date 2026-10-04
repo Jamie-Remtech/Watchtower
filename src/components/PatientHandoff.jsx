@@ -39,7 +39,14 @@ export const PatientHandoff = ({ patient, record, timeline: recent, names, respo
         });
         if (error || !data?.handoff) throw error ?? new Error('no result');
         let text = String(data.handoff);
-        text = text.includes('{{IDENTITY}}') ? text.replaceAll('{{IDENTITY}}', id) : `I — ${id}\n${text}`;
+        if (text.includes('{{IDENTITY}}')) text = text.replaceAll('{{IDENTITY}}', id);
+        else {
+          // the AI wrote its own identity line — replace it with the real one
+          const lines = text.split('\n');
+          const i = lines.findIndex(l => /^\s*I\s*[—–-]/.test(l));
+          if (i >= 0) lines[i] = t('log.ho.identity', { p: id }); else lines.unshift(t('log.ho.identity', { p: id }));
+          text = lines.join('\n');
+        }
         if (!off) { setNarrative(text); setAi(true); }
       } catch {
         if (!off) { setNarrative(basicNarrative); setAi(false); }

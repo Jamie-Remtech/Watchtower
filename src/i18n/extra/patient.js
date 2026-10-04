@@ -64,8 +64,8 @@ export default {
   'pat.f.weight_kg': 'Weight (kg)',
   'pat.f.notes': 'Special notes',
 
-  'pat.ph.last_name': 'Tremblay',
-  'pat.ph.first_name': 'Jean',
+  'pat.ph.last_name': 'e.g. Tremblay',
+  'pat.ph.first_name': 'e.g. Jean',
   'pat.ph.age_est': 'e.g. 50',
   'pat.ph.language': 'e.g. French',
   'pat.ph.phone': 'Patient phone',
