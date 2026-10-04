@@ -364,16 +364,25 @@ Deno.serve(async (req) => {
       // 1) measured radar over each anchor
       for (const a of anchors) {
         const dbz = await radarDbz(a);
-        if (dbz != null && dbz >= 40) {
+        // Graded: drizzle is not an alert, rain is a bell note, heavy rain a
+        // warning, and only a real convective cell (45+ dBZ) is critical.
+        if (dbz != null && dbz >= 45) {
           cands.push({
             dedupe_key: `radar-storm:${a.label}:${hourBucket}`, severity: 'critical', kind: 'weather',
             title: `Intense cell over ${a.label} (radar ${Math.round(dbz)} dBZ)`,
             detail: 'Radar measures a strong precipitation cell at this exact position right now — torrential rain, possible hail and lightning. Source: RainViewer radar composite.',
             source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz) },
           });
-        } else if (dbz != null && dbz >= 10) {
+        } else if (dbz != null && dbz >= 35) {
           cands.push({
-            dedupe_key: `radar-rain:${a.label}:${hourBucket}`, severity: 'critical', kind: 'weather',
+            dedupe_key: `radar-heavy:${a.label}:${hourBucket}`, severity: 'warning', kind: 'weather',
+            title: `Heavy rain over ${a.label} now (radar ${Math.round(dbz)} dBZ)`,
+            detail: `Radar shows heavy rain at this exact position (${Math.round(dbz)} dBZ) — reduced visibility, water on roads. Source: RainViewer radar composite.`,
+            source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz) },
+          });
+        } else if (dbz != null && dbz >= 20) {
+          cands.push({
+            dedupe_key: `radar-rain:${a.label}:${hourBucket}`, severity: 'info', kind: 'weather',
             title: `Rain over ${a.label} now (radar)`,
             detail: `Radar shows precipitation at this exact position (${Math.round(dbz)} dBZ). Source: RainViewer radar composite.`,
             source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz) },
@@ -527,6 +536,13 @@ Deno.serve(async (req) => {
           org_id: org.id, actor_kind: 'system', type: 'attention.raised',
           subject: c.dedupe_key, payload: { severity: c.severity, kind: c.kind, title: c.title, via: 'tower-sweep' },
         });
+        if (c.severity === 'warning' && c.dedupe_key.startsWith('radar-heavy:')) {
+          await sendTo(
+            subsOfOrg(org.id),
+            { kind: 'attention', title: `🌧 ${c.title}`, body: c.detail.slice(0, 140), tag: c.dedupe_key },
+            categoryOf(c), 'warning',
+          );
+        }
         if (c.severity === 'critical') {
           await sendTo(
             subsOfOrg(org.id),

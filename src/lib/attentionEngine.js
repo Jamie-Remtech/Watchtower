@@ -324,7 +324,9 @@ export async function runAttentionSweep() {
           }
           const dbz = best;
           const label = a.label ?? 'crew member';
-          if (dbz != null && dbz >= 40) {
+          // Graded: drizzle is not an alert, rain is a bell note, heavy rain a
+          // warning, and only a real convective cell (45+ dBZ) is critical.
+          if (dbz != null && dbz >= 45) {
             candidates.push({
               dedupe_key: `radar-storm:${label}:${hourBucket}`,
               severity: 'critical',
@@ -333,10 +335,19 @@ export async function runAttentionSweep() {
               detail: 'Radar measures a strong precipitation cell at this exact position right now — torrential rain, possible hail and lightning. Source: RainViewer radar composite.',
               source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz), frame: frame.time },
             });
-          } else if (dbz != null && dbz >= 10) {
+          } else if (dbz != null && dbz >= 35) {
+            candidates.push({
+              dedupe_key: `radar-heavy:${label}:${hourBucket}`,
+              severity: 'warning',
+              kind: 'weather',
+              title: `Heavy rain over ${label} now (radar ${Math.round(dbz)} dBZ)`,
+              detail: `Radar shows heavy rain at this exact position (${Math.round(dbz)} dBZ) — reduced visibility, water on roads. Source: RainViewer radar composite.`,
+              source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz), frame: frame.time },
+            });
+          } else if (dbz != null && dbz >= 20) {
             candidates.push({
               dedupe_key: `radar-rain:${label}:${hourBucket}`,
-              severity: 'critical',
+              severity: 'info',
               kind: 'weather',
               title: `Rain over ${label} now (radar)`,
               detail: `Radar shows precipitation at this exact position (${Math.round(dbz)} dBZ). Source: RainViewer radar composite.`,
