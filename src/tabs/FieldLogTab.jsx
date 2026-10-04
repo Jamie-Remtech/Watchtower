@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Mic, MicOff, Send, Loader2, MapPin, ClipboardList, Radio, Info,
-  UserPlus, X, FileText, Volume2, Copy, WifiOff, Pencil, Trash2, RotateCcw, History, Check, UserMinus
+  UserPlus, X, FileText, WifiOff, Pencil, Trash2, RotateCcw, History, Check, UserMinus, Contact2, AlertTriangle
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
@@ -10,6 +10,10 @@ import { useSpeech } from '../hooks/useSpeech';
 import { useTracker } from '../hooks/useTracker';
 import { startTracking, pauseTracking, isTrackingPaused } from '../lib/tracker';
 import { usePatients } from '../hooks/usePatients';
+import { usePatientRecords } from '../hooks/usePatientRecords';
+import { PatientRecord } from '../components/PatientRecord';
+import { PatientHandoff } from '../components/PatientHandoff';
+import { identityLine, shortName, ageOf, missingFields } from '../lib/patientRecord';
 import { parseCommand, TRIAGE_META } from '../lib/fieldCommands';
 import { beep, say } from '../lib/speechFeedback';
 import { useAuth } from '../auth/AuthContext';
@@ -46,20 +50,20 @@ const patientLabel = (p, t) => (p.tag ? t('log.tag', { tag: p.tag }) : t('log.pN
 
 // Plain (non-AI) IMIST-AMBO skeleton from the timeline — works with no
 // API key. The AI edge function upgrades this when configured.
-const basicHandoff = (patient, entries, t) => {
+const basicHandoff = (patient, record, entries, t) => {
+  const nr = t('pat.notRecorded');
   const lines = entries
-    .slice().reverse()
     .map(e => `  ${new Date(e.payload?.at_client ?? e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${e.payload?.text ?? e.type}`);
   return [
     t('log.ho.header', { p: patientLabel(patient, t), triage: patient.triage.toUpperCase() }),
-    t(patient.tag ? 'log.ho.identity' : 'log.ho.identityNoTag', { p: patientLabel(patient, t) }),
+    t('log.ho.identity', { p: identityLine(patient, record, t) }),
     t('log.ho.mechanism'),
     t('log.ho.injuries'),
     t('log.ho.signs'),
     t('log.ho.treatment'),
     ...lines,
-    t('log.ho.allergiesMeds'),
-    t('log.ho.backgroundOther'),
+    t('log.ho.allergiesMedsV', { a: record?.no_known_allergies ? t('pat.nka') : (record?.allergies || nr), m: record?.medications || nr }),
+    t('log.ho.backgroundOtherV', { b: record?.conditions || nr, o: [record?.blood_type && ` `, record?.notes].filter(Boolean).join(' · ') || nr }),
   ].join('\n');
 };
 
@@ -197,11 +201,14 @@ export const FieldLogTab = () => {
   const [names, setNames] = useState({});
   const [activePatientId, setActivePatientId] = useState(null);
   const [lastAck, setLastAck] = useState(null);
-  const [handoff, setHandoff] = useState(null); // { patient, text, ai }
-  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffFor, setHandoffFor] = useState(null); // patient
+  const [showRecord, setShowRecord] = useState(false);
   const [queued, setQueued] = useState(queuedCount());
   const tracker = useTracker();
   const { patients, createPatient, updatePatient } = usePatients();
+  const { records, save: saveRecord } = usePatientRecords();
+  const recordsRef = useRef(records);
+  recordsRef.current = records;
 
   const activePatient = patients.find(p => p.id === activePatientId) ?? null;
   const patientsRef = useRef(patients);
@@ -267,6 +274,22 @@ export const FieldLogTab = () => {
           ack(t('log.ack.status', { p: patientLabel(active, t), status: t(`log.status.${cmd.status}`) }), t(`log.status.${cmd.status}`));
           break;
         }
+        case 'record': {
+          if (!active) { nack(t('log.nack.noActive')); return; }
+          const cur = recordsRef.current[active.id] ?? {};
+          const patch = {};
+          if (cmd.field === 'name') {
+            const parts = cmd.value.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+            patch.last_name = parts.length > 1 ? parts.pop() : parts[0];
+            patch.first_name = parts.length ? parts.join(' ') : cur.first_name ?? null;
+          } else if (cmd.field === 'nka') { patch.no_known_allergies = true; patch.allergies = null; }
+          else if (cmd.field === 'allergies') { patch.allergies = cur.allergies ? `, ` : cmd.value; patch.no_known_allergies = false; }
+          else patch[cmd.field] = cmd.value;
+          await saveRecord(active.id, { ...cur, ...patch });
+          const what = t(`pat.f.`);
+          ack(t('pat.ack.saved', { field: what, p: patientLabel(active, t) }), t('pat.say.saved', { field: what }));
+          break;
+        }
         case 'mark': {
           await logEntry(`— time mark —`, active?.id);
           ack(t('log.ack.marked'), t('log.say.marked'));
@@ -283,7 +306,7 @@ export const FieldLogTab = () => {
       nack(/does not exist/i.test(err?.message ?? '') ? t('log.nack.noTable') : t('log.nack.failed'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createPatient, updatePatient, logEntry, t]);
+  }, [createPatient, updatePatient, logEntry, saveRecord, t]);
 
   const { supported, listening, interim, start, stop } = useSpeech({
     onFinal: (t) => { const cmd = parseCommand(t); if (cmd) execute(cmd); },
@@ -297,23 +320,6 @@ export const FieldLogTab = () => {
     await execute(cmd ?? { type: 'entry', text: body });
     setText('');
     setSaving(false);
-  };
-
-  // Handoff: AI-composed IMIST-AMBO if the edge function is deployed,
-  // honest template otherwise.
-  const generateHandoff = async (patient) => {
-    setHandoffBusy(true);
-    const timeline = entries.filter(e => e.subject === patient.id);
-    try {
-      const { data, error } = await supabase.functions.invoke('field-assist', {
-        body: { mode: 'handoff', patient, entries: timeline.slice().reverse(), language: document.documentElement.lang || 'en' },
-      });
-      if (error || !data?.handoff) throw error ?? new Error('no result');
-      setHandoff({ patient, text: data.handoff, ai: true });
-    } catch {
-      setHandoff({ patient, text: basicHandoff(patient, timeline, t), ai: false });
-    }
-    setHandoffBusy(false);
   };
 
   const pool = showRemoved ? allEntries : entries;
@@ -360,6 +366,8 @@ export const FieldLogTab = () => {
           >
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: TRIAGE_META[p.triage]?.dot }} />
             {patientLabel(p, t)}
+            {shortName(records[p.id]) && <span className="font-normal opacity-80">· {shortName(records[p.id])}</span>}
+            {records[p.id]?.allergies && <AlertTriangle className="w-3 h-3 text-red-400" />}
           </button>
         ))}
       </div>
@@ -383,6 +391,16 @@ export const FieldLogTab = () => {
               <button onClick={() => setActivePatientId(null)} className="p-1 text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
             </div>
           </div>
+          {(() => {
+            const r = records[activePatient.id];
+            const age = ageOf(r);
+            const bits = [shortName(r) && [r.first_name, r.last_name].filter(Boolean).join(' '), age != null && t('pat.ageY', { n: age }), r?.sex && r.sex !== 'unknown' && t(`pat.sex.${r.sex}`), r?.blood_type && r.blood_type !== 'unknown' && r.blood_type].filter(Boolean);
+            return (<>
+              {bits.length > 0 && <p className="text-xs text-slate-200">{bits.join(' · ')}</p>}
+              {r?.allergies && <p className="text-xs font-semibold text-red-200 bg-red-500/15 border border-red-500/40 rounded-lg px-2 py-1 flex items-start gap-1.5"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />{t('pat.allergyBanner', { a: r.allergies })}</p>}
+              {r?.no_known_allergies && <p className="text-[11px] text-green-400">{t('pat.nka')}</p>}
+            </>);
+          })()}
           {confirmRemovePatient && (
             <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2 flex-wrap">
               <p className="text-xs text-red-200 flex-1 min-w-[12rem]">{t('log.removePatientConfirm', { p: patientLabel(activePatient, t) })}</p>
@@ -403,20 +421,32 @@ export const FieldLogTab = () => {
             ))}
             <div className="flex-1" />
             <button
+              onClick={() => setShowRecord(v => !v)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] ${showRecord ? 'bg-sky-500/20 border-sky-500/50 text-sky-200' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
+            >
+              <Contact2 className="w-3 h-3" />{t('pat.file')}
+              {missingFields(records[activePatient.id]).length > 0 && <span className="ml-0.5 px-1 rounded bg-yellow-500/25 text-yellow-300">{missingFields(records[activePatient.id]).length}</span>}
+            </button>
+            <button
               onClick={() => execute({ type: 'status', status: 'transported' })}
               className="px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[10px] text-slate-300 hover:bg-slate-700"
             >
               {t('log.transported')}
             </button>
             <button
-              onClick={() => generateHandoff(activePatient)}
-              disabled={handoffBusy}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-[10px] font-semibold text-white disabled:opacity-50"
+              onClick={() => setHandoffFor(activePatient)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-[10px] font-semibold text-white"
             >
-              {handoffBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+              <FileText className="w-3 h-3" />
               {t('log.handoff')}
             </button>
           </div>
+          {showRecord && (
+            <div className="pt-2 border-t border-slate-800">
+              <PatientRecord key={activePatient.id} patient={activePatient} record={records[activePatient.id]} save={saveRecord}
+                names={names} myId={myId} isCoord={isCoord} />
+            </div>
+          )}
         </div>
       )}
 
@@ -528,37 +558,16 @@ export const FieldLogTab = () => {
         )}
       </div>
 
-      {/* Handoff modal */}
-      {handoff && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setHandoff(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-5 max-h-[85dvh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white">
-                {t('log.handoffTitle', { p: patientLabel(handoff.patient, t) })}
-                <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded ${handoff.ai ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'}`}>
-                  {handoff.ai ? t('log.handoffAi') : t('log.handoffTemplate')}
-                </span>
-              </h3>
-              <button onClick={() => setHandoff(null)} className="p-1 hover:bg-slate-800 rounded"><X className="w-4 h-4 text-slate-400" /></button>
-            </div>
-            <pre className="flex-1 overflow-y-auto text-xs text-slate-200 whitespace-pre-wrap bg-slate-950 border border-slate-800 rounded-lg p-3">{handoff.text}</pre>
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => say(handoff.text)}
-                className="flex-1 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 flex items-center justify-center gap-1.5 hover:bg-slate-700"
-              >
-                <Volume2 className="w-3.5 h-3.5" />{t('log.readAloud')}
-              </button>
-              <button
-                onClick={() => navigator.clipboard.writeText(handoff.text)}
-                className="flex-1 py-2 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-1.5"
-              >
-                <Copy className="w-3.5 h-3.5" />{t('log.copy')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Handoff — the complete patient file */}
+      {handoffFor && (() => {
+        const p = patients.find(x => x.id === handoffFor.id) ?? handoffFor;
+        const timeline = entries.filter(e => e.subject === p.id).slice().reverse();
+        return (
+          <PatientHandoff patient={p} record={records[p.id]} timeline={timeline} names={names}
+            responder={profile?.display_name} basicNarrative={basicHandoff(p, records[p.id], timeline, t)}
+            onClose={() => setHandoffFor(null)} />
+        );
+      })()}
     </div>
   );
 };

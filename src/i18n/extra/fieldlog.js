@@ -100,4 +100,6 @@ export default {
   'log.ho.treatment': 'T — Treatment & trends (timeline):',
   'log.ho.allergiesMeds': 'A — Allergies: [state]   M — Medications: [state]',
   'log.ho.backgroundOther': 'B — Background: [state]   O — Other: [state]',
+  'log.ho.allergiesMedsV': 'A — Allergies: {a}   M — Medications: {m}',
+  'log.ho.backgroundOtherV': 'B — Background: {b}   O — Other: {o}',
 };

@@ -238,7 +238,9 @@ export default {
       "Comandos de voz",
       "Painel de triagem no mapa",
       "Resumo com IA para o hospital",
-      "✏️ corrigir ou 🗑 remover uma nota — o original fica no histórico"
+      "✏️ corrigir ou 🗑 remover uma nota — o original fica no histórico",
+      "🪪 Ficha do paciente: escaneie o documento ou cartão de saúde e o formulário se preenche sozinho — nome, alergias, tipo sanguíneo, medicamentos, contato de emergência",
+      "📄 Transferência completa para imprimir, salvar como PDF ou enviar, com as fotos dos documentos"
      ]
     ],
     [
@@ -502,7 +504,9 @@ export default {
       "Sprachbefehle",
       "Triage-Tafel auf der Karte",
       "KI-Übergabe für das Krankenhaus",
-      "✏️ korrigieren oder 🗑 eine Notiz entfernen — das Original bleibt im Verlauf erhalten"
+      "✏️ korrigieren oder 🗑 eine Notiz entfernen — das Original bleibt im Verlauf erhalten",
+      "🪪 Patientenakte: Scanne den Ausweis oder die Versichertenkarte, und das Formular füllt sich von selbst — Name, Allergien, Blutgruppe, Medikamente, Notfallkontakt",
+      "📄 Vollständige Übergabe zum Drucken, Speichern als PDF oder Senden, mit den Ausweisfotos"
      ]
     ],
     [
@@ -766,7 +770,9 @@ export default {
       "Comandi vocali",
       "Tabellone triage sulla mappa",
       "Passaggio di consegne AI per l'ospedale",
-      "✏️ correggi o 🗑 elimina una nota — l'originale resta nella cronologia"
+      "✏️ correggi o 🗑 elimina una nota — l'originale resta nella cronologia",
+      "🪪 Scheda paziente: scansiona il documento o la tessera sanitaria e il modulo si compila da solo — nome, allergie, gruppo sanguigno, farmaci, contatto di emergenza",
+      "📄 Passaggio di consegne completo da stampare, salvare come PDF o inviare, con le foto dei documenti"
      ]
     ],
     [
@@ -1030,7 +1036,9 @@ export default {
       "Голосові команди",
       "Дошка тріажу на карті",
       "AI-передача для лікарні",
-      "✏️ виправити або 🗑 видалити нотатку — оригінал зберігається в історії"
+      "✏️ виправити або 🗑 видалити нотатку — оригінал зберігається в історії",
+      "🪪 Картка пацієнта: відскануй посвідчення або медичну картку — форма заповниться сама: ім'я, алергії, група крові, ліки, контакт для екстреного зв'язку",
+      "📄 Повний звіт передачі для друку, збереження у PDF або надсилання, з фотографіями документів"
      ]
     ],
     [
@@ -1294,7 +1302,9 @@ export default {
       "Polecenia głosowe",
       "Tablica segregacyjna na mapie",
       "Przekazanie AI dla szpitala",
-      "✏️ popraw lub 🗑 usuń notatkę — oryginał pozostaje w historii"
+      "✏️ popraw lub 🗑 usuń notatkę — oryginał pozostaje w historii",
+      "🪪 Karta pacjenta: zeskanuj dowód lub kartę zdrowia, a formularz wypełni się sam — imię i nazwisko, alergie, grupa krwi, leki, kontakt w nagłych wypadkach",
+      "📄 Pełne przekazanie do wydruku, zapisu jako PDF lub wysłania, wraz ze zdjęciami dokumentów"
      ]
     ],
     [
@@ -1558,7 +1568,9 @@ export default {
       "Sesli komutlar",
       "Harita üzerinde triyaj panosu",
       "Hastane için AI devir teslim raporu",
-      "✏️ notu düzelt veya 🗑 kaldır — orijinali geçmişinde kalır"
+      "✏️ notu düzelt veya 🗑 kaldır — orijinali geçmişinde kalır",
+      "🪪 Hasta dosyası: kimliği veya sağlık kartını tara, form kendiliğinden doldurulsun — ad, alerjiler, kan grubu, ilaçlar, acil durum kişisi",
+      "📄 Kimlik fotoğraflarıyla birlikte yazdırmaya, PDF olarak kaydetmeye veya göndermeye hazır eksiksiz devir teslim"
      ]
     ],
     [
@@ -1822,7 +1834,9 @@ export default {
       "الأوامر الصوتية",
       "لوحة الفرز على الخريطة",
       "تسليم بالذكاء الاصطناعي للمستشفى",
-      "✏️ صحّح أو 🗑 احذف ملاحظة — تبقى النسخة الأصلية في سجلها"
+      "✏️ صحّح أو 🗑 احذف ملاحظة — تبقى النسخة الأصلية في سجلها",
+      "🪪 ملف المريض: امسح البطاقة الشخصية أو البطاقة الصحية ويُملأ النموذج تلقائيًا — الاسم، الحساسية، فصيلة الدم، الأدوية، جهة اتصال الطوارئ",
+      "📄 تسليم كامل للطباعة أو الحفظ كملف PDF أو الإرسال، مع صور الهوية"
      ]
     ],
     [
@@ -2086,7 +2100,9 @@ export default {
       "वॉइस कमांड",
       "मैप पर ट्राइएज बोर्ड",
       "अस्पताल के लिए AI हैंडओवर",
-      "✏️ नोट ठीक करें या 🗑 हटाएँ — मूल उसके इतिहास में बना रहता है"
+      "✏️ नोट ठीक करें या 🗑 हटाएँ — मूल उसके इतिहास में बना रहता है",
+      "🪪 मरीज़ फ़ाइल: ID या हेल्थ कार्ड स्कैन करें और फ़ॉर्म अपने आप भर जाएगा — नाम, एलर्जी, ब्लड ग्रुप, दवाएं, आपातकालीन संपर्क",
+      "📄 ID फ़ोटो सहित पूरा हैंडओवर प्रिंट करें, PDF के रूप में सेव करें या भेजें"
      ]
     ],
     [
@@ -2350,7 +2366,9 @@ export default {
       "语音指令",
       "地图上的分诊看板",
       "AI 生成的医院交接摘要",
-      "✏️ 修正或 🗑 删除一条记录——原始内容保留在历史中"
+      "✏️ 修正或 🗑 删除一条记录——原始内容保留在历史中",
+      "🪪 患者档案：扫描身份证或健康卡，表单自动填写——姓名、过敏史、血型、用药、紧急联系人",
+      "📄 完整交接单，可打印、保存为 PDF 或发送，含身份证照片"
      ]
     ],
     [
@@ -2614,7 +2632,9 @@ export default {
       "音声コマンド",
       "マップ上のトリアージボード",
       "病院へのAI引き継ぎ",
-      "✏️で修正、🗑で削除 — 原本は履歴に残る"
+      "✏️で修正、🗑で削除 — 原本は履歴に残る",
+      "🪪 患者ファイル:IDまたは健康保険証をスキャンすると、氏名・アレルギー・血液型・服用薬・緊急連絡先が自動入力される",
+      "📄 ID写真付きの完全な引き継ぎ資料を印刷・PDF保存・送信できる"
      ]
     ],
     [
@@ -2878,7 +2898,9 @@ export default {
       "Mga voice command",
       "Triage board sa mapa",
       "AI handover para sa ospital",
-      "✏️ itama o 🗑 alisin ang isang tala — nananatili ang orihinal sa history nito"
+      "✏️ itama o 🗑 alisin ang isang tala — nananatili ang orihinal sa history nito",
+      "🪪 File ng pasyente: i-scan ang ID o health card at awtomatikong mapupunan ang form — pangalan, allergies, blood type, gamot, emergency contact",
+      "📄 Kumpletong handoff na puwedeng i-print, i-save bilang PDF, o ipadala, kasama ang mga larawan ng ID"
      ]
     ],
     [
@@ -3142,7 +3164,9 @@ export default {
       "Amri za sauti",
       "Ubao wa uchunguzi kwenye ramani",
       "Makabidhiano ya AI kwa hospitali",
-      "✏️ sahihisha au 🗑 futa dokezo — asili inabaki kwenye historia yake"
+      "✏️ sahihisha au 🗑 futa dokezo — asili inabaki kwenye historia yake",
+      "🪪 Faili la mgonjwa: changanua kitambulisho au kadi ya afya na fomu itajijaza — jina, mzio, aina ya damu, dawa, mawasiliano ya dharura",
+      "📄 Ukabidhi kamili wa kuchapisha, kuhifadhi kama PDF au kutuma, pamoja na picha za kitambulisho"
      ]
     ],
     [

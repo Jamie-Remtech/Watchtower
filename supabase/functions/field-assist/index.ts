@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   try {
-    const { mode, patient, entries, question, context, history, picture, situation, run, events, language, texts, target, format } = await req.json();
+    const { mode, patient, entries, question, context, history, picture, situation, run, events, language, texts, target, format, image, media_type, clinical } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY secret is not set' }, 500);
 
@@ -90,6 +90,37 @@ ${JSON.stringify(list)}`;
         : null;
       if (!out) return json({ error: 'unparseable translation', raw: textOf(data).slice(0, 200) }, 502);
       return json({ translations: out });
+    }
+
+    // ---- mode: id_extract — read a photographed ID / health card into
+    // patient-form fields. Nothing is stored here; the client shows every
+    // value for the responder to check before saving.
+    if (mode === 'id_extract') {
+      const data64 = String(image ?? '');
+      const mt = ['image/jpeg', 'image/png', 'image/webp'].includes(media_type) ? media_type : 'image/jpeg';
+      if (data64.length < 100 || data64.length > 7_000_000) return json({ error: 'image missing or too large' }, 400);
+      const prompt = `This photo was taken by an emergency responder of an identity document belonging to a patient (driver's licence, health insurance card, passport, provincial/state ID, military ID, status card, medical alert card, or similar — any country).
+Read it and return the fields below so the patient form fills itself.
+
+Rules:
+- Copy values exactly as printed (names in normal capitalisation: "TREMBLAY" → "Tremblay"). Do NOT guess: a field you cannot read clearly is null.
+- dob as YYYY-MM-DD. sex as female | male | other, or null. Expiry as printed.
+- A health insurance card (e.g. Québec RAMQ, Ontario OHIP, NHS, Medicare) goes in health_card / health_card_issuer / health_card_expiry, not id_number.
+- address on one line. blood_type / allergies / conditions only if the document states them (medical alert cards, some military IDs).
+- If the photo is not an identity document or is unreadable, set doc_type to "unreadable" and every other field to null.
+Respond with STRICT JSON only:
+{"doc_type":"short description, e.g. Québec driver's licence","last_name":null,"first_name":null,"dob":null,"sex":null,"address":null,"id_type":null,"id_number":null,"id_issuer":null,"id_expiry":null,"health_card":null,"health_card_issuer":null,"health_card_expiry":null,"blood_type":null,"allergies":null,"conditions":null,"notes":"anything relevant the responder should know, e.g. organ donor, corrective lenses — or null"}`;
+      const { ok, data } = await callClaude({
+        max_tokens: 900,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mt, data: data64 } },
+          { type: 'text', text: prompt },
+        ] }],
+      });
+      if (!ok) return json({ error: data?.error?.message ?? 'Claude API error' }, 502);
+      const parsed = parseJson(textOf(data));
+      if (!parsed || typeof parsed !== 'object') return json({ error: 'unparseable', raw: textOf(data).slice(0, 200) }, 502);
+      return json({ fields: parsed });
     }
 
     // ---- mode: protocol_draft — turn a situation into a playbook ----
@@ -277,8 +308,13 @@ Rules:
 - Extract medications with doses and times precisely as logged.
 - Keep it tight enough to read aloud in under 60 seconds.
 - Plain text, no markdown.
+- The Identity line must be exactly: "I — Identity: {{IDENTITY}}" (the app fills in name, age and sex on the device; you are not given them).
+- The recorded patient file below is authoritative for allergies, medications, blood type and background — include all of it. If the log adds anything, include that too.
 
 Patient: ${patient?.tag ? `triage tag ${patient.tag}` : `patient number ${patient?.num}`}, triage category: ${patient?.triage ?? 'unknown'}.
+
+Recorded patient file (clinical facts only):
+${JSON.stringify(clinical ?? {}, null, 1).slice(0, 3000)}
 
 Field log (times UTC):
 ${timeline || '(no entries)'}`;
@@ -292,7 +328,8 @@ ${timeline || '(no entries)'}`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 700,
+        max_tokens: 900,
+        ...(langRule ? { system: langRule } : {}),
         messages: [{ role: 'user', content: prompt }],
       }),
     });

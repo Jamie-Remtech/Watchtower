@@ -48,7 +48,29 @@ export const parseCommand = (raw) => {
 
   if (/^(mark|mark time|timestamp|time stamp)$/.test(t)) return { type: 'mark' };
 
+  // Patient file — keeps the spoken casing for names and drugs.
+  const r = raw.trim().replace(/[.!?]+$/g, '');
+  m = r.match(/^(?:patient(?:'s)? )?name(?: is)?:? (.+)$/i);
+  if (m) return { type: 'record', field: 'name', value: m[1].trim() };
+  if (/^(no known allergies|no allergies|nka|nkda)$/.test(t)) return { type: 'record', field: 'nka' };
+  m = r.match(/^(?:allergic to|allergy to|allergies to|allergies|allergy):? (.+)$/i);
+  if (m) return { type: 'record', field: 'allergies', value: m[1].trim() };
+  m = t.match(/^blood (?:type |group )?(.+)$/);
+  if (m) { const b = parseBlood(m[1]); if (b) return { type: 'record', field: 'blood_type', value: b }; }
+  m = t.match(/^(?:age|aged) (\d{1,3})$/) || t.match(/^(\d{1,3}) years? old$/);
+  if (m) return { type: 'record', field: 'age_est', value: parseInt(m[1], 10) };
+  m = t.match(/^(?:sex )?(male|female)(?: patient)?$/);
+  if (m) return { type: 'record', field: 'sex', value: m[1] };
+
   return { type: 'entry', text: raw.trim() };
+};
+
+// "o positive", "oh negative", "a b plus", "0+" → "O+"
+const parseBlood = (s) => {
+  const x = s.replace(/\b(oh|zero|0)\b/g, 'o').replace(/\ba b\b/g, 'ab').replace(/\s+/g, ' ').trim();
+  const m = x.match(/^(ab|a|b|o) ?(positive|plus|pos|\+|negative|minus|neg|-)$/) || x.match(/^(ab|a|b|o)(\+|-)$/);
+  if (!m) return /^unknown$/.test(x) ? 'unknown' : null;
+  return m[1].toUpperCase() + (/^(positive|plus|pos|\+)$/.test(m[2]) ? '+' : '-');
 };
 
 export const TRIAGE_META = {

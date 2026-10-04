@@ -52,3 +52,26 @@ html[data-theme="night"]::after {
 .maplibregl-popup-content {
   padding-right: 34px;
 }
+
+/* Patient handoff print sheet (PatientHandoff.jsx) — only this prints. */
+#wt-print-root { display: none; }
+@media print {
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body > *:not(#wt-print-root) { display: none !important; }
+  #wt-print-root { display: block; color: #000; background: #fff; font: 11pt/1.35 system-ui, sans-serif; padding: 0; }
+  #wt-print-root h1 { font-size: 16pt; margin: 0 0 2pt; }
+  #wt-print-root h2 { font-size: 12pt; margin: 12pt 0 4pt; border-bottom: 1px solid #000; padding-bottom: 2pt; }
+  #wt-print-root .meta { margin: 0; color: #333; font-size: 9pt; }
+  #wt-print-root .conf { margin: 2pt 0 8pt; font-size: 9pt; font-weight: 700; text-transform: uppercase; }
+  #wt-print-root table { width: 100%; border-collapse: collapse; }
+  #wt-print-root th, #wt-print-root td { text-align: left; vertical-align: top; padding: 2pt 4pt; border-bottom: 1px solid #ccc; }
+  #wt-print-root th { width: 28%; font-weight: 600; }
+  #wt-print-root tr.alert th, #wt-print-root tr.alert td { font-weight: 800; background: #fde2e2; }
+  #wt-print-root .missing { margin: 6pt 0 0; font-weight: 700; }
+  #wt-print-root pre { white-space: pre-wrap; font: inherit; margin: 0; }
+  #wt-print-root tr, #wt-print-root figure { break-inside: avoid; }
+  #wt-print-root .photos { display: flex; flex-wrap: wrap; gap: 8pt; }
+  #wt-print-root figure { margin: 0; }
+  #wt-print-root img { max-width: 85mm; max-height: 60mm; border: 1px solid #999; }
+  #wt-print-root figcaption { font-size: 8pt; }
+}
