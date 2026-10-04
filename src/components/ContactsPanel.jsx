@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { Search, Plus, Phone, MessageSquare, Mail, Send, Pencil, Trash2, Upload, X, Loader2, Radio, Star } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, Plus, Phone, MessageSquare, Mail, Send, Pencil, Trash2, Upload, X, Loader2, Radio, Star, Copy, Check, PhoneCall } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { getOrgId } from '../lib/org';
+import { useAuth } from '../auth/AuthContext';
 import { useContacts } from '../hooks/useComms';
 import { contactLinks, parseContactsCsv } from '../lib/comms';
 import { useI18n } from '../i18n/index.jsx';
@@ -7,12 +10,148 @@ import { useI18n } from '../i18n/index.jsx';
 const ICON = { call: Phone, sms: MessageSquare, whatsapp: MessageSquare, email: Mail, telegram: Send };
 const EMPTY = { name: '', agency: '', role: '', phone: '', email: '', whatsapp: '', telegram: '', radio: '', notes: '', groups: [] };
 
+// A phone has a dialer and an SMS app; a computer usually has neither, and
+// tel:/sms: links there only open Windows' "pick an application" box.
+const isPhone = () => {
+  try { return navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent); } catch { return false; }
+};
+
+// What the company line can do (booleans only), for every rank.
+const useCaps = () => {
+  const [caps, setCaps] = useState({ sms: false, whatsapp: false, voice: false });
+  useEffect(() => { supabase.rpc('comms_capabilities').then(({ data }) => { if (data) setCaps(data); }); }, []);
+  return caps;
+};
+
+const invokeDirect = async (body) => {
+  const { data, error } = await supabase.functions.invoke('comms-dispatch', { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context?.json?.(); msg = j?.error ?? msg; } catch { /* not JSON */ }
+    throw new Error(msg);
+  }
+  return data;
+};
+
+// Call / SMS / WhatsApp / email for one contact, native where it can be:
+// phones use their own dialer; computers call through the company line
+// (Watchtower rings your mobile, then connects you). Texts go out from the
+// company number and the conversation stays in Watchtower.
+const ContactActions = ({ c, caps }) => {
+  const { t } = useI18n();
+  const { profile, session, reloadProfile } = useAuth();
+  const phone = isPhone();
+  const [mode, setMode] = useState(null); // 'sms' | 'call'
+  const [text, setText] = useState('');
+  const [mobile, setMobile] = useState(profile?.mobile ?? '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [thread, setThread] = useState([]);
+
+  const loadThread = useCallback(async () => {
+    const org = await getOrgId();
+    const { data } = await supabase.from('messages').select('id, text, at, source, meta, sender').eq('org_id', org).eq('contact_id', c.id).is('deleted_at', null).order('at', { ascending: false }).limit(20);
+    setThread((data ?? []).reverse());
+  }, [c.id]);
+  useEffect(() => { if (mode === 'sms') loadThread(); }, [mode, loadThread]);
+
+  const fail = (e) => setMsg({ bad: true, text: ['no_mobile', 'no_number', 'no_line'].includes(e.message) ? t(`cx.ct.err.${e.message}`) : e.message });
+  const sendSms = async () => {
+    setBusy(true); setMsg(null);
+    try { await invokeDirect({ type: 'direct_sms', contact_id: c.id, text }); setText(''); setMsg({ text: t('cx.ct.sent') }); loadThread(); }
+    catch (e) { fail(e); }
+    setBusy(false);
+  };
+  const call = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      if (mobile.trim() && mobile.trim() !== (profile?.mobile ?? '')) {
+        const { error } = await supabase.from('profiles').update({ mobile: mobile.trim() }).eq('id', session.user.id);
+        if (error) throw error;
+        reloadProfile?.();
+      }
+      const r = await invokeDirect({ type: 'call', contact_id: c.id });
+      setMsg({ text: t('cx.ct.ringing', { last: r?.ringing ?? '' }) });
+      setMode(null);
+    } catch (e) { fail(e); }
+    setBusy(false);
+  };
+  const copy = (v) => navigator.clipboard?.writeText(v).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+
+  const btn = 'px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border';
+  const links = contactLinks(c).filter(l => !['call', 'sms'].includes(l.k));
+  const number = c.phone || c.whatsapp;
+  const input = 'w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500';
+
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <div className="flex flex-wrap gap-1">
+        {number && (phone
+          ? <a href={`tel:${number.replace(/[^\d+]/g, '')}`} className={`${btn} bg-green-600/20 border-green-500/40 text-green-200`}><Phone className="w-3 h-3" />{t('cx.ct.do.call')}</a>
+          : caps.voice
+            ? <button onClick={() => { setMode(mode === 'call' ? null : 'call'); setMsg(null); }} className={`${btn} bg-green-600/20 border-green-500/40 text-green-200`}><PhoneCall className="w-3 h-3" />{t('cx.ct.do.call')}</button>
+            : <button onClick={() => copy(number)} className={`${btn} bg-slate-800 border-slate-700 text-slate-200`} title={t('cx.ct.copyTitle')}>{copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}{number}</button>)}
+        {number && (caps.sms
+          ? <button onClick={() => { setMode(mode === 'sms' ? null : 'sms'); setMsg(null); }} className={`${btn} ${mode === 'sms' ? 'bg-sky-600/30 border-sky-500/50 text-sky-100' : 'bg-slate-800 border-slate-700 text-slate-200'}`}><MessageSquare className="w-3 h-3" />{t('cx.ct.do.sms')}</button>
+          : phone && <a href={`sms:${number.replace(/[^\d+]/g, '')}`} className={`${btn} bg-slate-800 border-slate-700 text-slate-200`}><MessageSquare className="w-3 h-3" />{t('cx.ct.do.sms')}</a>)}
+        {links.map(l => {
+          const I = ICON[l.k];
+          return (
+            <a key={l.k} href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className={`${btn} bg-slate-800 border-slate-700 text-slate-200`}>
+              <I className="w-3 h-3" />{t(`cx.ct.do.${l.k}`)}
+            </a>
+          );
+        })}
+      </div>
+
+      {mode === 'call' && (
+        <div className="p-2 rounded-lg bg-green-900/20 border border-green-700/40 space-y-1.5">
+          <p className="text-[11px] text-green-100">{t('cx.ct.callHow', { name: c.name })}</p>
+          <input className={input} type="tel" value={mobile} onChange={e => setMobile(e.target.value)} placeholder={t('cx.ct.myMobile')} />
+          <button disabled={busy || !mobile.trim()} onClick={call} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-semibold flex items-center gap-1 disabled:opacity-50">
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PhoneCall className="w-3.5 h-3.5" />}{t('cx.ct.callNow')}
+          </button>
+        </div>
+      )}
+
+      {mode === 'sms' && (
+        <div className="p-2 rounded-lg bg-slate-800/60 border border-slate-700 space-y-1.5">
+          {thread.length > 0 && (
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {thread.map(m => {
+                const out = m.meta?.direction === 'out' || (m.sender && m.source !== 'sms');
+                return (
+                  <div key={m.id} className={`flex ${out ? 'justify-end' : 'justify-start'}`}>
+                    <p className={`max-w-[85%] px-2 py-1 rounded-lg text-[11px] whitespace-pre-wrap ${out ? 'bg-orange-500/20 text-orange-50' : 'bg-sky-950/70 text-sky-50'}`}>
+                      {m.text}<span className="block text-[9px] opacity-60 text-right">{new Date(m.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex gap-1.5">
+            <input className={input} value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && text.trim() && !busy) sendSms(); }} placeholder={t('cx.ct.smsPh', { name: c.name })} maxLength={1500} />
+            <button disabled={busy || !text.trim()} onClick={sendSms} className="px-3 rounded-lg bg-sky-600 text-white text-xs font-semibold flex items-center gap-1 disabled:opacity-50">
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-500">{t('cx.ct.smsNote')}</p>
+        </div>
+      )}
+      {msg && <p className={`text-[11px] ${msg.bad ? 'text-red-300' : 'text-green-300'}`}>{msg.text}</p>}
+    </div>
+  );
+};
+
 // Everyone outside the app the operation may need: other agencies,
 // hospitals, utilities, volunteers. Tap to call / text / WhatsApp / email
 // from the device; groups drive broadcasts and SMS/email connectors.
 export const ContactsPanel = ({ canManage }) => {
   const { t } = useI18n();
   const { contacts, groups, save, importMany, remove } = useContacts();
+  const caps = useCaps();
   const [qText, setQ] = useState('');
   const [group, setGroup] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -127,17 +266,7 @@ export const ContactsPanel = ({ canManage }) => {
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {contactLinks(c).map(l => {
-                const I = ICON[l.k];
-                return (
-                  <a key={l.k} href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-                    className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1 border ${l.k === 'call' ? 'bg-green-600/20 border-green-500/40 text-green-200' : 'bg-slate-800 border-slate-700 text-slate-200'}`}>
-                    <I className="w-3 h-3" />{t(`cx.ct.do.${l.k}`)}
-                  </a>
-                );
-              })}
-            </div>
+            <ContactActions c={c} caps={caps} />
           </div>
         ))}
       </div>

@@ -105,6 +105,7 @@ export const AirspacePanel = ({ getMap, ready }) => {
     const remove = () => {
       try { if (map.getLayer(LAYER)) map.removeLayer(LAYER); if (map.getSource(SRC)) map.removeSource(SRC); } catch { /* map gone */ }
     };
+    // altitude columns only mean something in the tilted 3D view (drone areas always show)
     if (!on) { remove(); return; }
     const zoom = map.getZoom();
     const features = [];
@@ -116,6 +117,7 @@ export const AirspacePanel = ({ getMap, ready }) => {
         features.push({ type: 'Feature', properties: { color, base: 0, top: a.ceiling_m ?? a.alt_agl_m ?? 120, opacity: 0.25 }, geometry: { type: 'Polygon', coordinates: circle(a.lat, a.lng, a.radius_m) } });
         continue;
       }
+      if (!threeD) continue; // flat map: the plane icons say it all
       const agl = a.alt_agl_m ?? (a.alt_msl_m != null ? Math.max(15, a.alt_msl_m - groundRef) : 300);
       features.push({ type: 'Feature', properties: { color, base: 0, top: agl }, geometry: { type: 'Polygon', coordinates: square(a.lat, a.lng, half * 0.35) } });
       features.push({ type: 'Feature', properties: { color, base: Math.max(0, agl - half * 2), top: agl + half * 2 }, geometry: { type: 'Polygon', coordinates: square(a.lat, a.lng, half * 1.6) } });
@@ -136,7 +138,7 @@ export const AirspacePanel = ({ getMap, ready }) => {
         });
       }
     } catch { /* style not ready yet — next update retries */ }
-  }, [on, ready, tracks, conflictIds, groundRef, getMap]);
+  }, [on, ready, tracks, conflictIds, groundRef, getMap, threeD]);
   useEffect(() => () => {
     const map = getMap();
     try { if (map?.getLayer(LAYER)) map.removeLayer(LAYER); if (map?.getSource(SRC)) map.removeSource(SRC); } catch { /* map gone */ }
@@ -172,19 +174,28 @@ export const AirspacePanel = ({ getMap, ready }) => {
         const el = document.createElement('button');
         el.type = 'button';
         el.addEventListener('click', (e) => { e.stopPropagation(); setSelected(a.id); });
-        m = new maplibregl.Marker({ element: el, anchor: 'bottom-left', offset: [-4, 4] }).setLngLat([a.lng, a.lat]).addTo(map);
+        m = new maplibregl.Marker({ element: el, anchor: 'left', offset: [-9, 0] }).setLngLat([a.lng, a.lat]).addTo(map);
         markers.set(a.id, m);
       } else {
         m.setLngLat([a.lng, a.lat]);
       }
       const el = m.getElement();
-      el.title = `${name} · ${alt}`;
+      // hover: who it is — callsign, registration, type, height, speed
+      el.title = [
+        [a.callsign, a.registration && `${t('air.reg')} ${a.registration}`, a.model].filter(Boolean).join(' · ') || name,
+        [alt, a.speed_kmh != null && `${Math.round(a.speed_kmh)} km/h`, a.heading != null && `${Math.round(a.heading)}°`].filter(Boolean).join(' · '),
+        t('air.kind.' + a.kind),
+      ].filter(Boolean).join('\n');
       el.style.cssText = 'display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap;font:11px system-ui;color:#fff;background:transparent;border:0;padding:0';
-      el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${color};border:1.5px solid #020617;flex:none${danger ? ';box-shadow:0 0 0 3px rgba(239,68,68,.45)' : ''}"></span>`
-        + (label ? `<span style="display:flex;gap:4px;align-items:center;padding:1px 6px;border-radius:9px;background:rgba(2,6,23,.85);border:1.5px solid ${color}"><span style="font-size:12px">${KIND_ICON[a.kind] ?? '•'}</span><span style="font-weight:600">${name}</span><span style="opacity:.8">${alt}</span></span>` : '');
+      // aircraft and helicopters: a small plane pointing where it flies; drones and others: a dot
+      const icon = ['aircraft', 'helicopter'].includes(a.kind)
+        ? `<svg viewBox="0 0 24 24" width="18" height="18" style="flex:none;transform:rotate(${Math.round(a.heading ?? 0)}deg);filter:drop-shadow(0 0 1px #020617)${danger ? ' drop-shadow(0 0 4px #ef4444)' : ''}"><path d="M12 1.5c.8 0 1.4.9 1.4 2.2v5.6l8.1 4.6v2.2l-8.1-2.4v4.6l2.3 1.7v1.8L12 20.6l-3.7 1.2V20l2.3-1.7v-4.6l-8.1 2.4v-2.2l8.1-4.6V3.7c0-1.3.6-2.2 1.4-2.2z" fill="${color}" stroke="#020617" stroke-width="0.8"/></svg>`
+        : `<span style="width:10px;height:10px;border-radius:50%;background:${color};border:1.5px solid #020617;flex:none${danger ? ';box-shadow:0 0 0 3px rgba(239,68,68,.45)' : ''}"></span>`;
+      el.innerHTML = icon
+        + (label ? `<span style="display:flex;gap:4px;align-items:center;padding:1px 6px;border-radius:9px;background:rgba(2,6,23,.85);border:1.5px solid ${color}"><span style="font-weight:600">${name}</span><span style="opacity:.8">${alt}</span></span>` : '');
     }
     for (const [id, m] of markers) if (!seen.has(id)) { m.remove(); markers.delete(id); }
-  }, [on, ready, tracks, conflictIds, getMap, viewTick]);
+  }, [on, ready, tracks, conflictIds, getMap, viewTick, t]);
   useEffect(() => () => { markersRef.current.forEach(m => m.remove()); markersRef.current.clear(); }, []);
 
   // ---------- 3D view ----------

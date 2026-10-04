@@ -216,10 +216,70 @@ async function authorize(req: Request, connectorId: string): Promise<Row | null>
   return c;
 }
 
+// any field+ member of a company (direct SMS, call bridge)
+async function member(req: Request): Promise<Row | null> {
+  const u = await fetch(`${SUPA}/auth/v1/user`, { headers: { apikey: SVC, Authorization: req.headers.get('Authorization') ?? '' } });
+  if (!u.ok) return null;
+  const user = await u.json();
+  const [p] = await q(`profiles?id=eq.${user.id}&select=id,org_id,role,display_name,mobile`);
+  return p && ['field', 'operator', 'coordinator', 'admin'].includes(p.role) ? p : null;
+}
+const xmlEsc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// SMS / WhatsApp to one contact from the company line, and the call bridge:
+// Twilio rings the member's own mobile, then connects them to the contact
+// with the company number as caller ID — works from any computer.
+async function direct(req: Request, body: Row) {
+  const me = await member(req);
+  if (!me) return json({ error: 'not allowed' }, 403);
+  const [ct] = await q(`contacts?id=eq.${encodeURIComponent(body.contact_id ?? '')}&org_id=eq.${me.org_id}&select=*`);
+  if (!ct) return json({ error: 'contact not found' }, 404);
+  const wa = body.via === 'whatsapp';
+  const [c] = await q(`connectors?org_id=eq.${me.org_id}&enabled=eq.true&kind=eq.${wa ? 'twilio_whatsapp' : 'twilio_sms'}&secret_set=eq.true&order=created_at&limit=1&select=*`);
+  if (!c) return json({ error: 'no_line' }, 400);
+  const [sec] = await q(`connector_secrets?connector_id=eq.${c.id}&select=secret`);
+  const sid = sec?.secret?.account_sid, tok = sec?.secret?.auth_token;
+  if (!sid || !tok) return json({ error: 'no_line' }, 400);
+  const from = e164(c.config?.from ?? '');
+  const auth = { Authorization: `Basic ${btoa(`${sid}:${tok}`)}`, 'Content-Type': 'application/x-www-form-urlencoded' };
+
+  if (body.type === 'call') {
+    const mine = me.mobile ? e164(me.mobile) : '';
+    if (!/^\+\d{8,15}$/.test(mine)) return json({ error: 'no_mobile' }, 400);
+    const to = e164(ct.phone ?? ct.whatsapp ?? '');
+    if (!/^\+\d{8,15}$/.test(to)) return json({ error: 'no_number' }, 400);
+    const twiml = `<Response><Say>Watchtower. Connecting you to ${xmlEsc(ct.name)}.</Say><Dial callerId="${from}" timeout="30">${to}</Dial></Response>`;
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, { method: 'POST', headers: auth, body: new URLSearchParams({ To: mine, From: from, Twiml: twiml }) });
+    const detail = r.ok ? `HTTP ${r.status}` : `HTTP ${r.status} ${(await r.text()).slice(0, 200)}`;
+    await post('comms_deliveries', { org_id: me.org_id, connector_id: c.id, ref_type: 'call', ref_id: ct.id, target: `${me.display_name ?? ''} → ${ct.name}`.slice(0, 200), status: r.ok ? 'sent' : 'failed', detail });
+    await post('events', { org_id: me.org_id, actor_id: me.id, actor_kind: 'user', type: 'comms.call', payload: { contact_id: ct.id, contact: ct.name, ok: r.ok } });
+    return json(r.ok ? { ok: true, ringing: mine.slice(-4) } : { error: detail }, r.ok ? 200 : 502);
+  }
+
+  const text = String(body.text ?? '').trim().slice(0, 1500);
+  if (!text) return json({ error: 'empty' }, 400);
+  const to = e164(wa ? (ct.whatsapp || ct.phone || '') : (ct.phone ?? ''));
+  if (!/^\+\d{8,15}$/.test(to)) return json({ error: 'no_number' }, 400);
+  const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+    method: 'POST', headers: auth, body: new URLSearchParams({ To: wa ? `whatsapp:${to}` : to, From: wa ? `whatsapp:${from}` : from, Body: text }),
+  });
+  const detail = r.ok ? `HTTP ${r.status}` : `HTTP ${r.status} ${(await r.text()).slice(0, 200)}`;
+  await post('comms_deliveries', { org_id: me.org_id, connector_id: c.id, ref_type: 'message', ref_id: `direct:${ct.id}`, target: to, status: r.ok ? 'sent' : 'failed', detail });
+  if (!r.ok) return json({ error: detail }, 502);
+  // the conversation keeps it, next to the replies (same channel the line brings replies into)
+  await post('messages', {
+    org_id: me.org_id, sender: me.id, text, source: wa ? 'whatsapp' : 'sms', external_from: `→ ${ct.name}`,
+    contact_id: ct.id, connector_id: c.id, channel_id: c.inbound_channel ?? null, meta: { direction: 'out', to },
+  });
+  return json({ ok: true });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
-    const { type, id, connector_id } = await req.json();
+    const body = await req.json();
+    const { type, id, connector_id } = body;
+    if (type === 'direct_sms' || type === 'call') return await direct(req, body);
 
     if (type === 'test' || type === 'telegram_setup') {
       const c = await authorize(req, connector_id);

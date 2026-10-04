@@ -229,7 +229,7 @@ export default {
       "Arraste um marcador da paleta",
       "Desenhar → zona, círculo ou rota; uma zona de exclusão alerta quando alguém entra",
       "Camadas → mostrar ou ocultar equipe, zonas, as camadas de mapa da sua empresa · Importar / Exportar KML e GeoJSON",
-      "Comunicações → canais (Todos, Comando, TAC-1…) · Contatos: ligar, SMS, WhatsApp em um toque",
+      "Comunicações → canais (Todos, Comando, TAC-1…) · Contatos: ligar, SMS, WhatsApp em um toque — a partir de um computador, Ligar toca no seu celular e conecta a chamada, SMS é enviado pelo número da empresa",
       "Transmissão: todos precisam confirmar; grupos de contato recebem por SMS / e-mail",
       "Toque em uma mensagem → ⭐ VIP (fixado no topo), 🗄 Arquivar ou 🗑 Excluir — coordenadores podem restaurar",
       "Em um veículo: menu → Modo veículo — uma tela grande, leitura em voz alta"
@@ -502,7 +502,7 @@ export default {
       "Eine Markierung aus der Palette ziehen",
       "Zeichnen → Zone, Kreis oder Route; eine Sperrzone alarmiert, wenn jemand sie betritt",
       "Ebenen → Team, Zonen, Kartenebenen deines Unternehmens ein-/ausblenden · KML und GeoJSON importieren/exportieren",
-      "Kommunikation → Kanäle (Alle, Einsatzleitung, TAC-1…) · Kontakte: Anruf, SMS, WhatsApp mit einem Tipp",
+      "Kommunikation → Kanäle (Alle, Einsatzleitung, TAC-1…) · Kontakte: Anruf, SMS, WhatsApp mit einem Tipp — vom Computer aus klingelt der Anruf auf deinem Handy und verbindet dich, SMS wird von der Firmennummer verschickt",
       "Rundruf: alle müssen bestätigen; Kontaktgruppen erhalten ihn per SMS/E-Mail",
       "Tippe auf eine Nachricht → ⭐ VIP (oben angeheftet), 🗄 Archivieren oder 🗑 Löschen — Koordinatoren können wiederherstellen",
       "Im Fahrzeug: Menü → Fahrzeugmodus — ein großer Bildschirm, vorgelesen"
@@ -775,7 +775,7 @@ export default {
       "Trascina un marcatore dalla tavolozza",
       "Disegna → zona, cerchio o percorso; una zona di esclusione avvisa quando qualcuno vi entra",
       "Livelli → mostra o nascondi squadra, zone, i livelli mappa della tua azienda · Importa / Esporta KML e GeoJSON",
-      "Comunicazioni → canali (Tutti, Comando, TAC-1…) · Contatti: chiama, SMS, WhatsApp con un tocco",
+      "Comunicazioni → canali (Tutti, Comando, TAC-1…) · Contatti: chiamata, SMS, WhatsApp in un tocco — da computer, la chiamata squilla sul tuo cellulare e ti connette, l'SMS viene inviato dal numero aziendale",
       "Comunicazione di emergenza: tutti devono confermare la lettura; i gruppi di contatto la ricevono via SMS / email",
       "Tocca un messaggio → ⭐ VIP (fissato in alto), 🗄 Archivia o 🗑 Elimina — i coordinatori possono ripristinare",
       "In veicolo: menu → Modalità veicolo — una schermata grande, letta ad alta voce"
@@ -1048,7 +1048,7 @@ export default {
       "Перетягни позначку з палітри",
       "Малювати → зона, коло або маршрут; зона виключення сповіщає, коли хтось заходить",
       "Шари → показати або сховати команду, зони, шари карти компанії · Імпорт / Експорт KML та GeoJSON",
-      "Зв'язок → канали (Усі, Командування, TAC-1…) · Контакти: дзвінок, SMS, WhatsApp в один дотик",
+      "Зв'язок → канали (Усі, Командування, TAC-1…) · Контакти: дзвінок, SMS, WhatsApp в один дотик — з комп'ютера дзвінок телефонує на твій мобільний і з'єднує тебе, SMS надсилається з номера компанії",
       "Розсилка: кожен має підтвердити; групи контактів отримують через SMS / email",
       "Натисни на повідомлення → ⭐ VIP (закріплено згори), 🗄 Архів або 🗑 Видалити — координатори можуть відновити",
       "У транспортному засобі: меню → Режим транспортного засобу — один великий екран, читання вголос"
@@ -1321,7 +1321,7 @@ export default {
       "Przeciągnij znacznik z palety",
       "Rysuj → strefę, okrąg lub trasę; strefa zakazana alarmuje, gdy ktoś do niej wejdzie",
       "Warstwy → pokaż lub ukryj ekipy, strefy, warstwy mapy Twojej firmy · Importuj / eksportuj KML i GeoJSON",
-      "Komunikacja → kanały (Wszyscy, Dowództwo, TAC-1…) · Kontakty: połączenie, SMS, WhatsApp jednym dotknięciem",
+      "Komunikacja → kanały (Wszyscy, Dowództwo, TAC-1…) · Kontakty: połączenie, SMS, WhatsApp jednym dotknięciem — z komputera połączenie dzwoni na twój telefon i cię łączy, SMS wychodzi z numeru firmowego",
       "Komunikat alarmowy: każdy musi potwierdzić odbiór; grupy kontaktów otrzymują go przez SMS / e-mail",
       "Dotknij wiadomość → ⭐ VIP (przypięta u góry), 🗄 Archiwum lub 🗑 Usuń — koordynatorzy mogą przywrócić",
       "W pojeździe: menu → Tryb pojazdu — jeden duży ekran, czytany na głos"
@@ -1594,7 +1594,7 @@ export default {
       "Paletten bir işaret sürükle",
       "Çiz → bölge, çember veya rota; bir dışlama bölgesi birisi içeri girdiğinde uyarır",
       "Katmanlar → ekibi, bölgeleri, şirketinin harita katmanlarını göster veya gizle · KML ve GeoJSON içe/dışa aktar",
-      "İletişim → kanallar (Tüm Ekip, Komuta, TAC-1…) · Kişiler: tek dokunuşla ara, SMS, WhatsApp",
+      "İletişim → kanallar (Tüm birimler, Komuta, TAC-1…) · Kişiler: tek dokunuşla ara, SMS, WhatsApp — bilgisayardan, Ara seçeneği cep telefonunu arayıp seni bağlar, SMS şirket numarasından gönderilir",
       "Yayın: herkes onaylamalı; kişi grupları SMS / e-posta ile alır",
       "Bir mesaja dokun → ⭐ VIP (üstte sabitlenir), 🗄 Arşiv veya 🗑 Sil — koordinatörler geri yükleyebilir",
       "Araçtayken: menü → Araç modu — tek büyük ekran, sesli okuma"
@@ -1867,7 +1867,7 @@ export default {
       "اسحب علامة من اللوحة",
       "ارسم ← منطقة أو دائرة أو مسارًا؛ منطقة محظورة تنبّه عند دخول أحد إليها",
       "الطبقات ← أظهر أو أخفِ الفرق، المناطق، طبقات خرائط شركتك · استيراد/تصدير KML وGeoJSON",
-      "الاتصالات ← القنوات (الجميع، القيادة، TAC-1...) · جهات الاتصال: اتصال وSMS وواتساب بلمسة واحدة",
+      "الاتصالات → القنوات (الكل، القيادة، TAC-1…) · جهات الاتصال: اتصال، SMS، واتساب بضغطة واحدة — من حاسوب، يرنّ الاتصال في هاتفك المحمول ويصلك، وتُرسل SMS من رقم الشركة",
       "البث: يجب على الجميع تأكيد الاستلام؛ تصل مجموعات الاتصال عبر SMS أو البريد الإلكتروني",
       "اضغط على رسالة → ⭐ VIP (مثبتة في الأعلى)، 🗄 أرشفة أو 🗑 حذف — يمكن للمنسقين استعادتها",
       "داخل المركبة: القائمة → وضع المركبة — شاشة كبيرة واحدة، مع قراءة صوتية"
@@ -2140,7 +2140,7 @@ export default {
       "पैलेट से एक मार्कर खींचें",
       "ड्रॉ → ज़ोन, सर्कल या रूट बनाएँ; एक्सक्लूज़न ज़ोन में कोई घुसे तो अलर्ट मिलेगा",
       "लेयर → क्रू, ज़ोन, तेरी कंपनी की मैप लेयर दिखाएँ या छुपाएँ · KML और GeoJSON इम्पोर्ट / एक्सपोर्ट करें",
-      "कम्युनिकेशन → चैनल (All hands, Command, TAC-1…) · संपर्क: एक टैप में कॉल, SMS, WhatsApp करें",
+      "संचार → चैनल (All hands, Command, TAC-1…) · संपर्क: कॉल, SMS, WhatsApp एक टैप में — कंप्यूटर से, Call आपके मोबाइल पर रिंग करके आपको जोड़ता है, SMS कंपनी नंबर से भेजा जाता है",
       "ब्रॉडकास्ट: सबको पावती देनी होगी; कॉन्टैक्ट ग्रुप को यह SMS / ईमेल से मिलेगा",
       "किसी संदेश को टैप करें → ⭐ VIP (ऊपर पिन किया गया), 🗄 आर्काइव या 🗑 डिलीट करें — समन्वयक पुनर्स्थापित कर सकते हैं",
       "वाहन में: मेनू → व्हीकल मोड — एक बड़ी स्क्रीन, ज़ोर से पढ़कर सुनाया जाता है"
@@ -2413,7 +2413,7 @@ export default {
       "从标记面板拖出一个标记",
       "绘制 → 区域、圆形或路线；禁入区域在有人进入时会报警",
       "图层 → 显示或隐藏队员、区域、你公司的地图图层 · 导入/导出 KML 和 GeoJSON",
-      "通讯 → 频道（全员、指挥、TAC-1…）· 联系人：一键拨打电话、SMS、WhatsApp",
+      "通讯 → 频道（全员、指挥、TAC-1…）· 联系人：一键拨打电话、发送 SMS、WhatsApp —— 在电脑上使用时，拨打电话会呼叫你的手机并接通，SMS 则从公司号码发出",
       "广播：所有人都必须确认；联系人群组通过 SMS/邮件接收",
       "点击消息 → ⭐ 重要（置顶）、🗄 归档或 🗑 删除 — 协调员可恢复",
       "在车内：菜单 → 车辆模式 — 单一大屏幕，语音朗读"
@@ -2686,7 +2686,7 @@ export default {
       "パレットからマーカーをドラッグ",
       "描画 → ゾーン、円、ルートを作成。立入禁止ゾーンは誰かが入ると警告します",
       "レイヤー → 隊員、ゾーン、自社の地図レイヤーの表示/非表示 · KML・GeoJSONのインポート/エクスポート",
-      "通信 → チャンネル(全員、指令本部、TAC-1など) · 連絡先:ワンタップで通話・SMS・WhatsApp",
+      "通信 → チャンネル(全員, 指揮, TAC-1…) · 連絡先:通話・SMS・WhatsAppをワンタップで — パソコンから利用する場合、通話はあなたの携帯電話に着信してから接続され、SMSは会社番号から送信される",
       "一斉通報:全員の確認応答が必要 · 連絡先グループにはSMS/メールで送信",
       "メッセージをタップ → ⭐ VIP（最上部に固定）、🗄 アーカイブ、🗑 削除 — コーディネーターが復元可能",
       "車両内：メニュー → 車両モード — 大画面1つで読み上げ"
@@ -2959,7 +2959,7 @@ export default {
       "I-drag ang marker mula sa palette",
       "Gumuhit → zone, circle, o ruta; isang exclusion zone ay nag-aalerto kapag may pumasok",
       "Mga Layer → ipakita o itago ang crew, mga zone, mga map layer ng kumpanya mo · Mag-import / Mag-export ng KML at GeoJSON",
-      "Comms → mga channel (All hands, Command, TAC-1…) · Mga Contact: tumawag, mag-SMS, WhatsApp sa isang tap lang",
+      "Komunikasyon → mga channel (All hands, Command, TAC-1…) · Mga Contact: tumawag, mag-SMS, mag-WhatsApp sa isang tap lang — mula sa computer, ang Call ay tatawag sa iyong mobile at ikokonekta ka, ang SMS ay ipapadala mula sa numero ng kompanya",
       "Broadcast: kailangang kilalanin ito ng lahat; matatanggap ito ng mga contact group sa pamamagitan ng SMS / email",
       "I-tap ang mensahe → ⭐ VIP (naka-pin sa itaas), 🗄 Archive o 🗑 Delete — maaaring i-restore ng mga coordinator",
       "Sa sasakyan: menu → Vehicle mode — isang malaking screen, binabasa nang malakas"
@@ -3232,7 +3232,7 @@ export default {
       "Buruta alama kutoka kwenye palette",
       "Chora → kanda, duara au njia; kanda ya kuzuiwa hutoa tahadhari mtu anapoingia",
       "Tabaka → onyesha au ficha wafanyakazi, kanda, tabaka za ramani za kampuni yako · Ingiza / Hamisha KML na GeoJSON",
-      "Mawasiliano → chaneli (All hands, Command, TAC-1…) · Mawasiliano: piga simu, SMS, WhatsApp kwa mguso mmoja",
+      "Mawasiliano → chaneli (Wote, Amri, TAC-1…) · Anwani: piga simu, SMS, WhatsApp kwa mguso mmoja — ukiwa kwenye kompyuta, Kupiga simu kunapiga kwenye simu yako ya mkononi na kukuunganisha, SMS hutumwa kutoka nambari ya kampuni",
       "Tangazo: kila mtu lazima athibitishe; vikundi vya mawasiliano hupokea kwa SMS / barua pepe",
       "Gusa ujumbe → ⭐ VIP (umebandikwa juu), 🗄 Hifadhi au 🗑 Futa — waratibu wanaweza kurejesha",
       "Ukiwa kwenye gari: menyu → Hali ya Gari — skrini moja kubwa, inasomwa kwa sauti"
