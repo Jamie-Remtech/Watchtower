@@ -25,7 +25,7 @@ export const fr = {
   'ns.test': "M'envoyer une alerte test", 'ns.sending': 'Envoi…', 'ns.noDevice': "Aucun appareil inscrit aux notifications — active-les d'abord sur cet appareil.",
   'ns.sent': 'Envoyée à {n} appareil(s).', 'ns.failed': 'Envoi impossible : {e}',
   'ns.language': 'Ma langue', 'ns.languageNote': "Watchtower affiche ses écrans dans ta langue et traduit automatiquement ce que ton équipe écrit — messages, alertes, notes.",
-  'ns.partialUi': '* Pour ces langues, les écrans restent en anglais pour l’instant — tout ce que ton équipe écrit est quand même traduit dans la tienne.',
+  'ns.partialUi': 'Les écrans dans cette langue sont traduits automatiquement et attendent la révision d’un locuteur natif. Avise ton coordonnateur si un mot est erroné — surtout sur les boutons de sécurité.',
   'cat.hazard': 'Dangers', 'cat.hazard.d': 'Feux de forêt, séismes, effets en cascade',
   'cat.weather': 'Météo', 'cat.weather.d': 'Radar, pluie imminente, prévisions des prochains jours',
   'cat.comms': 'Messages', 'cat.comms.d': "Clavardage d'équipe dans Comms",

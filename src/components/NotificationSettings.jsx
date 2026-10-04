@@ -91,7 +91,7 @@ export const NotificationSettings = () => {
           {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}{hasDictionary(l.code) ? '' : ' *'}</option>)}
         </select>
         <p className="text-[10px] text-slate-500">{t('ns.languageNote')}</p>
-        <p className="text-[10px] text-slate-600">{t('ns.partialUi')}</p>
+        {!['en', 'fr', 'es'].includes(lang) && <p className="text-[10px] text-amber-300/80">{t('ns.partialUi')}</p>}
       </div>
 
       <div className="space-y-1.5">

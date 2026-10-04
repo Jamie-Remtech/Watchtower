@@ -32,7 +32,7 @@ export const en = {
   'ns.test': 'Send me a test alert', 'ns.sending': 'Sending…', 'ns.noDevice': 'No device registered for push yet — enable notifications on this device first.',
   'ns.sent': 'Sent to {n} device(s).', 'ns.failed': 'Could not send: {e}',
   'ns.language': 'My language', 'ns.languageNote': 'Watchtower shows its screens in your language and translates what your team writes — messages, alerts, notes — automatically.',
-  'ns.partialUi': '* Screens stay in English for now in these languages — everything your team writes is still translated into yours.',
+  'ns.partialUi': 'Screens in this language are machine-translated and awaiting review by a native speaker. Tell your coordinator if a word is wrong — especially on safety buttons.',
   'cat.hazard': 'Hazards', 'cat.hazard.d': 'Wildfires, earthquakes, cascade warnings',
   'cat.weather': 'Weather', 'cat.weather.d': 'Radar, rain nowcast, forward outlook',
   'cat.comms': 'Messages', 'cat.comms.d': 'Team chat in Comms',
