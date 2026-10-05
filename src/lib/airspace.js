@@ -13,12 +13,25 @@ export const VERTICAL_BUFFER_M = 300;
 export const FT = 3.28084;
 
 // how long each kind of feed stays "live" without an update
-const FRESH_S = { receiver: 90, remoteid: 120, telemetry: 120, declared: Infinity, public: 60 };
+// public: wide views come from a cache refreshed about every minute
+const FRESH_S = { receiver: 90, remoteid: 120, telemetry: 120, declared: Infinity, public: 150 };
 
 export async function fetchPublicAir(lat, lng, radiusKm) {
   const { data, error } = await supabase.functions.invoke('air-public', { body: { lat, lng, radius_km: radiusKm } });
   if (error || !Array.isArray(data?.aircraft)) return [];
   return data.aircraft.map(a => ({ ...a, source: 'public', seen_at: new Date(Date.now() - (a.age_s ?? 0) * 1000).toISOString() }));
+}
+
+// Every aircraft in a map view: bbox = [west, south, east, north]
+export async function fetchPublicAirBox(bbox) {
+  const { data, error } = await supabase.functions.invoke('air-public', { body: { bbox } });
+  if (error || !Array.isArray(data?.aircraft)) return null;
+  return {
+    aircraft: data.aircraft.map(a => ({ ...a, source: 'public', seen_at: new Date(Date.now() - (data.age_s ?? 0) * 1000).toISOString() })),
+    partial: !!data.partial,      // view larger than the server covers at once
+    pending: data.pending ?? 0,   // areas still being fetched for the first time
+    ageS: data.age_s ?? 0,        // oldest area in the view
+  };
 }
 
 export async function fetchOwnAir() {

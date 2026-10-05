@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/index.jsx';
 import { getLastCoords } from '../lib/tracker';
 import {
-  fetchPublicAir, fetchOwnAir, mergeTracks, findConflicts, groundElevation, declareFlight, endFlight,
+  fetchPublicAirBox, fetchOwnAir, mergeTracks, findConflicts, groundElevation, declareFlight, endFlight,
   distanceKm, bearingTo, metres, feet, KIND_ICON, KIND_COLOR,
 } from '../lib/airspace';
 
@@ -22,8 +22,43 @@ const ON_KEY = 'wt-air-on';
 const SRC = 'air-3d';
 const LAYER = 'air-columns';
 const POLL_MS = 10000;
-const AIR_MIN_ZOOM = 6;     // below this (continent view), public aircraft are not drawn
-const LABEL_MIN_ZOOM = 7;   // below this, aircraft are icons only (names on hover / tap)
+const AIR_MIN_ZOOM = 2.5;   // whole-planet view: public aircraft not fetched
+const LABEL_MIN_ZOOM = 8;   // below this, planes are map symbols only (details on hover / tap)
+const PTS_SRC = 'air-pts';
+const PTS_LAYER = 'air-planes';
+const PLANE_PATH = 'M12 1.5c.8 0 1.4.9 1.4 2.2v5.6l8.1 4.6v2.2l-8.1-2.4v4.6l2.3 1.7v1.8L12 20.6l-3.7 1.2V20l2.3-1.7v-4.6l-8.1 2.4v-2.2l8.1-4.6V3.7c0-1.3.6-2.2 1.4-2.2z';
+
+// Plane / dot icons drawn once into the map's sprite, one per colour: the map
+// itself then places, rotates and scales thousands of them with the zoom.
+function ensureAirIcons(map) {
+  const tones = { ...KIND_COLOR, conflict: '#ef4444' };
+  for (const [tone, color] of Object.entries(tones)) {
+    for (const shape of ['plane', 'dot']) {
+      const name = `wt-air-${shape}-${tone}`;
+      if (map.hasImage(name)) continue;
+      const s = 48;
+      const c = document.createElement('canvas');
+      c.width = c.height = s;
+      const g = c.getContext('2d');
+      g.fillStyle = color;
+      g.strokeStyle = '#020617';
+      if (shape === 'plane') {
+        g.scale(s / 24, s / 24);
+        const p = new Path2D(PLANE_PATH);
+        g.lineWidth = 1.1;
+        g.stroke(p);
+        g.fill(p);
+      } else {
+        g.beginPath();
+        g.arc(s / 2, s / 2, s * 0.24, 0, Math.PI * 2);
+        g.lineWidth = 5;
+        g.stroke();
+        g.fill();
+      }
+      map.addImage(name, g.getImageData(0, 0, s, s), { pixelRatio: 2 });
+    }
+  }
+}
 const MAX_LABELS = 60;
 
 const square = (lat, lng, half) => {
@@ -58,41 +93,57 @@ export const AirspacePanel = ({ getMap, ready }) => {
   const markersRef = useRef(new Map());
   const zoomRef = useRef(8);
   const [viewTick, setViewTick] = useState(0);   // map moved → re-declutter the tags
-  const [coverKm, setCoverKm] = useState(null);  // radius of public data around the centre
-  const [tooWide, setTooWide] = useState(false); // zoomed out too far for public aircraft
+  const [partial, setPartial] = useState(false); // view larger than the server covers in one go
+  const [coverage, setCoverage] = useState({ pending: 0, ageS: 0 });
+  const fillTimer = useRef(null);
+  const loadPublicRef = useRef(null);
+  const [tooWide, setTooWide] = useState(false); // whole-planet view: public aircraft off
 
   const toggleOn = () => setOn(v => { try { localStorage.setItem(ON_KEY, v ? '0' : '1'); } catch { /* private mode */ } return !v; });
 
   // ---------- data ----------
-  const loadPublic = useCallback(async () => {
+  // Every aircraft in the visible map (the server tiles the view into shared
+  // cells). Zoomed right out to the whole planet only our own feeds show.
+  const lastFetchRef = useRef(0);
+  const loadPublic = useCallback(async (force = false) => {
     const map = getMap();
     if (!map) return;
-    // Public data covers a circle around the map centre (max ~460 km). Zoomed
-    // out to a continent that circle is a few pixels wide and every plane in it
-    // piles up in one spot — so below AIR_MIN_ZOOM only our own feeds show.
-    if (map.getZoom() < AIR_MIN_ZOOM) { setTooWide(true); setCoverKm(null); setPublicAir([]); return; }
+    const z = map.getZoom();
+    if (z < AIR_MIN_ZOOM) { setTooWide(true); setPublicAir([]); return; }
+    // wide views refresh less often — the public network is shared and free
+    if (!force && Date.now() - lastFetchRef.current < (z < 6 ? 30000 : POLL_MS - 1000)) return;
+    lastFetchRef.current = Date.now();
     setTooWide(false);
-    const c = map.getCenter();
     const b = map.getBounds();
-    const radius = Math.min(460, Math.max(20, distanceKm({ lat: c.lat, lng: c.lng }, { lat: b.getNorth(), lng: b.getEast() })));
-    setCoverKm(Math.round(radius));
-    setPublicAir(await fetchPublicAir(c.lat, c.lng, radius));
+    let w = b.getWest(), e = b.getEast();
+    if (e - w >= 300) { w = -180; e = 180; }
+    const res = await fetchPublicAirBox([w, Math.max(-85, b.getSouth()), e, Math.min(85, b.getNorth())]);
+    if (res) {
+      setPublicAir(res.aircraft);
+      setPartial(res.partial);
+      setCoverage({ pending: res.pending, ageS: res.ageS });
+      // areas still filling in: look again soon instead of waiting a full cycle
+      if (res.pending > 0) { clearTimeout(fillTimer.current); fillTimer.current = setTimeout(() => loadPublicRef.current?.(true), 6000); }
+    }
+    const c = map.getCenter();
     const g = await groundElevation(c.lat, c.lng);
     if (g != null) setGroundRef(g);
   }, [getMap]);
+  loadPublicRef.current = loadPublic;
+  useEffect(() => () => clearTimeout(fillTimer.current), []);
   const loadOwn = useCallback(async () => setOwnAir(await fetchOwnAir()), []);
 
   useEffect(() => {
     if (!on || !ready) return;
     let cancelled = false;
     setLoading(true);
-    Promise.all([loadPublic(), loadOwn()]).finally(() => { if (!cancelled) setLoading(false); });
+    Promise.all([loadPublic(true), loadOwn()]).finally(() => { if (!cancelled) setLoading(false); });
     const id = setInterval(() => { loadPublic(); loadOwn(); }, POLL_MS);
     const ch = supabase.channel(`air-tracks-${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'air_tracks' }, () => loadOwn())
       .subscribe();
     const map = getMap();
-    const onMove = () => { zoomRef.current = map.getZoom(); setViewTick(v => v + 1); loadPublic(); };
+    const onMove = () => { zoomRef.current = map.getZoom(); setViewTick(v => v + 1); loadPublic(true); };
     map?.on('moveend', onMove);
     return () => { cancelled = true; clearInterval(id); supabase.removeChannel(ch); map?.off('moveend', onMove); };
   }, [on, ready, loadPublic, loadOwn, getMap]);
@@ -151,9 +202,85 @@ export const AirspacePanel = ({ getMap, ready }) => {
     try { if (map?.getLayer(LAYER)) map.removeLayer(LAYER); if (map?.getSource(SRC)) map.removeSource(SRC); } catch { /* map gone */ }
   }, [getMap]);
 
-  // ---------- map: dots + decluttered name tags ----------
-  // Every aircraft gets a dot. A name tag is shown only when zoomed in enough
-  // and only where it does not cover another tag; conflicts and drones win.
+  // ---------- map: plane symbols drawn by the map itself ----------
+  // Each aircraft is a symbol at its true position, rotated to its track and
+  // sized with the zoom — the map draws thousands without piling up. Hover
+  // (or tap) shows callsign, registration, type, height and speed.
+  const popupRef = useRef(null);
+  const describe = useCallback((p) => {
+    const esc = (s) => String(s ?? '').replace(/[<>&"]/g, '');
+    const first = [p.callsign, p.registration && `${t('air.reg')} ${p.registration}`, p.model].filter(Boolean).map(esc).join(' · ') || esc(p.name);
+    const second = [p.alt, p.speed != null && p.speed !== '' && `${p.speed} km/h`, p.hdg != null && p.hdg !== '' && `${p.hdg}°`].filter(Boolean).map(esc).join(' · ');
+    return `<div style="font:12px system-ui;color:#0f172a"><b>${first}</b><br/>${second}<br/><span style="color:#64748b">${esc(t(`air.kind.${p.kind}`))} · ${esc(t(`air.src.${p.source}`))}</span></div>`;
+  }, [t]);
+  const describeRef = useRef(describe);
+  describeRef.current = describe;
+  const handlersRef = useRef(false);
+
+  useEffect(() => {
+    const map = getMap();
+    if (!map || !ready) return;
+    const remove = () => {
+      try { if (map.getLayer(PTS_LAYER)) map.removeLayer(PTS_LAYER); if (map.getSource(PTS_SRC)) map.removeSource(PTS_SRC); } catch { /* map gone */ }
+      popupRef.current?.remove();
+    };
+    if (!on) { remove(); return; }
+    const features = tracks.filter(a => Number.isFinite(a.lat) && Number.isFinite(a.lng)).map(a => {
+      const danger = conflictIds.has(a.id);
+      const shape = ['aircraft', 'helicopter'].includes(a.kind) ? 'plane' : 'dot';
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+        properties: {
+          id: a.id, img: `wt-air-${shape}-${danger ? 'conflict' : (KIND_COLOR[a.kind] ? a.kind : 'other')}`,
+          rot: shape === 'plane' ? Math.round(a.heading ?? 0) : 0, danger: danger ? 1 : 0,
+          name: nameOf(a), callsign: a.callsign ?? '', registration: a.registration ?? '', model: a.model ?? '',
+          alt: a.source === 'declared' ? `≤${Math.round(a.ceiling_m ?? 0)} m` : metres(a.alt_msl_m),
+          speed: a.speed_kmh != null ? Math.round(a.speed_kmh) : '', hdg: a.heading != null ? Math.round(a.heading) : '',
+          kind: a.kind ?? 'other', source: a.source ?? 'public',
+        },
+      };
+    });
+    const fc = { type: 'FeatureCollection', features };
+    try {
+      ensureAirIcons(map);
+      if (map.getSource(PTS_SRC)) { map.getSource(PTS_SRC).setData(fc); return; }
+      map.addSource(PTS_SRC, { type: 'geojson', data: fc });
+      map.addLayer({
+        id: PTS_LAYER, type: 'symbol', source: PTS_SRC,
+        layout: {
+          'icon-image': ['get', 'img'],
+          'icon-rotate': ['get', 'rot'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'symbol-sort-key': ['get', 'danger'],
+          // small over a continent, larger as you zoom in
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.32, 5, 0.45, 8, 0.65, 11, 0.85, 14, 1.05],
+        },
+      });
+      if (handlersRef.current) return; // hover / tap handlers live on the map, once
+      handlersRef.current = true;
+      const show = (e) => {
+        const f = e.features?.[0];
+        if (!f) return;
+        map.getCanvas().style.cursor = 'pointer';
+        if (!popupRef.current) popupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: '260px' });
+        popupRef.current.setLngLat(f.geometry.coordinates).setHTML(describeRef.current(f.properties)).addTo(map);
+      };
+      map.on('mousemove', PTS_LAYER, show);
+      map.on('mouseleave', PTS_LAYER, () => { map.getCanvas().style.cursor = ''; popupRef.current?.remove(); });
+      map.on('click', PTS_LAYER, (e) => { show(e); const id = e.features?.[0]?.properties?.id; if (id) setSelected(id); });
+    } catch { /* style not ready yet — the next update retries */ }
+  }, [on, ready, tracks, conflictIds, getMap]);
+  useEffect(() => () => {
+    const map = getMap();
+    try { if (map?.getLayer(PTS_LAYER)) map.removeLayer(PTS_LAYER); if (map?.getSource(PTS_SRC)) map.removeSource(PTS_SRC); } catch { /* map gone */ }
+    popupRef.current?.remove();
+  }, [getMap]);
+
+  // ---------- name tags (zoomed in, or in conflict) ----------
+  // Only where a tag does not cover another one; conflicts and drones first.
   useEffect(() => {
     const map = getMap();
     const markers = markersRef.current;
@@ -161,21 +288,20 @@ export const AirspacePanel = ({ getMap, ready }) => {
     const zoom = map.getZoom();
     const rank = (a) => (conflictIds.has(a.id) ? 0 : a.kind === 'drone' ? 1 : a.kind === 'helicopter' ? 2 : 3) * 1e6 + (a.alt_msl_m ?? 0);
     const placed = [];
-    const seen = new Set();
+    const keep = new Set();
+    const canvas = map.getCanvas();
     for (const a of [...tracks].sort((x, y) => rank(x) - rank(y))) {
-      seen.add(a.id);
       const danger = conflictIds.has(a.id);
-      const color = danger ? '#ef4444' : KIND_COLOR[a.kind] ?? '#94a3b8';
+      if (!(zoom >= LABEL_MIN_ZOOM || (danger && zoom >= 4)) || placed.length >= MAX_LABELS) continue;
+      const p = map.project([a.lng, a.lat]);
+      if (p.x < 0 || p.y < 0 || p.x > canvas.clientWidth || p.y > canvas.clientHeight) continue;
       const name = nameOf(a).replace(/[<>&]/g, '');
       const alt = a.source === 'declared' ? `≤${Math.round(a.ceiling_m ?? 0)} m` : metres(a.alt_msl_m);
-      // name tag only if zoomed in (or in conflict) and there is room for it
-      let label = (zoom >= LABEL_MIN_ZOOM || (danger && zoom >= 4)) && placed.length < MAX_LABELS;
-      if (label) {
-        const p = map.project([a.lng, a.lat]);
-        const box = { x: p.x + 6, y: p.y - 22, w: 34 + (name.length + alt.length) * 6.2, h: 18 };
-        label = !placed.some(b => box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y);
-        if (label) placed.push(box);
-      }
+      const box = { x: p.x + 10, y: p.y - 9, w: 22 + (name.length + alt.length) * 6.2, h: 18 };
+      if (placed.some(b => box.x < b.x + b.w && box.x + box.w > b.x && box.y < b.y + b.h && box.y + box.h > b.y)) continue;
+      placed.push(box);
+      keep.add(a.id);
+      const color = danger ? '#ef4444' : KIND_COLOR[a.kind] ?? '#94a3b8';
       let m = markers.get(a.id);
       if (!m) {
         const el = document.createElement('button');
@@ -184,27 +310,15 @@ export const AirspacePanel = ({ getMap, ready }) => {
         // through the inline transform, so the style must never be rewritten later
         el.style.cssText = 'display:flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap;font:11px system-ui;color:#fff;background:transparent;border:0;padding:0';
         el.addEventListener('click', (e) => { e.stopPropagation(); setSelected(a.id); });
-        m = new maplibregl.Marker({ element: el, anchor: 'left', offset: [-9, 0] }).setLngLat([a.lng, a.lat]).addTo(map);
+        m = new maplibregl.Marker({ element: el, anchor: 'left', offset: [10, 0] }).setLngLat([a.lng, a.lat]).addTo(map);
         markers.set(a.id, m);
       } else {
         m.setLngLat([a.lng, a.lat]);
       }
-      const el = m.getElement();
-      // hover: who it is — callsign, registration, type, height, speed
-      el.title = [
-        [a.callsign, a.registration && `${t('air.reg')} ${a.registration}`, a.model].filter(Boolean).join(' · ') || name,
-        [alt, a.speed_kmh != null && `${Math.round(a.speed_kmh)} km/h`, a.heading != null && `${Math.round(a.heading)}°`].filter(Boolean).join(' · '),
-        t(`air.kind.${a.kind}`),
-      ].filter(Boolean).join('\n');
-      // aircraft and helicopters: a small plane pointing where it flies; drones and others: a dot
-      const icon = ['aircraft', 'helicopter'].includes(a.kind)
-        ? `<svg viewBox="0 0 24 24" width="18" height="18" style="flex:none;transform:rotate(${Math.round(a.heading ?? 0)}deg);filter:drop-shadow(0 0 1px #020617)${danger ? ' drop-shadow(0 0 4px #ef4444)' : ''}"><path d="M12 1.5c.8 0 1.4.9 1.4 2.2v5.6l8.1 4.6v2.2l-8.1-2.4v4.6l2.3 1.7v1.8L12 20.6l-3.7 1.2V20l2.3-1.7v-4.6l-8.1 2.4v-2.2l8.1-4.6V3.7c0-1.3.6-2.2 1.4-2.2z" fill="${color}" stroke="#020617" stroke-width="0.8"/></svg>`
-        : `<span style="width:10px;height:10px;border-radius:50%;background:${color};border:1.5px solid #020617;flex:none${danger ? ';box-shadow:0 0 0 3px rgba(239,68,68,.45)' : ''}"></span>`;
-      el.innerHTML = icon
-        + (label ? `<span style="display:flex;gap:4px;align-items:center;padding:1px 6px;border-radius:9px;background:rgba(2,6,23,.85);border:1.5px solid ${color}"><span style="font-weight:600">${name}</span><span style="opacity:.8">${alt}</span></span>` : '');
+      m.getElement().innerHTML = `<span style="display:flex;gap:4px;align-items:center;padding:1px 6px;border-radius:9px;background:rgba(2,6,23,.85);border:1.5px solid ${color}"><span style="font-weight:600">${name}</span><span style="opacity:.8">${alt}</span></span>`;
     }
-    for (const [id, m] of markers) if (!seen.has(id)) { m.remove(); markers.delete(id); }
-  }, [on, ready, tracks, conflictIds, getMap, viewTick, t]);
+    for (const [id, m] of markers) if (!keep.has(id)) { m.remove(); markers.delete(id); }
+  }, [on, ready, tracks, conflictIds, getMap, viewTick]);
   useEffect(() => () => { markersRef.current.forEach(m => m.remove()); markersRef.current.clear(); }, []);
 
   // ---------- 3D view ----------
@@ -357,9 +471,10 @@ export const AirspacePanel = ({ getMap, ready }) => {
             </div>
           )}
           {on && tooWide && <p className="text-[11px] text-amber-300 leading-snug">{t('air.zoomIn')}</p>}
-          {coverKm != null && !tooWide && (
+          {on && !tooWide && (
             <p className="text-[10px] text-slate-400 leading-snug">
-              {t('air.coverage', { km: coverKm })}{(getMap()?.getZoom?.() ?? 8) < LABEL_MIN_ZOOM && ` ${t('air.zoomForNames')}`}
+              {coverage.pending > 0 ? t('air.filling', { n: coverage.pending }) : partial ? t('air.partial') : t('air.coverageView')}
+              {coverage.pending === 0 && coverage.ageS > 45 && ` ${t('air.age', { s: coverage.ageS })}`} {t('air.zoomForNames')}
             </p>
           )}
           <p className="text-[9px] text-slate-600 leading-snug">{t('air.note')}</p>
