@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getOrgId } from '../lib/org';
 
 // Real presence: who actually has Watchtower open right now.
 // Uses Supabase Realtime Presence — each signed-in client tracks
@@ -22,7 +23,7 @@ async function start() {
     if (!user) return;
     let orgId = localStorage.getItem('watchtower-org-id');
     if (!orgId) {
-      const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+      const prof = { org_id: await getOrgId() }; // company being worked in (0040)
       orgId = prof?.org_id;
       if (orgId) localStorage.setItem('watchtower-org-id', orgId);
     }

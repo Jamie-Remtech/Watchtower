@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { setCachedOrgId } from '../lib/org';
+import { setCachedOrgId, effectiveOrgOf } from '../lib/org';
 
 const AuthContext = createContext(null);
 
@@ -15,9 +15,12 @@ export const AuthProvider = ({ children }) => {
       .select('*')
       .eq('id', userId)
       .single();
+    // Platform staff viewing another company (0040): every screen works in
+    // that company (org_id); home_org_id keeps their own.
+    const prof = data ? { ...data, home_org_id: data.org_id, org_id: effectiveOrgOf(data), viewing: effectiveOrgOf(data) !== data.org_id } : null;
     // Cache the company before anything renders that queries it
-    if (data?.org_id) setCachedOrgId(data.org_id);
-    setProfile(data ?? null);
+    if (prof?.org_id) setCachedOrgId(prof.org_id);
+    setProfile(prof);
   }, []);
 
   useEffect(() => {

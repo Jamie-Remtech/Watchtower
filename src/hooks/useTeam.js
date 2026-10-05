@@ -80,7 +80,7 @@ export const useTeam = () => {
 
   const createInvitation = useCallback(async ({ role, email }) => {
     const me = (await supabase.auth.getUser()).data?.user;
-    const { data: myProfile } = await supabase.from('profiles').select('org_id').eq('id', me.id).single();
+    const myProfile = { org_id: await getOrgId() }; // company being worked in (0040)
     const { data, error } = await supabase
       .from('invitations')
       .insert({ org_id: myProfile.org_id, role, email: email || null, invited_by: me.id })
@@ -115,8 +115,7 @@ export const useTeam = () => {
   const createTeam = useCallback(async (name) => {
     let orgId = localStorage.getItem('watchtower-org-id');
     if (!orgId) {
-      const me = (await supabase.auth.getUser()).data?.user;
-      const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', me?.id).single();
+      const prof = { org_id: await getOrgId() }; // company being worked in (0040)
       orgId = prof?.org_id;
     }
     const { error } = await supabase.from('teams').insert({ org_id: orgId, name });

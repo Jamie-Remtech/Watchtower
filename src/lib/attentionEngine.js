@@ -5,6 +5,7 @@ import { logEvent } from './eventLog';
 import { pushToTeam, localNotify } from './push';
 import { categoryOfItem } from './notifyPrefs';
 import { findProtocolForItem, startProtocolRun } from './protocols';
+import { getOrgId } from './org';
 
 // ============================================
 // ATTENTION ENGINE v1
@@ -50,7 +51,7 @@ export async function runAttentionSweep() {
   if (!isSupabaseConfigured) return { raised: 0 };
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { raised: 0 };
-  const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+  const prof = { org_id: await getOrgId() }; // company being worked in (0040)
   const orgId = prof?.org_id;
   if (!orgId) return { raised: 0 };
 

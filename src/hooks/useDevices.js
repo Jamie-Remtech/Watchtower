@@ -33,8 +33,7 @@ export const useDevices = () => {
   useEffect(() => { refresh(); }, [refresh]);
 
   const createDevice = useCallback(async ({ name, kind, status, lat, lng }) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     const cost = DEVICE_KINDS.find(k => k.id === kind)?.cost ?? 1;
     const { data, error } = await supabase
       .from('devices')

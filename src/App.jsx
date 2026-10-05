@@ -21,6 +21,7 @@ import { findProtocolForItem, startProtocolRun } from './lib/protocols';
 import { AttentionPanel } from './components/AttentionPanel';
 import { CheckInPrompt } from './components/CheckInPrompt';
 import { BroadcastBanner } from './components/Broadcasts';
+import { CompanySwitcher, ViewingBanner } from './components/CompanySwitcher';
 import { NotificationSettings } from './components/NotificationSettings';
 import { AppearanceSettings } from './components/AppearanceSettings';
 import { saveAppearance, hasLocalAppearance, DEFAULT_APPEARANCE } from './theme/theme';
@@ -346,13 +347,7 @@ const WatchtowerPortal = () => {
         </div>
         
         <div className="px-3 py-2 border-b border-slate-800">
-          <div className="px-2 py-1.5 bg-slate-800/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-medium text-white text-xs">{org.name}</span>
-              {org.region && <span className="text-xs text-slate-500">· {org.region}</span>}
-            </div>
-          </div>
+          <CompanySwitcher org={org} />
         </div>
         
         <nav className="flex-1 px-2 py-1.5 overflow-y-auto">
@@ -428,6 +423,7 @@ const WatchtowerPortal = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 wt-under-header lg:pt-0">
+        <ViewingBanner org={org} />
         {isStaff && towerAgeMin != null && towerAgeMin > 15 && (
           <div className="bg-red-600 text-white text-xs font-semibold px-4 py-2 flex items-center gap-2 flex-shrink-0" role="alert">
             <AlertTriangle className="w-4 h-4 shrink-0" />

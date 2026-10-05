@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { enqueueEvent } from './offlineQueue';
+import { getOrgId } from './org';
 
 const ORG_CACHE_KEY = 'watchtower-org-id';
 
@@ -16,7 +17,7 @@ export async function logEvent(type, payload = {}, subject = null) {
     if (!user) return;
     let orgId = localStorage.getItem(ORG_CACHE_KEY);
     if (!orgId) {
-      const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+      const prof = { org_id: await getOrgId() }; // company being worked in (0040)
       orgId = prof?.org_id;
       if (orgId) localStorage.setItem(ORG_CACHE_KEY, orgId);
     }

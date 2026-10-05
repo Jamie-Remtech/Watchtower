@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
+import { getOrgId } from '../lib/org';
 
 // Saved tactical views ("fronts"): shared org-wide, realtime-synced so
 // every operator, tab, and popped-out window shows the same list.
@@ -27,7 +28,7 @@ export const useMapViews = () => {
 
   const createView = useCallback(async ({ name, lat, lng, zoom, map_mode }) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     const { data, error } = await supabase
       .from('map_views')
       .insert({ org_id: prof.org_id, name, lat, lng, zoom, map_mode, created_by: user.id })

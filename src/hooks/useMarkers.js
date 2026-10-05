@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
+import { getOrgId } from '../lib/org';
 
 // Marker kinds a rescuer actually needs, one tap away. Ids are stored on
 // markers rows — never rename one. 'poi' must stay last (the fallback).
@@ -71,7 +72,7 @@ export const useMarkers = () => {
 
   const createMarker = useCallback(async ({ kind, label, lat, lng, notes = null }) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     const { data, error } = await supabase
       .from('markers')
       .insert({ org_id: prof.org_id, kind, label, notes, lat, lng, created_by: user.id })
@@ -87,7 +88,7 @@ export const useMarkers = () => {
   const createMarkers = useCallback(async (list) => {
     if (!list?.length) return [];
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     const rows = list.map(m => ({ org_id: prof.org_id, kind: m.kind || 'poi', label: m.label ?? '', notes: m.notes ?? null, lat: m.lat, lng: m.lng, created_by: user.id }));
     const { data, error } = await supabase.from('markers').insert(rows).select();
     if (error) throw error;

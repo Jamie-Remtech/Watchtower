@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/AuthContext';
 import { logEvent } from '../lib/eventLog';
 import { useI18n } from '../i18n/index.jsx';
+import { getOrgId } from '../lib/org';
 
 // Viewers (including stood-down members) can knock on the door:
 // the request lands in the admins' attention bell and Activity feed.
@@ -24,7 +25,7 @@ export const RequestAccess = () => {
       const uid = session?.user?.id;
       let orgId = localStorage.getItem('watchtower-org-id');
       if (!orgId) {
-        const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', uid).single();
+        const prof = { org_id: await getOrgId() }; // company being worked in (0040)
         orgId = prof?.org_id;
         if (orgId) localStorage.setItem('watchtower-org-id', orgId);
       }

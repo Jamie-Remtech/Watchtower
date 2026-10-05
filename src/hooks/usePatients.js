@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logEvent } from '../lib/eventLog';
+import { getOrgId } from '../lib/org';
 
 // Multi-casualty roster: realtime-synced patients with SALT triage.
 export const usePatients = () => {
@@ -26,7 +27,7 @@ export const usePatients = () => {
 
   const createPatient = useCallback(async ({ tag = null, lat = null, lng = null } = {}) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     const num = (patients.reduce((m, p) => Math.max(m, p.num), 0) || 0) + 1;
     const { data, error } = await supabase
       .from('patients')

@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { logEvent } from './eventLog';
 import { pushToTeam } from './push';
+import { getOrgId } from './org';
 
 // ============================================
 // Protocol run plumbing shared by the Protocols tab and the
@@ -26,7 +27,7 @@ export async function startProtocolRun(protocol, context = {}) {
   const { data: { user } } = await supabase.auth.getUser();
   let orgId = localStorage.getItem('watchtower-org-id');
   if (!orgId) {
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user?.id).single();
+    const prof = { org_id: await getOrgId() }; // company being worked in (0040)
     orgId = prof?.org_id;
     if (orgId) localStorage.setItem('watchtower-org-id', orgId);
   }
