@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}, {alt} — kilomita {km} {dir} ya {drone}; ukaribu zaidi kilomita {cpa} baada ya sekunde {s}.",
  "air.empty": "Hakuna kitu angani kwenye mwonekano.",
  "air.reg": "Nam.",
+ "air.zoomIn": "Kuza ndani kwenye eneo (kama mkoa au jimbo kwa upana) ili kuona ndege — data ya umma hufunika hadi km 460 kuzunguka kitovu cha ramani. Drone zako, vipokezi, na maonyo ya migongano huonyeshwa kila wakati.",
  "air.coverage": "Data ya umma ya ndege inahusisha {km} km kuzunguka katikati ya ramani — hamisha ramani ili kuona sehemu nyingine.",
  "air.zoomForNames": "Kuza ili kuona majina na urefu; elekeza au gusa ndege kuona nambari yake ya usajili na maelezo.",
  "air.detailAlt": "Kimo {m} ({ft}) juu ya usawa wa bahari · {src}",

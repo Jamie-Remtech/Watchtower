@@ -21,6 +21,7 @@ export default {
   'air.conflictLine': '{kind}, {alt} — {km} km {dir} of {drone}; closest approach {cpa} km in {s} s.',
   'air.empty': 'Nothing airborne in view.',
   'air.reg': 'Reg.',
+  'air.zoomIn': 'Zoom in to a region (about a province or state across) to see aircraft — public data covers up to 460 km around the map centre. Your own drones, receivers and conflict warnings always show.',
   'air.coverage': 'Public aircraft data covers {km} km around the centre of the map — move the map to look elsewhere.',
   'air.zoomForNames': 'Zoom in to see names and heights; hover or tap a plane for its registration and details.',
   'air.detailAlt': 'Altitude {m} ({ft}) above sea level · {src}',

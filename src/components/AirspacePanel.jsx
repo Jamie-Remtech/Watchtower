@@ -22,7 +22,8 @@ const ON_KEY = 'wt-air-on';
 const SRC = 'air-3d';
 const LAYER = 'air-columns';
 const POLL_MS = 10000;
-const LABEL_MIN_ZOOM = 7;   // below this, aircraft are dots (names on hover / tap)
+const AIR_MIN_ZOOM = 6;     // below this (continent view), public aircraft are not drawn
+const LABEL_MIN_ZOOM = 7;   // below this, aircraft are icons only (names on hover / tap)
 const MAX_LABELS = 60;
 
 const square = (lat, lng, half) => {
@@ -58,6 +59,7 @@ export const AirspacePanel = ({ getMap, ready }) => {
   const zoomRef = useRef(8);
   const [viewTick, setViewTick] = useState(0);   // map moved → re-declutter the tags
   const [coverKm, setCoverKm] = useState(null);  // radius of public data around the centre
+  const [tooWide, setTooWide] = useState(false); // zoomed out too far for public aircraft
 
   const toggleOn = () => setOn(v => { try { localStorage.setItem(ON_KEY, v ? '0' : '1'); } catch { /* private mode */ } return !v; });
 
@@ -65,9 +67,14 @@ export const AirspacePanel = ({ getMap, ready }) => {
   const loadPublic = useCallback(async () => {
     const map = getMap();
     if (!map) return;
+    // Public data covers a circle around the map centre (max ~460 km). Zoomed
+    // out to a continent that circle is a few pixels wide and every plane in it
+    // piles up in one spot — so below AIR_MIN_ZOOM only our own feeds show.
+    if (map.getZoom() < AIR_MIN_ZOOM) { setTooWide(true); setCoverKm(null); setPublicAir([]); return; }
+    setTooWide(false);
     const c = map.getCenter();
     const b = map.getBounds();
-    const radius = Math.min(200, Math.max(20, distanceKm({ lat: c.lat, lng: c.lng }, { lat: b.getNorth(), lng: b.getEast() })));
+    const radius = Math.min(460, Math.max(20, distanceKm({ lat: c.lat, lng: c.lng }, { lat: b.getNorth(), lng: b.getEast() })));
     setCoverKm(Math.round(radius));
     setPublicAir(await fetchPublicAir(c.lat, c.lng, radius));
     const g = await groundElevation(c.lat, c.lng);
@@ -187,7 +194,7 @@ export const AirspacePanel = ({ getMap, ready }) => {
       el.title = [
         [a.callsign, a.registration && `${t('air.reg')} ${a.registration}`, a.model].filter(Boolean).join(' · ') || name,
         [alt, a.speed_kmh != null && `${Math.round(a.speed_kmh)} km/h`, a.heading != null && `${Math.round(a.heading)}°`].filter(Boolean).join(' · '),
-        t('air.kind.' + a.kind),
+        t(`air.kind.${a.kind}`),
       ].filter(Boolean).join('\n');
       // aircraft and helicopters: a small plane pointing where it flies; drones and others: a dot
       const icon = ['aircraft', 'helicopter'].includes(a.kind)
@@ -349,7 +356,8 @@ export const AirspacePanel = ({ getMap, ready }) => {
               ))}
             </div>
           )}
-          {coverKm != null && (
+          {on && tooWide && <p className="text-[11px] text-amber-300 leading-snug">{t('air.zoomIn')}</p>}
+          {coverKm != null && !tooWide && (
             <p className="text-[10px] text-slate-400 leading-snug">
               {t('air.coverage', { km: coverKm })}{(getMap()?.getZoom?.() ?? 8) < LABEL_MIN_ZOOM && ` ${t('air.zoomForNames')}`}
             </p>

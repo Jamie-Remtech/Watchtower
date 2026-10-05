@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}, {alt} — {km} km {dir} ng {drone}; pinakamalapit na approach {cpa} km sa {s} s.",
  "air.empty": "Walang eroplanong nakikita sa view.",
  "air.reg": "Reg.",
+ "air.zoomIn": "I-zoom papasok sa isang rehiyon (humigit-kumulang kasinglaki ng isang probinsya o estado) para makita ang mga eroplano — sakop ng pampublikong datos ang hanggang 460 km mula sa gitna ng mapa. Palaging nagpapakita ang sarili mong mga drone, receiver, at mga babala sa conflict.",
  "air.coverage": "Sinasaklaw ng pampublikong data ng eroplano ang {km} km sa paligid ng gitna ng mapa — ilipat ang mapa para tumingin sa ibang lugar.",
  "air.zoomForNames": "I-zoom para makita ang mga pangalan at taas; i-hover o i-tap ang eroplano para sa rehistro at detalye nito.",
  "air.detailAlt": "Altitude {m} ({ft}) mula sa sea level · {src}",

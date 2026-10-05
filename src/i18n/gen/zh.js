@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}，{alt}——位于{drone}以{dir}{km}公里处；{s}秒后最近距离{cpa}公里。",
  "air.empty": "视野内无空中目标。",
  "air.reg": "注册号",
+ "air.zoomIn": "放大到某个区域(约一个省或州的范围)即可查看飞机——公共数据覆盖地图中心周围最多460 km。你自己的无人机、接收设备和冲突预警始终显示。",
  "air.coverage": "公开飞机数据覆盖地图中心周围 {km} 公里范围 — 移动地图以查看其他区域。",
  "air.zoomForNames": "放大查看名称和高度；将鼠标悬停或点击飞机以查看其注册号和详细信息。",
  "air.detailAlt": "海拔高度 {m}（{ft}）· {src}",

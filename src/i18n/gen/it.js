@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}, {alt} — {km} km {dir} di {drone}; massimo avvicinamento {cpa} km in {s} s.",
  "air.empty": "Nessun velivolo in vista.",
  "air.reg": "Reg.",
+ "air.zoomIn": "Esegui lo zoom su una regione (circa l'estensione di una provincia o stato) per vedere gli aeromobili — i dati pubblici coprono fino a 460 km intorno al centro della mappa. I tuoi droni, ricevitori e avvisi di conflitto sono sempre visibili.",
  "air.coverage": "I dati pubblici sugli aerei coprono {km} km intorno al centro della mappa — sposta la mappa per guardare altrove.",
  "air.zoomForNames": "Ingrandisci per vedere nomi e quote; passa il mouse o tocca un velivolo per la sua registrazione e i dettagli.",
  "air.detailAlt": "Altitudine {m} ({ft}) sul livello del mare · {src}",

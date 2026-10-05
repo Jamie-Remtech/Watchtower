@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}, {alt} — {km} km {dir} von {drone}; kürzeste Distanz {cpa} km in {s} s.",
  "air.empty": "Nichts Fliegendes in Sicht.",
  "air.reg": "Kennz.",
+ "air.zoomIn": "Zoome auf eine Region (etwa so groß wie ein Bundesland) heran, um Luftfahrzeuge zu sehen – öffentliche Daten decken bis zu 460 km um den Kartenmittelpunkt ab. Deine eigenen Drohnen, Empfänger und Konfliktwarnungen werden immer angezeigt.",
  "air.coverage": "Öffentliche Flugzeugdaten umfassen {km} km um die Kartenmitte — verschiebe die Karte für andere Bereiche.",
  "air.zoomForNames": "Zoom hinein, um Namen und Höhen zu sehen; Flugzeug antippen oder darauf zeigen für Kennzeichen und Details.",
  "air.detailAlt": "Höhe {m} ({ft}) über dem Meeresspiegel · {src}",

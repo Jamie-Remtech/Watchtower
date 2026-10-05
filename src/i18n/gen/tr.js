@@ -215,6 +215,7 @@ export default {
  "air.conflictLine": "{kind}, {alt} — {km} km {dir} yönünde, {drone}; en yakın yaklaşım {cpa} km, {s} sn içinde.",
  "air.empty": "Görüş alanında havada bir şey yok.",
  "air.reg": "Tescil",
+ "air.zoomIn": "Uçakları görmek için bir bölgeye (yaklaşık bir il veya eyalet genişliğinde) yakınlaş — genel veriler harita merkezi etrafında 460 km'ye kadar kapsar. Kendi dronların, alıcıların ve çakışma uyarıların her zaman gösterilir.",
  "air.coverage": "Halka açık uçak verileri, haritanın merkezi etrafındaki {km} km'yi kapsar — başka bir yeri görmek için haritayı kaydır.",
  "air.zoomForNames": "İsimleri ve yükseklikleri görmek için yakınlaştır; tescil ve ayrıntılar için bir uçağın üzerine gel veya dokun.",
  "air.detailAlt": "İrtifa {m} ({ft}) deniz seviyesinden · {src}",
