@@ -59,7 +59,7 @@ export default {
     [
      "🗺️",
      "Mapa tático e comunicação",
-     "Posições da equipe ao vivo, marcadores, zonas que alertam quando alguém entra, rotas de evacuação e acesso, suas próprias camadas de mapa e importação de KML/GeoJSON. Canais, um diretório de contatos externos, transmissões de emergência com confirmação — e os próprios sistemas da sua empresa conectados: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, gateways de rádio e despacho, um feed CAP."
+     "Posições da equipe ao vivo, marcadores, zonas que avisam quando alguém entra, rotas de evacuação e acesso, suas próprias camadas de mapa e importação de KML/GeoJSON. Canais de grupo, conversas privadas individuais e em grupo, threads de SMS/WhatsApp de contatos externos — cada uma em sua própria lista — transmissões de emergência com confirmação de leitura — e os próprios sistemas da sua empresa conectados: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, gateways de rádio e despacho, um feed CAP."
     ],
     [
      "🩺",
@@ -224,7 +224,7 @@ export default {
     [
      "🗺️",
      "Mapa tático e Comunicação",
-     "O mapa tático mostra sua equipe ao vivo, além de marcadores, zonas e rotas que qualquer um pode desenhar. Comunicações reúne os canais da equipe, seus contatos externos e transmissões de emergência.",
+     "O mapa tático mostra sua equipe ao vivo, além de marcadores, zonas e rotas que qualquer um pode desenhar. A Comunicação lista suas conversas em três grupos — canais e grupos, mensagens diretas, contatos externos — com contagem de não lidas; abra uma para ler e responder. “Nova mensagem” inicia uma conversa privada individual, “Novo grupo” um grupo privado.",
      [
       "Arraste um marcador da paleta",
       "Desenhar → zona, círculo ou rota; uma zona de exclusão alerta quando alguém entra",
@@ -332,7 +332,7 @@ export default {
     [
      "🗺️",
      "Taktische Karte und Kommunikation",
-     "Live-Positionen des Teams, Markierungen, Zonen mit Alarm bei Zutritt, Evakuierungs- und Zufahrtsrouten, eigene Kartenebenen und KML-/GeoJSON-Import. Kanäle, ein Verzeichnis externer Kontakte, Notfall-Rundrufe mit Bestätigung – und die Systeme deines Unternehmens angebunden: SMS, WhatsApp, E-Mail, Teams, Slack, Telegram, PagerDuty, Funk- und Leitstellen-Gateways, ein CAP-Feed."
+     "Live-Positionen des Teams, Markierungen, Zonen mit Alarm bei Betreten, Evakuierungs- und Zufahrtsrouten, eigene Kartenebenen und KML/GeoJSON-Import. Gruppenkanäle, private Einzel- und Gruppengespräche, SMS/WhatsApp-Verläufe externer Kontakte — jeweils in eigener Liste — Notfall-Rundrufe mit Bestätigung — sowie die eigenen Systeme deines Unternehmens angebunden: SMS, WhatsApp, E-Mail, Teams, Slack, Telegram, PagerDuty, Funk- und Einsatzleitstellen-Gateways, ein CAP-Feed."
     ],
     [
      "🩺",
@@ -497,7 +497,7 @@ export default {
     [
      "🗺️",
      "Taktische Karte und Kommunikation",
-     "Die taktische Karte zeigt dein Team live, dazu Markierungen, Zonen und Routen, die jeder einzeichnen kann. Kommunikation enthält die Teamkanäle, deine externen Kontakte und Notfall-Rundrufe.",
+     "Die taktische Karte zeigt dein Team live, dazu Markierungen, Zonen und Routen, die jeder einzeichnen kann. Kommunikation listet deine Gespräche in drei Gruppen — Kanäle und Gruppen, Direktnachrichten, externe Kontakte — mit Anzahl ungelesener Nachrichten; öffne eine, um zu lesen und zu antworten. „Neue Nachricht“ startet ein privates Einzelgespräch, „Neue Gruppe“ eine private Gruppe.",
      [
       "Eine Markierung aus der Palette ziehen",
       "Zeichnen → Zone, Kreis oder Route; eine Sperrzone alarmiert, wenn jemand sie betritt",
@@ -605,7 +605,7 @@ export default {
     [
      "🗺️",
      "Mappa tattica e comunicazioni",
-     "Posizioni della squadra in tempo reale, marcatori, zone che avvisano quando qualcuno vi entra, percorsi di evacuazione e di accesso, i tuoi livelli mappa personalizzati e l'importazione KML/GeoJSON. Canali, una rubrica di contatti esterni, comunicazioni di emergenza con conferma di lettura — e i sistemi della tua azienda collegati: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, gateway radio e di centrale, un feed CAP."
+     "Posizioni live della squadra, marcatori, zone che avvisano quando qualcuno entra, percorsi di evacuazione e accesso, i tuoi livelli mappa personalizzati e l'importazione KML/GeoJSON. Canali di gruppo, conversazioni private individuali e di gruppo, thread SMS/WhatsApp con contatti esterni — ciascuno nella propria lista — comunicazioni di emergenza con conferma di ricezione — e i sistemi della tua azienda collegati: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, gateway radio e di dispatch, un feed CAP."
     ],
     [
      "🩺",
@@ -770,7 +770,7 @@ export default {
     [
      "🗺️",
      "Mappa tattica e Comunicazioni",
-     "La mappa tattica mostra la tua squadra in tempo reale, oltre a marcatori, zone e percorsi che chiunque può disegnare. Comunicazioni contiene i canali della squadra, i tuoi contatti esterni e le comunicazioni di emergenza.",
+     "La mappa tattica mostra la tua squadra in tempo reale, oltre a marcatori, zone e percorsi che chiunque può disegnare. Le comunicazioni elencano le tue conversazioni in tre gruppi — canali e gruppi, messaggi diretti, contatti esterni — con il conteggio dei messaggi non letti; apri una conversazione per leggere e rispondere. \"Nuovo messaggio\" avvia una conversazione privata individuale, \"Nuovo gruppo\" una conversazione privata di gruppo.",
      [
       "Trascina un marcatore dalla tavolozza",
       "Disegna → zona, cerchio o percorso; una zona di esclusione avvisa quando qualcuno vi entra",
@@ -878,7 +878,7 @@ export default {
     [
      "🗺️",
      "Тактична карта та зв'язок",
-     "Позиції команди в реальному часі, маркери, зони з сповіщенням при вході, маршрути евакуації та під'їзду, власні шари карти й імпорт KML/GeoJSON. Канали, довідник зовнішніх контактів, екстрені розсилки з підтвердженням — і підключені системи твоєї компанії: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, радіо- та диспетчерські шлюзи, канал CAP."
+     "Позиції екіпажів у реальному часі, маркери, зони зі сповіщенням про вхід, маршрути евакуації та під'їзду, власні шари карти та імпорт KML/GeoJSON. Групові канали, приватні особисті й групові розмови, SMS/WhatsApp-переписки із зовнішніми контактами — кожні у своєму списку — екстрені розсилки з підтвердженням отримання — і підключені системи твоєї компанії: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, радіо- та диспетчерські шлюзи, канал CAP."
     ],
     [
      "🩺",
@@ -1043,7 +1043,7 @@ export default {
     [
      "🗺️",
      "Тактична карта та Зв'язок",
-     "Тактична карта показує твою команду в реальному часі, а також маркери, зони й маршрути, які можна малювати. Зв'язок містить канали команди, зовнішні контакти та екстрені розсилки.",
+     "Тактична карта показує твою команду в реальному часі, а також маркери, зони й маршрути, які може малювати будь-хто. Зв'язок показує твої розмови у трьох групах — канали й групи, особисті повідомлення, зовнішні контакти — з лічильником непрочитаних; відкрий, щоб прочитати й відповісти. «Нове повідомлення» починає приватну розмову один на один, «Нова група» — приватну групу.",
      [
       "Перетягни позначку з палітри",
       "Малювати → зона, коло або маршрут; зона виключення сповіщає, коли хтось заходить",
@@ -1151,7 +1151,7 @@ export default {
     [
      "🗺️",
      "Mapa taktyczna i łączność",
-     "Pozycje ekip na żywo, znaczniki, strefy alarmujące przy wejściu, trasy ewakuacji i dojazdu, własne warstwy mapy oraz import KML/GeoJSON. Kanały, katalog kontaktów zewnętrznych, komunikaty alarmowe z potwierdzeniem odbioru — oraz podłączone systemy Twojej firmy: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, bramki radiowe i dyspozytorskie, kanał CAP."
+     "Pozycje zespołu na żywo, znaczniki, strefy alarmujące o wejściu, trasy ewakuacji i dojazdu, własne warstwy mapy oraz import KML/GeoJSON. Kanały grupowe, prywatne rozmowy indywidualne i grupowe, wątki SMS/WhatsApp z kontaktami zewnętrznymi — każde na osobnej liście — alarmy awaryjne z potwierdzeniem odbioru — oraz podłączone systemy twojej firmy: SMS, WhatsApp, e-mail, Teams, Slack, Telegram, PagerDuty, bramki radiowe i dyspozytorskie, kanał CAP."
     ],
     [
      "🩺",
@@ -1316,7 +1316,7 @@ export default {
     [
      "🗺️",
      "Mapa taktyczna i Komunikacja",
-     "Mapa taktyczna pokazuje Twój zespół na żywo oraz znaczniki, strefy i trasy, które może narysować każdy. Komunikacja zawiera kanały zespołu, kontakty zewnętrzne i komunikaty alarmowe.",
+     "Mapa taktyczna pokazuje twój zespół na żywo, a także znaczniki, strefy i trasy, które każdy może narysować. Komunikacja wyświetla twoje rozmowy w trzech grupach — kanały i grupy, wiadomości prywatne, kontakty zewnętrzne — z liczbą nieprzeczytanych; otwórz, aby przeczytać i odpowiedzieć. „Nowa wiadomość” rozpoczyna prywatną rozmowę jeden na jeden, „Nowa grupa” — grupę prywatną.",
      [
       "Przeciągnij znacznik z palety",
       "Rysuj → strefę, okrąg lub trasę; strefa zakazana alarmuje, gdy ktoś do niej wejdzie",
@@ -1424,7 +1424,7 @@ export default {
     [
      "🗺️",
      "Taktik harita ve iletişim",
-     "Canlı ekip konumları, işaretler, birisi girdiğinde uyaran bölgeler, tahliye ve erişim rotaları, kendi harita katmanların ve KML/GeoJSON içe aktarma. Kanallar, bir dış kişiler rehberi, onaylı acil durum yayınları — ve şirketinin kendi sistemleri entegre: SMS, WhatsApp, e-posta, Teams, Slack, Telegram, PagerDuty, telsiz ve sevk ağ geçitleri, bir CAP akışı."
+     "Canlı ekip konumları, işaretler, birisi girdiğinde uyarı veren bölgeler, tahliye ve erişim güzergahları, kendi harita katmanların ve KML/GeoJSON içe aktarma. Grup kanalları, özel birebir ve grup konuşmaları, dış kişilerin SMS/WhatsApp yazışmaları — her biri kendi listesinde — onaylamalı acil durum yayınları — ve şirketinin kendi sistemleri bağlı: SMS, WhatsApp, e-posta, Teams, Slack, Telegram, PagerDuty, telsiz ve sevk ağ geçitleri, bir CAP akışı."
     ],
     [
      "🩺",
@@ -1589,7 +1589,7 @@ export default {
     [
      "🗺️",
      "Taktik harita ve İletişim",
-     "Taktik harita ekibini canlı gösterir, ayrıca herkesin çizebileceği işaretler, bölgeler ve rotalar. İletişim, ekip kanallarını, dış kişilerini ve acil durum yayınlarını barındırır.",
+     "Taktik harita ekibini canlı gösterir, ayrıca herkesin çizebileceği işaretler, bölgeler ve güzergahlar. İletişim, konuşmalarını üç grupta listeler — kanallar ve gruplar, direkt mesajlar, dış kişiler — okunmamış sayılarıyla birlikte; okumak ve yanıtlamak için birini aç. “Yeni mesaj” özel birebir bir konuşma başlatır, “Yeni grup” ise özel bir grup.",
      [
       "Paletten bir işaret sürükle",
       "Çiz → bölge, çember veya rota; bir dışlama bölgesi birisi içeri girdiğinde uyarır",
@@ -1697,7 +1697,7 @@ export default {
     [
      "🗺️",
      "خريطة تكتيكية واتصالات",
-     "مواقع الفرق المباشرة، العلامات، والمناطق التي تنبّه عند دخول أحد إليها، مسارات الإخلاء والوصول، طبقات الخرائط الخاصة بك واستيراد KML/GeoJSON. القنوات، دليل جهات الاتصال الخارجية، البث الطارئ مع تأكيد الاستلام — وأنظمة شركتك المتصلة: SMS، واتساب، البريد الإلكتروني، Teams، Slack، Telegram، PagerDuty، بوابات اللاسلكي والإرسال، وتغذية CAP."
+     "مواقع الطاقم المباشرة، العلامات، والمناطق التي تنبّهك عند دخول أحد إليها، مسارات الإخلاء والوصول، طبقات الخريطة الخاصة بك واستيراد KML/GeoJSON. قنوات المجموعات، المحادثات الخاصة الفردية والجماعية، مواضيع SMS/WhatsApp مع جهات الاتصال الخارجية — كل منها في قائمته الخاصة — البلاغات الطارئة مع إقرار الاستلام — وأنظمة شركتك المتصلة: SMS وWhatsApp والبريد الإلكتروني وTeams وSlack وTelegram وPagerDuty وبوابات اللاسلكي والإرسال، وتغذية CAP."
     ],
     [
      "🩺",
@@ -1862,7 +1862,7 @@ export default {
     [
      "🗺️",
      "الخريطة التكتيكية والاتصالات",
-     "تعرض الخريطة التكتيكية فريقك مباشرة، إضافة إلى العلامات والمناطق والمسارات التي يمكن لأي شخص رسمها. يضم قسم الاتصالات قنوات الفريق وجهات اتصالك الخارجية والبث الطارئ.",
+     "تعرض الخريطة التكتيكية فريقك مباشرة، بالإضافة إلى العلامات والمناطق والمسارات التي يمكن لأي شخص رسمها. يسرد قسم الاتصالات محادثاتك في ثلاث مجموعات — القنوات والمجموعات، الرسائل المباشرة، وجهات الاتصال الخارجية — مع عدد الرسائل غير المقروءة؛ افتح إحداها للقراءة والرد. يبدأ \"رسالة جديدة\" محادثة خاصة فردية، و\"مجموعة جديدة\" مجموعة خاصة.",
      [
       "اسحب علامة من اللوحة",
       "ارسم ← منطقة أو دائرة أو مسارًا؛ منطقة محظورة تنبّه عند دخول أحد إليها",
@@ -1970,7 +1970,7 @@ export default {
     [
      "🗺️",
      "सामरिक मानचित्र और संचार",
-     "लाइव क्रू पोज़िशन, मार्कर, ऐसे ज़ोन जो किसी के घुसने पर अलर्ट करें, निकासी और पहुँच मार्ग, तेरी अपनी मैप लेयर और KML/GeoJSON इम्पोर्ट। चैनल, बाहरी संपर्कों की डायरेक्टरी, पावती सहित इमरजेंसी ब्रॉडकास्ट — और तेरी कंपनी के अपने सिस्टम जुड़े हुए: SMS, WhatsApp, ईमेल, Teams, Slack, Telegram, PagerDuty, रेडियो और डिस्पैच गेटवे, एक CAP फ़ीड।"
+     "लाइव क्रू स्थितियाँ, मार्कर, ज़ोन जो किसी के प्रवेश करने पर अलर्ट करते हैं, निकासी और पहुँच मार्ग, आपके अपने मैप लेयर और KML/GeoJSON इम्पोर्ट। ग्रुप चैनल, निजी डायरेक्ट और ग्रुप वार्तालाप, बाहरी संपर्कों की SMS/WhatsApp थ्रेड — हर एक अपनी सूची में — पावती सहित इमरजेंसी ब्रॉडकास्ट — और आपकी कंपनी के अपने सिस्टम जुड़े हुए: SMS, WhatsApp, ईमेल, Teams, Slack, Telegram, PagerDuty, रेडियो और डिस्पैच गेटवे, एक CAP फ़ीड।"
     ],
     [
      "🩺",
@@ -2135,7 +2135,7 @@ export default {
     [
      "🗺️",
      "टैक्टिकल मैप और कम्यूनिकेशन",
-     "टैक्टिकल मैप तेरी टीम को लाइव दिखाता है, साथ ही मार्कर, ज़ोन और रूट जो कोई भी बना सकता है। कम्युनिकेशन में टीम चैनल, तेरे बाहरी संपर्क और इमरजेंसी ब्रॉडकास्ट होते हैं।",
+     "टैक्टिकल मैप आपकी टीम को लाइव दिखाता है, साथ ही मार्कर, ज़ोन और मार्ग जिन्हें कोई भी बना सकता है। कम्स आपकी बातचीत को तीन समूहों में सूचीबद्ध करता है — चैनल और ग्रुप, डायरेक्ट मैसेज, बाहरी संपर्क — अपठित गिनती के साथ; पढ़ने और जवाब देने के लिए किसी एक को खोलें। \"नया मैसेज\" एक निजी वन-टू-वन शुरू करता है, \"नया ग्रुप\" एक निजी ग्रुप।",
      [
       "पैलेट से एक मार्कर खींचें",
       "ड्रॉ → ज़ोन, सर्कल या रूट बनाएँ; एक्सक्लूज़न ज़ोन में कोई घुसे तो अलर्ट मिलेगा",
@@ -2243,7 +2243,7 @@ export default {
     [
      "🗺️",
      "战术地图与通讯",
-     "实时队员位置、标记点、有人进入即报警的区域、疏散与进入路线、你自己的地图图层以及 KML/GeoJSON 导入。频道、外部联系人通讯录、需确认的紧急广播——还能接入你公司自己的系统：SMS、WhatsApp、邮件、Teams、Slack、Telegram、PagerDuty、无线电与调度网关、CAP 信息源。"
+     "实时队员位置、标记点、有人进入即报警的区域、撤离与进入路线、你自己的地图图层以及 KML/GeoJSON 导入功能。群组频道、私信与群聊对话、外部联系人的 SMS/WhatsApp 会话——各自独立成列——需确认收悉的紧急广播——以及接入你单位自有系统：SMS、WhatsApp、邮件、Teams、Slack、Telegram、PagerDuty、无线电与调度网关、CAP 信息源。"
     ],
     [
      "🩺",
@@ -2408,7 +2408,7 @@ export default {
     [
      "🗺️",
      "战术地图与通讯",
-     "战术地图实时显示你的团队，还有任何人都可以绘制的标记点、区域和路线。通讯里保存着团队频道、你的外部联系人和紧急广播。",
+     "战术地图实时显示你的队伍，以及任何人都可绘制的标记点、区域和路线。通讯栏将对话分为三组——频道与群组、私信、外部联系人——并显示未读数；点开即可查看并回复。“新建消息”发起一对一私聊，“新建群组”则创建私密群聊。",
      [
       "从标记面板拖出一个标记",
       "绘制 → 区域、圆形或路线；禁入区域在有人进入时会报警",
@@ -2516,7 +2516,7 @@ export default {
     [
      "🗺️",
      "戦術マップと通信",
-     "隊員のリアルタイム位置、マーカー、進入時に警告するゾーン、避難・進入ルート、独自の地図レイヤー、KML/GeoJSONインポート。チャンネル、外部連絡先ディレクトリ、確認応答付き緊急一斉通報 — さらに自社システムとの連携:SMS、WhatsApp、メール、Teams、Slack、Telegram、PagerDuty、無線・指令ゲートウェイ、CAPフィード。"
+     "クルーのライブ位置、マーカー、誰かが進入すると通知するゾーン、避難・進入ルート、自分のマップレイヤー、KML/GeoJSONインポート。グループチャンネル、プライベートな個別・グループ会話、外部連絡先とのSMS/WhatsAppスレッド——それぞれ専用リストで表示——確認応答付きの緊急一斉通知——さらに自社のシステム連携:SMS、WhatsApp、メール、Teams、Slack、Telegram、PagerDuty、無線・指令ゲートウェイ、CAPフィード。"
     ],
     [
      "🩺",
@@ -2681,7 +2681,7 @@ export default {
     [
      "🗺️",
      "戦術マップと連絡",
-     "戦術マップでは、チームの位置をリアルタイムで確認できるほか、誰でも描けるマーカー、ゾーン、ルートを表示します。通信には、チームチャンネル、外部連絡先、緊急一斉通報がまとめられています。",
+     "戦術マップにはチーム全員のライブ位置に加え、誰でも描けるマーカー、ゾーン、ルートが表示される。通信はチャンネル・グループ、ダイレクトメッセージ、外部連絡先の3グループに分かれて会話を一覧表示し、未読数も確認できる。開いて既読・返信が可能。「新規メッセージ」でプライベートな1対1、「新規グループ」でプライベートグループを開始する。",
      [
       "パレットからマーカーをドラッグ",
       "描画 → ゾーン、円、ルートを作成。立入禁止ゾーンは誰かが入ると警告します",
@@ -2789,7 +2789,7 @@ export default {
     [
      "🗺️",
      "Tactical Map at Komunikasyon",
-     "Live na posisyon ng mga crew, markers, mga zone na nag-aalerto kapag may pumasok, mga ruta ng evacuation at access, ang sarili mong mga map layer at KML/GeoJSON import. Mga channel, isang directory ng mga outside contact, mga emergency broadcast na may acknowledgement — at mga sariling sistema ng kumpanya mo na naka-plug in: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, radio at dispatch gateway, isang CAP feed."
+     "Live na mga posisyon ng crew, mga marker, mga zone na nag-aalerto kapag may pumasok, mga ruta ng paglikas at access, ang sarili mong mga layer ng mapa, at pag-import ng KML/GeoJSON. Mga group channel, pribadong direkta at grupong usapan, mga SMS/WhatsApp thread ng mga outside contact — bawat isa sa sariling listahan nito — mga emergency broadcast na may acknowledgement — at mga sariling sistema ng kumpanya mo na naka-plug in: SMS, WhatsApp, email, Teams, Slack, Telegram, PagerDuty, mga radio at dispatch gateway, isang CAP feed."
     ],
     [
      "🩺",
@@ -2954,7 +2954,7 @@ export default {
     [
      "🗺️",
      "Tactical map at Comms",
-     "Ipinapakita ng tactical map ang team mo nang live, kasama ang mga marker, zone at ruta na kahit sino ay maaaring iguhit. Hawak ng Comms ang mga channel ng team, ang mga outside contact mo at ang mga emergency broadcast.",
+     "Ipinapakita ng tactical map ang iyong team nang live, kasama ang mga marker, zone, at ruta na maaaring iguhit ng kahit sino. Nililista ng Comms ang mga usapan mo sa tatlong grupo — mga channel at grupo, direktang mensahe, outside contact — na may bilang ng hindi pa nababasa; buksan ang isa para basahin at sagutin. Nagsisimula ang \"New message\" ng pribadong usapan ng dalawang tao, at ang \"New group\" naman ng pribadong grupo.",
      [
       "I-drag ang marker mula sa palette",
       "Gumuhit → zone, circle, o ruta; isang exclusion zone ay nag-aalerto kapag may pumasok",
@@ -3062,7 +3062,7 @@ export default {
     [
      "🗺️",
      "Ramani ya kiufundi na mawasiliano",
-     "Mahali pa wafanyakazi papo hapo, alama, kanda zinazotoa tahadhari mtu anapoingia, njia za uhamishaji na ufikiaji, tabaka zako za ramani na uingizaji wa KML/GeoJSON. Chaneli, orodha ya mawasiliano ya nje, matangazo ya dharura yenye uthibitisho — na mifumo ya kampuni yako yenyewe ikiunganishwa: SMS, WhatsApp, barua pepe, Teams, Slack, Telegram, PagerDuty, njia za redio na ulandanishaji, mkondo wa CAP."
+     "Nafasi za moja kwa moja za timu, alama, maeneo yanayotoa tahadhari mtu anapoingia, njia za uhamishaji na ufikiaji, tabaka zako za ramani na uingizaji wa KML/GeoJSON. Chaneli za vikundi, mazungumzo binafsi ya moja kwa moja na ya vikundi, minyororo ya SMS/WhatsApp ya watu wa nje — kila moja katika orodha yake — matangazo ya dharura yenye uthibitisho — na mifumo yako ya kampuni iliyounganishwa: SMS, WhatsApp, barua pepe, Teams, Slack, Telegram, PagerDuty, njia za redio na utumaji, mlisho wa CAP."
     ],
     [
      "🩺",
@@ -3227,7 +3227,7 @@ export default {
     [
      "🗺️",
      "Ramani ya mbinu na Mawasiliano",
-     "Ramani ya kiutendaji inaonyesha timu yako papo hapo, pamoja na alama, kanda na njia ambazo yeyote anaweza kuchora. Mawasiliano yana chaneli za timu, mawasiliano yako ya nje na matangazo ya dharura.",
+     "Ramani ya kiufundi inaonyesha timu yako moja kwa moja, pamoja na alama, maeneo na njia ambazo mtu yeyote anaweza kuchora. Mawasiliano huorodhesha mazungumzo yako katika makundi matatu — chaneli na vikundi, ujumbe wa moja kwa moja, watu wa nje — ukiwa na idadi ya ujumbe usiosomwa; fungua mojawapo kusoma na kujibu. “Ujumbe Mpya” huanzisha mazungumzo binafsi ya mtu mmoja kwa mmoja, “Kikundi Kipya” huanzisha kikundi binafsi.",
      [
       "Buruta alama kutoka kwenye palette",
       "Chora → kanda, duara au njia; kanda ya kuzuiwa hutoa tahadhari mtu anapoingia",

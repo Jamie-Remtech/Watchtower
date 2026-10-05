@@ -50,7 +50,9 @@ async function loadItem(type: string, id: string): Promise<Item | null> {
   if (type === 'message') {
     const [m] = await q(`messages?id=eq.${encodeURIComponent(id)}&select=*`);
     if (!m) return null;
-    const [ch] = m.channel_id ? await q(`channels?id=eq.${m.channel_id}&select=name`) : [null];
+    const [ch] = m.channel_id ? await q(`channels?id=eq.${m.channel_id}&select=name,kind`) : [null];
+    // direct and group conversations are private — never relayed to outside systems
+    if (ch && ch.kind && ch.kind !== 'channel') return null;
     let who = m.external_from as string | null;
     if (!who && m.sender) { const [p] = await q(`profiles?id=eq.${m.sender}&select=display_name`); who = p?.display_name ?? null; }
     const where = ch?.name ?? 'All hands';

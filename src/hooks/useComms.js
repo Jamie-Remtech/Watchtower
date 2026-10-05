@@ -32,7 +32,9 @@ const useLiveTable = (table, query, deps = []) => {
 };
 
 export const useChannels = () => {
-  const { rows, refresh } = useLiveTable('channels', q => q.eq('archived', false).order('sort').order('created_at'));
+  // company channels only — direct and group conversations live in useConversations
+  const { rows: all, refresh } = useLiveTable('channels', q => q.eq('archived', false).order('sort').order('created_at'));
+  const rows = all.filter(c => (c.kind ?? 'channel') === 'channel');
   const save = useCallback(async (ch) => {
     const org = await getOrgId();
     const row = { name: ch.name.trim().slice(0, 60), description: ch.description || null, color: ch.color || '#f97316', min_role: ch.min_role || 'field', sort: ch.sort ?? 0 };
