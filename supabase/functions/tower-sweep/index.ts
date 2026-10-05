@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     // drive the live radar/nowcast checks; the last KNOWN position per
     // person (<48 h) drives daily briefs and the forward outlook — a
     // crew member's phone may sleep, but their environment does not.
-    const anchorsByOrg = new Map<string, Array<{ lat: number; lng: number; label: string }>>();
+    const anchorsByOrg = new Map<string, Array<{ lat: number; lng: number; label: string; profileId?: string }>>();
     const peopleByOrg = new Map<string, Array<{ lat: number; lng: number; label: string; profileId: string }>>();
     const seen = new Set<string>();
     for (const p of positions ?? []) {
@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
       const label = nameOf[p.profile_id] ?? 'crew member';
       if (new Date(p.at).getTime() >= freshCutMs) {
         const arr = anchorsByOrg.get(p.org_id) ?? [];
-        arr.push({ lat: p.lat, lng: p.lng, label });
+        arr.push({ lat: p.lat, lng: p.lng, label, profileId: p.profile_id });
         anchorsByOrg.set(p.org_id, arr);
       }
       const ppl = peopleByOrg.get(p.org_id) ?? [];
@@ -347,6 +347,8 @@ Deno.serve(async (req) => {
       }
     };
     const subsOfOrg = (orgId: string) => (subs ?? []).filter((x: Sub) => x.org_id === orgId);
+    // org|label of everyone with rain already recorded in the last ~90 min (loaded on first need)
+    let recentRain: Set<string> | null = null;
     const categoryOf = (c: Cand) =>
       c.kind === 'weather' ? (c.dedupe_key.startsWith('brief:') ? 'briefs' : 'weather') : 'hazard';
     // Who a check-in expects: operational members of its team (or the
@@ -390,7 +392,7 @@ Deno.serve(async (req) => {
             dedupe_key: `radar-rain:${a.label}:${hourBucket}`, severity: 'info', kind: 'weather',
             title: `Rain over ${a.label} now (radar)`,
             detail: `Radar shows precipitation at this exact position (${Math.round(dbz)} dBZ). Source: RainViewer radar composite.`,
-            source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz) },
+            source: { lat: a.lat, lng: a.lng, dbz: Math.round(dbz), profile_id: a.profileId ?? null },
           });
         }
       }
@@ -541,6 +543,24 @@ Deno.serve(async (req) => {
           org_id: org.id, actor_kind: 'system', type: 'attention.raised',
           subject: c.dedupe_key, payload: { severity: c.severity, kind: c.kind, title: c.title, via: 'tower-sweep' },
         });
+        // Rain starting over someone: one push to that person, at the start
+        // of an episode only (no rain recorded over them in the last 90 min).
+        if (c.dedupe_key.startsWith('radar-rain:') && (c.source as { profile_id?: string })?.profile_id) {
+          const label = c.dedupe_key.split(':')[1];
+          if (recentRain === null) {
+            const rows = await q(`attention_items?select=org_id,dedupe_key,created_at&created_at=gte.${new Date(Date.now() - 95 * 60000).toISOString()}&or=(dedupe_key.like.radar-rain:*,dedupe_key.like.radar-heavy:*,dedupe_key.like.radar-storm:*)`);
+            recentRain = new Set((rows ?? []).filter((r: { created_at: string }) => Date.now() - Date.parse(r.created_at) > 60_000)
+              .map((r: { org_id: string; dedupe_key: string }) => `${r.org_id}|${r.dedupe_key.split(':')[1]}`));
+          }
+          if (!recentRain.has(`${org.id}|${label}`)) {
+            const pid = (c.source as { profile_id: string }).profile_id;
+            await sendTo(
+              subsOfOrg(org.id).filter((x: Sub) => x.profile_id === pid),
+              { kind: 'attention', title: '🌦 Rain is starting over you', body: c.detail.slice(0, 140), tag: c.dedupe_key },
+              categoryOf(c), 'warning',
+            );
+          }
+        }
         if (c.severity === 'warning' && c.dedupe_key.startsWith('radar-heavy:')) {
           await sendTo(
             subsOfOrg(org.id),

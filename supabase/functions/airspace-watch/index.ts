@@ -125,15 +125,43 @@ Deno.serve(async (req) => {
     )) ?? [];
     if (!Array.isArray(drones) || !drones.length) return json({ drones: 0, conflicts: [] });
 
-    // aircraft per area: one public query per 0.5° cell with drones, plus each org's receivers
-    const cells = new Map<string, { lat: number; lng: number }>();
-    for (const d of drones) cells.set(`${Math.round(d.lat * 2) / 2},${Math.round(d.lng * 2) / 2}`, { lat: d.lat, lng: d.lng });
+    // Public aircraft come from the shared cell cache (air_cells, kept fresh
+    // by air-cells at a polite 1 request/s — the public networks refuse
+    // bursts). Drone areas are marked "fine" so their cells refresh every
+    // ~15 s; a cell with no data yet is fetched right here, once.
+    const CELL_LAT = 5;
+    const stepAt = (edge: number) => Math.ceil(CELL_LAT / Math.cos(Math.min(80, Math.abs(edge)) * Math.PI / 180));
+    const cellOf = (lat: number, lng: number) => {
+      const lat0 = Math.floor(lat / CELL_LAT) * CELL_LAT;
+      const step = stepAt(Math.max(Math.abs(lat0), Math.abs(lat0 + CELL_LAT)));
+      const lng0 = Math.floor(lng / step) * step;
+      const clng = ((lng0 + step / 2 + 540) % 360) - 180;
+      return { key: `${lat0}:${step}:${Math.round(clng * 100)}`, lat: lat0 + CELL_LAT / 2, lng: +clng.toFixed(3) };
+    };
+    const cells = new Map<string, { key: string; lat: number; lng: number }>();
+    for (const d of drones) {
+      // the drone's cell and its neighbours' within ~40 km
+      for (const [dy, dx] of [[0, 0], [0.4, 0], [-0.4, 0], [0, 0.5], [0, -0.5]]) { const c = cellOf(d.lat + dy, d.lng + dx); cells.set(c.key, c); }
+    }
+    const nowIso = new Date().toISOString();
+    await fetch(`${supaUrl}/rest/v1/air_cells?on_conflict=key`, {
+      method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([...cells.values()].map(c => ({ ...c, wanted_at: nowIso, want_fine_at: nowIso }))),
+    });
+    const rows: any[] = await q(`air_cells?key=in.(${encodeURIComponent([...cells.keys()].map(k => `"${k}"`).join(','))})&select=key,at,ac`);
     const publicAir: Track[] = [];
+    const have = new Set<string>();
+    for (const r of rows ?? []) {
+      if (!r.at || !Array.isArray(r.ac) || nowMs - Date.parse(r.at) > 90_000) continue;
+      have.add(r.key);
+      for (const a of r.ac) publicAir.push({ id: `icao:${a[0]}`, kind: a[9], callsign: a[1], registration: a[2], lat: a[4], lng: a[5], alt_msl_m: a[6], heading: a[7], speed_kmh: a[8] } as Track);
+    }
     for (const c of cells.values()) {
-      try {
-        const r = await fetch(`https://api.adsb.lol/v2/point/${c.lat.toFixed(3)}/${c.lng.toFixed(3)}/40`, { headers: { 'User-Agent': 'Watchtower emergency coordination' } });
-        const d = await r.json();
-        for (const a of d.ac ?? []) { const n = normaliseAdsb(a); if (n) publicAir.push(n); }
+      if (have.has(c.key)) continue;
+      try { // nothing fresh yet: one direct look, small radius around the cell centre's drones
+        const r = await fetch(`https://opendata.adsb.fi/api/v2/lat/${c.lat.toFixed(3)}/lon/${c.lng.toFixed(3)}/dist/250`, { headers: { 'User-Agent': 'Watchtower emergency coordination' } });
+        if (!r.ok) continue;
+        for (const a of (await r.json()).aircraft ?? []) { const n = normaliseAdsb(a); if (n) publicAir.push(n); }
       } catch { /* public feed unavailable — receivers still count */ }
     }
     const recvAir: (Track & { org_id: string })[] = (await q(

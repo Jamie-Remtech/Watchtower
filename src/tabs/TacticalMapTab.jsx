@@ -163,16 +163,35 @@ export const TacticalMapTab = () => {
   const nameOf = Object.fromEntries(liveMembers.map(m => [m.id, m.name]));
   const unitOf = Object.fromEntries(liveMembers.filter(m => m.radioCallsign && m.radioCallsign !== '—').map(m => [m.id, m.radioCallsign]));
 
-  const teamMarkers = teamPositions
-    .filter(p => Date.now() - new Date(p.at) < FRESH_MS)
-    .map(p => ({
-      id: `pos-${p.profile_id}`,
-      name: `${unitOf[p.profile_id] ? `${unitOf[p.profile_id]} · ` : ''}${nameOf[p.profile_id] ?? t('veh.someone')} (${new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})${p.net_quality ? ` · 📶 ${tOr(t, `sig.q.${memberLink(p).quality}`, memberLink(p).quality)}${p.net_rtt_ms != null ? ` ${p.net_rtt_ms} ms` : ''}` : ''}`,
-      type: 'person',
-      status: 'live',
-      position: { lat: p.lat, lng: p.lng },
-      icon: '🧍',
-    }));
+  // Everyone's last known position (last 7 days): live ones normally, older
+  // ones faded with "last seen …"; people of linked companies show theirs.
+  const myOrg = cachedOrgId();
+  const agoText = (iso) => {
+    const m = (Date.now() - Date.parse(iso)) / 60000;
+    return m < 90 ? t('tac.agoMin', { n: Math.max(1, Math.round(m)) }) : m < 2880 ? t('tac.agoH', { n: Math.round(m / 60) }) : t('tac.agoD', { n: Math.round(m / 1440) });
+  };
+  const allCrew = teamPositions
+    .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    .map(p => {
+      const fresh = Date.now() - Date.parse(p.at) < FRESH_MS;
+      const unit = unitOf[p.profile_id] ?? p.callsign;
+      const who = nameOf[p.profile_id] ?? p.display_name ?? t('veh.someone');
+      const company = p.org_id && myOrg && p.org_id !== myOrg ? ` · ${p.company ?? t('tac.linkedCompany')}` : '';
+      const when = fresh ? new Date(p.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('tac.lastSeen', { ago: agoText(p.at) });
+      const link = fresh && p.net_quality ? ` · 📶 ${tOr(t, `sig.q.${memberLink(p).quality}`, memberLink(p).quality)}${p.net_rtt_ms != null ? ` ${p.net_rtt_ms} ms` : ''}` : '';
+      return {
+        id: `pos-${p.profile_id}`,
+        name: `${unit && unit !== '—' ? `${unit} · ` : ''}${who}${company} (${when})${link}`,
+        type: 'person',
+        status: fresh ? 'live' : 'stale',
+        position: { lat: p.lat, lng: p.lng },
+        icon: fresh ? '🧍' : '👤',
+        color: fresh ? undefined : '#64748b',
+        fresh,
+      };
+    });
+  const teamMarkers = allCrew.filter(m => m.fresh);
+  const staleCrew = allCrew.filter(m => !m.fresh);
 
   const tacticalMarkers = liveMarkers.map(m => {
     const meta = markerMeta(m.kind);
@@ -211,7 +230,7 @@ export const TacticalMapTab = () => {
       position: { lat: d.lat, lng: d.lng },
       icon: KIND_ICON[d.kind] ?? '📍',
     })) : []),
-    ...(layers.crew ? teamMarkers : []),
+    ...(layers.crew ? [...teamMarkers, ...staleCrew] : []),
     ...(layers.patients ? patientMarkers : []),
     ...(myPos ? [{ id: 'me', name: t('tac.myPosition'), type: 'person', status: 'here', position: myPos, icon: '📍' }] : []),
   ];
@@ -471,7 +490,7 @@ export const TacticalMapTab = () => {
           <Map className="w-4 h-4 text-orange-400" />
           <h2 className="text-sm font-bold text-white">{t('tac.title')}</h2>
           <span className="text-xs text-slate-500">
-            {t(placed.length === 1 ? 'tac.device1' : 'tac.deviceN', { n: placed.length })} · {t('tac.liveCrew', { n: teamMarkers.length })}
+            {t(placed.length === 1 ? 'tac.device1' : 'tac.deviceN', { n: placed.length })} · {t('tac.liveCrew', { n: teamMarkers.length })}{staleCrew.length > 0 && ` · ${t('tac.lastKnown', { n: staleCrew.length })}`}
           </span>
           {/* Triage board: live casualty counts by SALT category */}
           {Object.keys(triageCounts).length > 0 && (

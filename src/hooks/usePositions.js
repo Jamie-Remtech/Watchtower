@@ -9,16 +9,17 @@ export const usePositions = () => {
   const isLive = isSupabaseConfigured;
   const [latest, setLatest] = useState([]);       // newest fix per profile_id
 
+  // One row per person (their latest fix, last 7 days) — own company and
+  // linked companies — with name, callsign and company (0039).
   const refresh = useCallback(async () => {
     if (!isLive) return;
-    const { data } = await supabase
-      .from('positions')
-      .select('*')
-      .order('at', { ascending: false })
-      .limit(300);
-    if (!data) return;
+    const { data, error } = await supabase.rpc('latest_positions', { p_days: 7 });
+    if (!error && data) { setLatest(data); return; }
+    // older database without 0039: newest fixes overall
+    const { data: rows } = await supabase.from('positions').select('*').order('at', { ascending: false }).limit(300);
+    if (!rows) return;
     const byProfile = new Map();
-    for (const p of data) if (!byProfile.has(p.profile_id)) byProfile.set(p.profile_id, p);
+    for (const p of rows) if (!byProfile.has(p.profile_id)) byProfile.set(p.profile_id, p);
     setLatest([...byProfile.values()]);
   }, [isLive]);
 
